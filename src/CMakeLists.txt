@@ -29,33 +29,6 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "(amd64)|(AMD64)|(x86_64)")
 	endif (USE_NATIVE_ARCH)
 endif ()
 
-add_subdirectory(../deps/NeuralAudio NeuralAudio)
-
-# --- nam_dsp: local DSP static lib (Biquad EQ, Depth, IR convolver) ---
-set(NAM_DSP_SOURCES
-	dsp/Biquad.cpp
-	dsp/Biquad.h
-	dsp/EQ.cpp
-	dsp/EQ.h
-	dsp/DepthFilter.cpp
-	dsp/DepthFilter.h
-	dsp/IRConvolver.cpp
-	dsp/IRConvolver.h
-	dsp/dr_wav.h
-	# FFTConvolver bundled sources (no CMakeLists upstream)
-	../deps/FFTConvolver/AudioFFT.cpp
-	../deps/FFTConvolver/FFTConvolver.cpp
-	../deps/FFTConvolver/TwoStageFFTConvolver.cpp
-	../deps/FFTConvolver/Utilities.cpp)
-
-add_library(nam_dsp STATIC ${NAM_DSP_SOURCES})
-target_include_directories(nam_dsp PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/dsp
-	${CMAKE_CURRENT_SOURCE_DIR}/../deps/FFTConvolver)
-set_target_properties(nam_dsp PROPERTIES
-	CXX_STANDARD 17
-	POSITION_INDEPENDENT_CODE ON)
-
 set(SOURCES nam_lv2.cpp
 	nam_plugin.cpp
 	nam_plugin.h)

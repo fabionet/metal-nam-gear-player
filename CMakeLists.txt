@@ -21,24 +21,58 @@ endif()
 
 set(NAM_LV2_ID http://github.com/mikeoliphant/neural-amp-modeler-lv2)
 
-add_subdirectory(src)
+option(NAM_BUILD_LV2_LEGACY "Build the original hand-written LV2 plugin" ON)
+option(NAM_BUILD_JUCE       "Build the JUCE-based plugin (VST3/LV2/Standalone)" ON)
 
+# --- Shared deps (NeuralAudio + nam_dsp static lib) used by both targets ---
+add_subdirectory(deps/NeuralAudio NeuralAudio)
 
-# create neural_amp_modeler.lv2
-add_custom_target(copy_binaries ALL
-	${CMAKE_COMMAND} -E copy "$<TARGET_FILE:neural_amp_modeler>" neural_amp_modeler.lv2/
-	DEPENDS neural_amp_modeler
-)
+set(NAM_DSP_SOURCES
+	src/dsp/Biquad.cpp
+	src/dsp/Biquad.h
+	src/dsp/EQ.cpp
+	src/dsp/EQ.h
+	src/dsp/DepthFilter.cpp
+	src/dsp/DepthFilter.h
+	src/dsp/IRConvolver.cpp
+	src/dsp/IRConvolver.h
+	src/dsp/dr_wav.h
+	deps/FFTConvolver/AudioFFT.cpp
+	deps/FFTConvolver/FFTConvolver.cpp
+	deps/FFTConvolver/TwoStageFFTConvolver.cpp
+	deps/FFTConvolver/Utilities.cpp)
 
-file(COPY resources/modgui.ttl DESTINATION neural_amp_modeler.lv2)
-file(COPY resources/modgui DESTINATION neural_amp_modeler.lv2)
+add_library(nam_dsp STATIC ${NAM_DSP_SOURCES})
+target_include_directories(nam_dsp PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/src/dsp
+	${CMAKE_CURRENT_SOURCE_DIR}/deps/FFTConvolver)
+set_target_properties(nam_dsp PROPERTIES
+	CXX_STANDARD 17
+	POSITION_INDEPENDENT_CODE ON)
 
-configure_file(resources/manifest.ttl.in neural_amp_modeler.lv2/manifest.ttl)
-configure_file(resources/neural_amp_modeler.ttl.in neural_amp_modeler.lv2/neural_amp_modeler.ttl)
+if(NAM_BUILD_LV2_LEGACY)
+	add_subdirectory(src)
 
-install (DIRECTORY ${CMAKE_BINARY_DIR}/neural_amp_modeler.lv2
-       DESTINATION ${LIB_INSTALL_DIR}/lv2
-)
+	# create neural_amp_modeler.lv2
+	add_custom_target(copy_binaries ALL
+		${CMAKE_COMMAND} -E copy "$<TARGET_FILE:neural_amp_modeler>" neural_amp_modeler.lv2/
+		DEPENDS neural_amp_modeler
+	)
+
+	file(COPY resources/modgui.ttl DESTINATION neural_amp_modeler.lv2)
+	file(COPY resources/modgui DESTINATION neural_amp_modeler.lv2)
+
+	configure_file(resources/manifest.ttl.in neural_amp_modeler.lv2/manifest.ttl)
+	configure_file(resources/neural_amp_modeler.ttl.in neural_amp_modeler.lv2/neural_amp_modeler.ttl)
+
+	install (DIRECTORY ${CMAKE_BINARY_DIR}/neural_amp_modeler.lv2
+		DESTINATION ${LIB_INSTALL_DIR}/lv2
+	)
+endif()
+
+if(NAM_BUILD_JUCE)
+	add_subdirectory(juce)
+endif()
 
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "oliphant@nostatic.org>")

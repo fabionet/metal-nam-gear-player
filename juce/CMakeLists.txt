@@ -1,0 +1,49 @@
+# JUCE-based plugin (VST3 + LV2 + Standalone) — wraps existing nam_dsp + NeuralAudio.
+# Stage 1: skeleton only — empty processor, host-generic UI.
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/JUCE JUCE)
+
+juce_add_plugin(NAMCustom
+    PRODUCT_NAME          "NAM Custom"
+    COMPANY_NAME          "fabionet"
+    BUNDLE_ID             "com.fabionet.namcustom"
+    PLUGIN_MANUFACTURER_CODE Fbnt
+    PLUGIN_CODE              Nmcu
+    FORMATS                  VST3 LV2 Standalone
+    LV2URI                   "https://github.com/mikeoliphant/neural-amp-modeler-lv2#namcustom-juce"
+    IS_SYNTH                 FALSE
+    NEEDS_MIDI_INPUT         FALSE
+    NEEDS_MIDI_OUTPUT        FALSE
+    COPY_PLUGIN_AFTER_BUILD  FALSE
+)
+
+target_sources(NAMCustom PRIVATE
+    PluginProcessor.cpp
+    PluginProcessor.h
+    PluginEditor.cpp
+    PluginEditor.h
+)
+
+target_compile_definitions(NAMCustom PUBLIC
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+)
+
+target_link_libraries(NAMCustom PRIVATE
+    nam_dsp
+    NeuralAudio
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_audio_processors
+    PRIVATE
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_lto_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_include_directories(NAMCustom PRIVATE
+    ${CMAKE_SOURCE_DIR}/deps/NeuralAudio
+    ${CMAKE_SOURCE_DIR}/deps/denormal
+)
