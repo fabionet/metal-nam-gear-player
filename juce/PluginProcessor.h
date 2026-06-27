@@ -1,13 +1,17 @@
-// Stage 1 skeleton — empty processor. NAMPipeline + APVTS will land in Stage 2/3.
+// Stage 3 — NAMAudioProcessor: APVTS + dual NAMPipeline + async model/IR loader.
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <atomic>
+#include <memory>
+
+#include "NAMPipeline.h"
 
 class NAMAudioProcessor : public juce::AudioProcessor
 {
 public:
     NAMAudioProcessor();
-    ~NAMAudioProcessor() override = default;
+    ~NAMAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -28,9 +32,41 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
-    void getStateInformation (juce::MemoryBlock&) override {}
-    void setStateInformation (const void*, int) override {}
+    void getStateInformation (juce::MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
+
+    // --- File loading (called from UI thread, runs on ThreadPool) ---
+    void loadModelAsync (const juce::File& f);
+    void loadIRAsync    (const juce::File& f);
+    void clearModel();
+    void clearIR();
+
+    juce::String getCurrentModelPath() const { return currentModelPath_; }
+    juce::String getCurrentIRPath()    const { return currentIRPath_;    }
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
+    // Two pipelines for 3 channel modes (mono mirror / dual-mono / stereo split).
+    std::unique_ptr<NAMPipeline> pipelineL_;
+    std::unique_ptr<NAMPipeline> pipelineR_;
+
+    // Pending swap slots: worker fills, audio thread consumes.
+    std::atomic<NAMPipeline*> pendingL_ { nullptr };
+    std::atomic<NAMPipeline*> pendingR_ { nullptr };
+
+    juce::ThreadPool loaderPool_ { 1 };
+
+    juce::String currentModelPath_;
+    juce::String currentIRPath_;
+
+    double sampleRate_  = 48000.0;
+    int    blockSize_   = 512;
+
+    void pushParametersToPipelines();
+    void consumePendingSwaps();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NAMAudioProcessor)
 };
