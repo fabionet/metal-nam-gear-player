@@ -22,6 +22,8 @@ target_sources(NAMCustom PRIVATE
     PluginProcessor.h
     PluginEditor.cpp
     PluginEditor.h
+    NAMPipeline.cpp
+    NAMPipeline.h
 )
 
 target_compile_definitions(NAMCustom PUBLIC
