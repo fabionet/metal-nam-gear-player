@@ -25,9 +25,11 @@
 
 #include "dsp/EQ.h"
 #include "dsp/DepthFilter.h"
+#include "dsp/IRConvolver.h"
 
 #define PlUGIN_URI "http://github.com/mikeoliphant/neural-amp-modeler-lv2"
 #define MODEL_URI PlUGIN_URI "#model"
+#define IR_URI    PlUGIN_URI "#ir"
 
 namespace NAM {
 	static constexpr unsigned int MAX_FILE_NAME = 1024;
@@ -35,7 +37,10 @@ namespace NAM {
 	enum LV2WorkType {
 		kWorkTypeLoad,
 		kWorkTypeSwitch,
-		kWorkTypeFree
+		kWorkTypeFree,
+		kWorkTypeLoadIR,
+		kWorkTypeSwitchIR,
+		kWorkTypeFreeIR
 	};
 
 	struct LV2LoadModelMsg {
@@ -54,6 +59,24 @@ namespace NAM {
 		LV2WorkType type;
 		NeuralAudio::NeuralModel* model;
 		NeuralAudio::NeuralModel* model_r;
+	};
+
+	struct LV2LoadIRMsg {
+		LV2WorkType type;
+		char path[MAX_FILE_NAME];
+	};
+
+	struct LV2SwitchIRMsg {
+		LV2WorkType type;
+		char path[MAX_FILE_NAME];
+		nam_dsp::IRConvolver* ir;
+		nam_dsp::IRConvolver* ir_r;
+	};
+
+	struct LV2FreeIRMsg {
+		LV2WorkType type;
+		nam_dsp::IRConvolver* ir;
+		nam_dsp::IRConvolver* ir_r;
 	};
 
 	class Plugin {
@@ -93,6 +116,9 @@ namespace NAM {
 		NeuralAudio::NeuralModel* currentModel = nullptr;
 		NeuralAudio::NeuralModel* currentModelR = nullptr;
 		std::string currentModelPath;
+		nam_dsp::IRConvolver* currentIR = nullptr;
+		nam_dsp::IRConvolver* currentIRR = nullptr;
+		std::string currentIRPath;
 		float prevDCInput = 0;
 		float prevDCOutput = 0;
 		float qualityScale = 1.0f;
@@ -120,6 +146,7 @@ namespace NAM {
 		void process(uint32_t n_samples) noexcept;
 
 		void write_current_path();
+		void write_current_ir_path();
 
 		static uint32_t options_get(LV2_Handle instance, LV2_Options_Option* options);
 		static uint32_t options_set(LV2_Handle instance, const LV2_Options_Option* options);
@@ -147,6 +174,7 @@ namespace NAM {
 			LV2_URID patch_value;
 			LV2_URID units_frame;
 			LV2_URID model_Path;
+			LV2_URID ir_Path;
 		};
 
 		URIs uris = {};

@@ -16,6 +16,7 @@ namespace NAM {
 	{
 		// prevent allocations on the audio thread
 		currentModelPath.reserve(MAX_FILE_NAME + 1);
+		currentIRPath.reserve(MAX_FILE_NAME + 1);
 
 		bypassThresholdLinear = powf(10, BYPASS_DB_THRESHOLD * 0.05f);
 
@@ -40,6 +41,8 @@ namespace NAM {
 	{
 		delete currentModel;
 		delete currentModelR;
+		delete currentIR;
+		delete currentIRR;
 	}
 
 	bool Plugin::initialize(double sampleRate, const LV2_Feature* const* features) noexcept
@@ -94,6 +97,7 @@ namespace NAM {
 		uris.units_frame = map->map(map->handle, LV2_UNITS__frame);
 
 		uris.model_Path = map->map(map->handle, MODEL_URI);
+		uris.ir_Path = map->map(map->handle, IR_URI);
 
 		if (options != nullptr)
 			options_set(this, options);
@@ -179,7 +183,77 @@ namespace NAM {
 				return LV2_WORKER_SUCCESS;
 			}
 
+			case kWorkTypeLoadIR:
+			{
+				auto msg = static_cast<const LV2LoadIRMsg*>(data);
+				auto nam = static_cast<NAM::Plugin*>(instance);
+
+				nam_dsp::IRConvolver* ir = nullptr;
+				nam_dsp::IRConvolver* ir_r = nullptr;
+				LV2SwitchIRMsg response = { kWorkTypeSwitchIR, {}, {}, {} };
+
+				const size_t pathlen = strlen(msg->path);
+				if (pathlen > 0 && pathlen < MAX_FILE_NAME)
+				{
+					lv2_log_trace(&nam->logger, "Staging IR change: `%s`\n", msg->path);
+					try
+					{
+						ir = new nam_dsp::IRConvolver();
+						if (!ir->loadFromFile(msg->path, nam->sampleRate))
+						{
+							delete ir;
+							ir = nullptr;
+						}
+						else
+						{
+							ir->prepare(64, 4096);
+							ir_r = new nam_dsp::IRConvolver();
+							if (!ir_r->loadFromFile(msg->path, nam->sampleRate))
+							{
+								delete ir_r;
+								ir_r = nullptr;
+							}
+							else
+							{
+								ir_r->prepare(64, 4096);
+							}
+						}
+					}
+					catch (const std::exception&)
+					{
+						delete ir; ir = nullptr;
+						delete ir_r; ir_r = nullptr;
+					}
+				}
+
+				if (ir != nullptr)
+				{
+					response.ir = ir;
+					response.ir_r = ir_r;
+					memcpy(response.path, msg->path, pathlen);
+				}
+				else
+				{
+					if (ir_r) { delete ir_r; ir_r = nullptr; }
+					response.path[0] = '\0';
+					if (pathlen > 0)
+						lv2_log_error(&nam->logger, "Unable to load IR from: '%s'\n", msg->path);
+				}
+
+				respond(handle, sizeof(response), &response);
+				return LV2_WORKER_SUCCESS;
+			}
+
+			case kWorkTypeFreeIR:
+			{
+				auto msg = static_cast<const LV2FreeIRMsg*>(data);
+				delete msg->ir;
+				delete msg->ir_r;
+				return LV2_WORKER_SUCCESS;
+			}
+
 			case kWorkTypeSwitch:
+			case kWorkTypeSwitchIR:
 				// should not happen!
 				break;
 		}
@@ -190,7 +264,24 @@ namespace NAM {
 	// runs on RT, right after process(), must not block or [de]allocate memory
 	LV2_Worker_Status Plugin::work_response(LV2_Handle instance, uint32_t size,	const void* data)
 	{
-		if (*(const LV2WorkType*)data != kWorkTypeSwitch)
+		auto workType = *(const LV2WorkType*)data;
+
+		if (workType == kWorkTypeSwitchIR)
+		{
+			auto msg = static_cast<const LV2SwitchIRMsg*>(data);
+			auto nam = static_cast<NAM::Plugin*>(instance);
+
+			LV2FreeIRMsg reply = { kWorkTypeFreeIR, nam->currentIR, nam->currentIRR };
+			nam->currentIR = msg->ir;
+			nam->currentIRR = msg->ir_r;
+			nam->currentIRPath = msg->path;
+
+			nam->schedule->schedule_work(nam->schedule->handle, sizeof(reply), &reply);
+			nam->write_current_ir_path();
+			return LV2_WORKER_SUCCESS;
+		}
+
+		if (workType != kWorkTypeSwitch)
 			return LV2_WORKER_ERR_UNKNOWN;
 
 		auto msg = static_cast<const LV2SwitchModelMsg*>(data);
@@ -246,6 +337,7 @@ namespace NAM {
 				if (obj->body.otype == uris.patch_Get)
 				{
 					write_current_path();
+					write_current_ir_path();
 				}
 				else if (obj->body.otype == uris.patch_Set)
 				{
@@ -258,13 +350,22 @@ namespace NAM {
 					                    0);
 
 					if (property && property->type == uris.atom_URID &&
-						((const LV2_Atom_URID*)property)->body == uris.model_Path &&
 						file_path && file_path->type == uris.atom_Path &&
 						file_path->size > 0 && file_path->size < MAX_FILE_NAME)
 					{
-						LV2LoadModelMsg msg = { kWorkTypeLoad, {} };
-						memcpy(msg.path, file_path + 1, file_path->size);
-						schedule->schedule_work(schedule->handle, sizeof(msg), &msg);
+						const LV2_URID propURID = ((const LV2_Atom_URID*)property)->body;
+						if (propURID == uris.model_Path)
+						{
+							LV2LoadModelMsg msg = { kWorkTypeLoad, {} };
+							memcpy(msg.path, file_path + 1, file_path->size);
+							schedule->schedule_work(schedule->handle, sizeof(msg), &msg);
+						}
+						else if (propURID == uris.ir_Path)
+						{
+							LV2LoadIRMsg msg = { kWorkTypeLoadIR, {} };
+							memcpy(msg.path, file_path + 1, file_path->size);
+							schedule->schedule_work(schedule->handle, sizeof(msg), &msg);
+						}
 					}
 				}
 			}
@@ -420,6 +521,12 @@ namespace NAM {
 			}
 		}
 
+		// IR convolver (cab simulation, post-EQ)
+		if (currentIR != nullptr && currentIR->isReady())
+		{
+			currentIR->process(ports.audio_out_l, ports.audio_out_l, n_samples);
+		}
+
 		// Convert output level from db
 		float desiredOutputLevel = powf(10, (*(ports.output_level) + modelLoudnessAdjustmentDB) * 0.05f);
 
@@ -469,6 +576,12 @@ namespace NAM {
 				// 5-band EQ — channel 1
 				for (unsigned int i = 0; i < n_samples; i++)
 					ports.audio_out_r[i] = eq.processSample(1, ports.audio_out_r[i]);
+
+				// IR convolver — channel R (independent instance)
+				if (currentIRR != nullptr && currentIRR->isReady())
+				{
+					currentIRR->process(ports.audio_out_r, ports.audio_out_r, n_samples);
+				}
 
 				// Output gain
 				for (unsigned int i = 0; i < n_samples; i++)
@@ -562,6 +675,22 @@ namespace NAM {
 #endif
 		}
 
+		// Save IR path too (if loaded)
+		if (!nam->currentIRPath.empty())
+		{
+			char* iapath = map_path->abstract_path(map_path->handle, nam->currentIRPath.c_str());
+			store(handle, nam->uris.ir_Path, iapath, strlen(iapath) + 1, nam->uris.atom_Path,
+				LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+			if (free_path != nullptr)
+				free_path->free_path(free_path->handle, iapath);
+			else
+			{
+#ifndef _WIN32
+				free(iapath);
+#endif
+			}
+		}
+
 		return LV2_STATE_SUCCESS;
 	}
 
@@ -636,6 +765,40 @@ namespace NAM {
 			nam->currentModelPath = msg.path;
 		}
 
+		// Restore IR path (if present)
+		{
+			size_t   ir_size = 0;
+			uint32_t ir_type = 0;
+			uint32_t ir_flags = 0;
+			const void* ir_val = retrieve(handle, nam->uris.ir_Path, &ir_size, &ir_type, &ir_flags);
+
+			if (ir_val && ir_type == nam->uris.atom_Path)
+			{
+				LV2_State_Map_Path* map_path = (LV2_State_Map_Path*)lv2_features_data(features, LV2_STATE__mapPath);
+				if (map_path != nullptr)
+				{
+					char* ir_abs = map_path->absolute_path(map_path->handle, (const char*)ir_val);
+					size_t ir_len = strlen(ir_abs);
+					if (ir_len < MAX_FILE_NAME)
+					{
+						NAM::LV2LoadIRMsg ir_msg = { NAM::kWorkTypeLoadIR, {} };
+						memcpy(ir_msg.path, ir_abs, ir_len);
+						nam->schedule->schedule_work(nam->schedule->handle, sizeof(ir_msg), &ir_msg);
+						nam->currentIRPath = ir_msg.path;
+					}
+					LV2_State_Free_Path* free_path = (LV2_State_Free_Path*)lv2_features_data(features, LV2_STATE__freePath);
+					if (free_path != nullptr)
+						free_path->free_path(free_path->handle, ir_abs);
+					else
+					{
+#ifndef _WIN32
+						free(ir_abs);
+#endif
+					}
+				}
+			}
+		}
+
 		return result;
 	}
 
@@ -650,6 +813,21 @@ namespace NAM {
 		lv2_atom_forge_urid(&atom_forge, uris.model_Path);
 		lv2_atom_forge_key(&atom_forge, uris.patch_value);
 		lv2_atom_forge_path(&atom_forge, currentModelPath.c_str(), (uint32_t)currentModelPath.length() + 1);
+
+		lv2_atom_forge_pop(&atom_forge, &frame);
+	}
+
+	void Plugin::write_current_ir_path()
+	{
+		LV2_Atom_Forge_Frame frame;
+
+		lv2_atom_forge_frame_time(&atom_forge, 0);
+		lv2_atom_forge_object(&atom_forge, &frame, 0, uris.patch_Set);
+
+		lv2_atom_forge_key(&atom_forge, uris.patch_property);
+		lv2_atom_forge_urid(&atom_forge, uris.ir_Path);
+		lv2_atom_forge_key(&atom_forge, uris.patch_value);
+		lv2_atom_forge_path(&atom_forge, currentIRPath.c_str(), (uint32_t)currentIRPath.length() + 1);
 
 		lv2_atom_forge_pop(&atom_forge, &frame);
 	}
