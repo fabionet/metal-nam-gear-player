@@ -284,7 +284,7 @@ namespace NAM {
 			{
 				for (unsigned int i = 0; i < n_samples; i++)
 				{
-					if (abs(ports.audio_in[i]) <= bypassThresholdLinear)
+					if (abs(ports.audio_in_l[i]) <= bypassThresholdLinear)
 					{
 						silentSamples++;
 					}
@@ -300,9 +300,13 @@ namespace NAM {
 
 					if (smartBypassed)
 					{
+						int bypassMode = (int)*(ports.channel_mode);
 						for (unsigned int i = 0; i < n_samples; i++)
 						{
-							ports.audio_out[i] = ports.audio_in[i];
+							ports.audio_out_l[i] = ports.audio_in_l[i];
+							ports.audio_out_r[i] = (bypassMode == 2)
+								? ports.audio_in_r[i]
+								: ports.audio_in_l[i];
 						}
 
 						return;
@@ -327,7 +331,7 @@ namespace NAM {
 				// do very basic smoothing
 				level = (.99f * level) + (.01f * desiredInputLevel);
 
-				ports.audio_out[i] = ports.audio_in[i] * level;
+				ports.audio_out_l[i] = ports.audio_in_l[i] * level;
 			}
 
 			inputLevel = level;
@@ -338,7 +342,7 @@ namespace NAM {
 
 			for (unsigned int i = 0; i < n_samples; i++)
 			{
-				ports.audio_out[i] = ports.audio_in[i] * level;
+				ports.audio_out_l[i] = ports.audio_in_l[i] * level;
 			}
 		}
 
@@ -346,7 +350,7 @@ namespace NAM {
 
 		if (currentModel != nullptr)
 		{
-			currentModel->Process(ports.audio_out, ports.audio_out, n_samples);
+			currentModel->Process(ports.audio_out_l, ports.audio_out_l, n_samples);
 
 			modelLoudnessAdjustmentDB = currentModel->GetRecommendedOutputDBAdjustment();
 		}
@@ -365,7 +369,7 @@ namespace NAM {
 			}
 			for (unsigned int i = 0; i < n_samples; i++)
 			{
-				ports.audio_out[i] = depthFilter.processSample(0, ports.audio_out[i]);
+				ports.audio_out_l[i] = depthFilter.processSample(0, ports.audio_out_l[i]);
 			}
 		}
 
@@ -394,7 +398,7 @@ namespace NAM {
 
 			for (unsigned int i = 0; i < n_samples; i++)
 			{
-				ports.audio_out[i] = eq.processSample(0, ports.audio_out[i]);
+				ports.audio_out_l[i] = eq.processSample(0, ports.audio_out_l[i]);
 			}
 		}
 
@@ -410,7 +414,7 @@ namespace NAM {
 				// do very basic smoothing
 				level = (.99f * level) + (.01f * desiredOutputLevel);
 
-				ports.audio_out[i] = ports.audio_out[i] * outputLevel;
+				ports.audio_out_l[i] = ports.audio_out_l[i] * outputLevel;
 			}
 
 			outputLevel = level;
@@ -421,7 +425,25 @@ namespace NAM {
 
 			for (unsigned int i = 0; i < n_samples; i++)
 			{
-				ports.audio_out[i] = ports.audio_out[i] * level;
+				ports.audio_out_l[i] = ports.audio_out_l[i] * level;
+			}
+		}
+
+		// Channel routing — fan L into R based on channel_mode
+		//   0 = Mono:         R_out mirrors L_out (processed)
+		//   1 = Dual-Mono:    placeholder (mirrors L_out); true dual-mono needs a 2nd model instance (Stage 3d)
+		//   2 = Split-Stereo: R_out = R_in dry (unprocessed)
+		{
+			int mode = (int)*(ports.channel_mode);
+			if (mode == 2)
+			{
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] = ports.audio_in_r[i];
+			}
+			else
+			{
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] = ports.audio_out_l[i];
 			}
 		}
 
@@ -429,13 +451,13 @@ namespace NAM {
 
 		//for (unsigned int i = 0; i < n_samples; i++)
 		//{
-		//	float dcInput = ports.audio_out[i];
+		//	float dcInput = ports.audio_out_l[i];
 
 		//	// dc blocker
-		//	ports.audio_out[i] = ports.audio_out[i] - prevDCInput + dcBlockCoefficient * prevDCOutput;
+		//	ports.audio_out_l[i] = ports.audio_out_l[i] - prevDCInput + dcBlockCoefficient * prevDCOutput;
 
 		//	prevDCInput = dcInput;
-		//	prevDCOutput = ports.audio_out[i];
+		//	prevDCOutput = ports.audio_out_l[i];
 		//}
 	}
 

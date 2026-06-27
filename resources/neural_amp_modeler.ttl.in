@@ -73,13 +73,13 @@ A large collection of models is available at https://www.tone3000.com
 	lv2:port [
 		a lv2:InputPort, lv2:AudioPort;
 		lv2:index 2;
-		lv2:symbol "input";
-		lv2:name "Input";
+		lv2:symbol "input_l";
+		lv2:name "Input L";
 	], [
 		a lv2:OutputPort, lv2:AudioPort;
 		lv2:index 3;
-		lv2:symbol "output";
-		lv2:name "Output";
+		lv2:symbol "output_l";
+		lv2:name "Output L";
 	];
 
 	# Parameters
@@ -198,4 +198,26 @@ A large collection of models is available at https://www.tone3000.com
 		lv2:minimum 60.0;
 		lv2:maximum 250.0;
 		units:unit units:hz;
+	], [
+		a lv2:InputPort, lv2:AudioPort;
+		lv2:index 17;
+		lv2:symbol "input_r";
+		lv2:name "Input R";
+	], [
+		a lv2:OutputPort, lv2:AudioPort;
+		lv2:index 18;
+		lv2:symbol "output_r";
+		lv2:name "Output R";
+	], [
+		a lv2:ControlPort, lv2:InputPort;
+		lv2:index 19;
+		lv2:symbol "channel_mode";
+		lv2:name "Channel Mode";
+		lv2:default 0;
+		lv2:minimum 0;
+		lv2:maximum 2;
+		lv2:portProperty lv2:integer, lv2:enumeration;
+		lv2:scalePoint [ rdfs:label "Mono";          rdf:value 0 ];
+		lv2:scalePoint [ rdfs:label "Dual-Mono";     rdf:value 1 ];
+		lv2:scalePoint [ rdfs:label "Split-Stereo";  rdf:value 2 ];
 	].

@@ -59,8 +59,8 @@ namespace NAM {
 		struct Ports {
 			const LV2_Atom_Sequence* control;
 			LV2_Atom_Sequence* notify;
-			const float* audio_in;
-			float* audio_out;
+			const float* audio_in_l;
+			float* audio_out_l;
 			float* input_level;
 			float* output_level;
 			float* quality_scale;
@@ -74,6 +74,9 @@ namespace NAM {
 			float* depth;
 			float* resonance;
 			float* resonance_freq;
+			const float* audio_in_r;
+			float* audio_out_r;
+			float* channel_mode;
 		};
 
 		Ports ports = {};
