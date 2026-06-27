@@ -24,6 +24,7 @@
 #include <NeuralAudio/NeuralModel.h>
 
 #include "dsp/EQ.h"
+#include "dsp/DepthFilter.h"
 
 #define PlUGIN_URI "http://github.com/mikeoliphant/neural-amp-modeler-lv2"
 #define MODEL_URI PlUGIN_URI "#model"
@@ -70,6 +71,9 @@ namespace NAM {
 			float* eq_presence;
 			float* eq_treble;
 			float* eq_air;
+			float* depth;
+			float* resonance;
+			float* resonance_freq;
 		};
 
 		Ports ports = {};
@@ -95,6 +99,11 @@ namespace NAM {
 		float eqPresCached = 0.f;
 		float eqTreCached = 0.f;
 		float eqAirCached = 0.f;
+
+		nam_dsp::DepthFilter depthFilter;
+		float depthCached = 0.f;
+		float resCached = 0.f;
+		float resFreqCached = 100.f;
 
 		Plugin();
 		~Plugin();

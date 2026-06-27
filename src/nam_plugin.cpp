@@ -98,6 +98,7 @@ namespace NAM {
 			options_set(this, options);
 
 		eq.prepare(sampleRate, 1);
+		depthFilter.prepare(sampleRate, 1);
 
 		return true;
 	}
@@ -350,7 +351,25 @@ namespace NAM {
 			modelLoudnessAdjustmentDB = currentModel->GetRecommendedOutputDBAdjustment();
 		}
 
-		// 5-band EQ (post-model, pre-output-gain)
+		// Depth + Resonance (Mesa-style power-amp shaping, post-model, pre-EQ)
+		{
+			float d = *(ports.depth);
+			if (d != depthCached) { depthFilter.setDepth(d); depthCached = d; }
+			float r = *(ports.resonance);
+			float rf = *(ports.resonance_freq);
+			if (r != resCached || rf != resFreqCached)
+			{
+				depthFilter.setResonance(r, rf);
+				resCached = r;
+				resFreqCached = rf;
+			}
+			for (unsigned int i = 0; i < n_samples; i++)
+			{
+				ports.audio_out[i] = depthFilter.processSample(0, ports.audio_out[i]);
+			}
+		}
+
+		// 5-band EQ (post-depth, pre-output-gain)
 		{
 			float v;
 			v = *(ports.eq_bass);
