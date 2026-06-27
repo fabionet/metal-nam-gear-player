@@ -39,6 +39,7 @@ namespace NAM {
 	Plugin::~Plugin()
 	{
 		delete currentModel;
+		delete currentModelR;
 	}
 
 	bool Plugin::initialize(double sampleRate, const LV2_Feature* const* features) noexcept
@@ -97,8 +98,8 @@ namespace NAM {
 		if (options != nullptr)
 			options_set(this, options);
 
-		eq.prepare(sampleRate, 1);
-		depthFilter.prepare(sampleRate, 1);
+		eq.prepare(sampleRate, 2);
+		depthFilter.prepare(sampleRate, 2);
 
 		return true;
 	}
@@ -115,7 +116,8 @@ namespace NAM {
 				auto nam = static_cast<NAM::Plugin*>(instance);
 
 				NeuralAudio::NeuralModel* model = nullptr;
-				LV2SwitchModelMsg response = { kWorkTypeSwitch, {}, {} };
+				NeuralAudio::NeuralModel* model_r = nullptr;
+				LV2SwitchModelMsg response = { kWorkTypeSwitch, {}, {}, {} };
 				LV2_Worker_Status result = LV2_WORKER_SUCCESS;
 
 				try
@@ -134,13 +136,22 @@ namespace NAM {
 						lv2_log_trace(&nam->logger, "Staging model change: `%s`\n", msg->path);
 
 						model = nam->loader.CreateFromFile(msg->path);
+						// Load a second independent instance for true dual-mono (right channel)
+						model_r = nam->loader.CreateFromFile(msg->path);
 					}
 
 					if (model != nullptr)
 					{
 						response.model = model;
+						response.model_r = model_r;
 
 						memcpy(response.path, msg->path, pathlen);
+					}
+					else if (model_r != nullptr)
+					{
+						// L failed but R loaded — discard R to keep both nullptr
+						delete model_r;
+						model_r = nullptr;
 					}
 				}
 				catch (const std::exception&)
@@ -163,6 +174,7 @@ namespace NAM {
 			{
 				auto msg = static_cast<const LV2FreeModelMsg*>(data);
 				delete msg->model;
+				delete msg->model_r;
 
 				return LV2_WORKER_SUCCESS;
 			}
@@ -184,11 +196,12 @@ namespace NAM {
 		auto msg = static_cast<const LV2SwitchModelMsg*>(data);
 		auto nam = static_cast<NAM::Plugin*>(instance);
 
-		// prepare reply for deleting old model
-		LV2FreeModelMsg reply = { kWorkTypeFree, nam->currentModel };
+		// prepare reply for deleting old models
+		LV2FreeModelMsg reply = { kWorkTypeFree, nam->currentModel, nam->currentModelR };
 
-		// swap current model with new one
+		// swap current models with new ones
 		nam->currentModel = msg->model;
+		nam->currentModelR = msg->model_r;
 		nam->currentModelPath = msg->path;
 		assert(nam->currentModelPath.capacity() >= MAX_FILE_NAME + 1);
 
@@ -267,6 +280,10 @@ namespace NAM {
 			{
 				currentModel->SetQualityScaleFactor(qualityScale);
 			}
+			if (currentModelR != nullptr)
+			{
+				currentModelR->SetQualityScaleFactor(qualityScale);
+			}
 		}
 
 		float level;
@@ -304,9 +321,10 @@ namespace NAM {
 						for (unsigned int i = 0; i < n_samples; i++)
 						{
 							ports.audio_out_l[i] = ports.audio_in_l[i];
-							ports.audio_out_r[i] = (bypassMode == 2)
-								? ports.audio_in_r[i]
-								: ports.audio_in_l[i];
+							// Mono: mirror L; Dual-Mono / Split-Stereo: pass R input dry
+							ports.audio_out_r[i] = (bypassMode == 0)
+								? ports.audio_in_l[i]
+								: ports.audio_in_r[i];
 						}
 
 						return;
@@ -429,13 +447,34 @@ namespace NAM {
 			}
 		}
 
-		// Channel routing — fan L into R based on channel_mode
-		//   0 = Mono:         R_out mirrors L_out (processed)
-		//   1 = Dual-Mono:    placeholder (mirrors L_out); true dual-mono needs a 2nd model instance (Stage 3d)
+		// Channel routing for R out — depends on channel_mode
+		//   0 = Mono:         R_out mirrors fully-processed L_out
+		//   1 = Dual-Mono:    R processed independently through 2nd model instance + per-channel DSP state
 		//   2 = Split-Stereo: R_out = R_in dry (unprocessed)
 		{
 			int mode = (int)*(ports.channel_mode);
-			if (mode == 2)
+			if (mode == 1 && currentModelR != nullptr)
+			{
+				// Input gain (use settled inputLevel from L pipeline; no separate smoothing)
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] = ports.audio_in_r[i] * inputLevel;
+
+				// Model R (independent state)
+				currentModelR->Process(ports.audio_out_r, ports.audio_out_r, n_samples);
+
+				// Depth+Resonance — channel 1
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] = depthFilter.processSample(1, ports.audio_out_r[i]);
+
+				// 5-band EQ — channel 1
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] = eq.processSample(1, ports.audio_out_r[i]);
+
+				// Output gain
+				for (unsigned int i = 0; i < n_samples; i++)
+					ports.audio_out_r[i] *= outputLevel;
+			}
+			else if (mode == 2)
 			{
 				for (unsigned int i = 0; i < n_samples; i++)
 					ports.audio_out_r[i] = ports.audio_in_r[i];

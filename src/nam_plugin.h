@@ -47,11 +47,13 @@ namespace NAM {
 		LV2WorkType type;
 		char path[MAX_FILE_NAME];
 		NeuralAudio::NeuralModel* model;
+		NeuralAudio::NeuralModel* model_r;
 	};
 
 	struct LV2FreeModelMsg {
 		LV2WorkType type;
 		NeuralAudio::NeuralModel* model;
+		NeuralAudio::NeuralModel* model_r;
 	};
 
 	class Plugin {
@@ -89,6 +91,7 @@ namespace NAM {
 
 		NeuralAudio::NeuralModelLoader loader;
 		NeuralAudio::NeuralModel* currentModel = nullptr;
+		NeuralAudio::NeuralModel* currentModelR = nullptr;
 		std::string currentModelPath;
 		float prevDCInput = 0;
 		float prevDCOutput = 0;
