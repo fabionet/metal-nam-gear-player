@@ -97,6 +97,8 @@ namespace NAM {
 		if (options != nullptr)
 			options_set(this, options);
 
+		eq.prepare(sampleRate, 1);
+
 		return true;
 	}
 
@@ -346,6 +348,35 @@ namespace NAM {
 			currentModel->Process(ports.audio_out, ports.audio_out, n_samples);
 
 			modelLoudnessAdjustmentDB = currentModel->GetRecommendedOutputDBAdjustment();
+		}
+
+		// 5-band EQ (post-model, pre-output-gain)
+		{
+			float v;
+			v = *(ports.eq_bass);
+			if (v != eqBassCached) { eq.setBass(v); eqBassCached = v; }
+			v = *(ports.eq_presence);
+			if (v != eqPresCached) { eq.setPresence(v); eqPresCached = v; }
+			v = *(ports.eq_treble);
+			if (v != eqTreCached) { eq.setTreble(v); eqTreCached = v; }
+			v = *(ports.eq_air);
+			if (v != eqAirCached) { eq.setAir(v); eqAirCached = v; }
+
+			float mf = *(ports.eq_mid_freq);
+			float mq = *(ports.eq_mid_q);
+			float mg = *(ports.eq_mid_gain);
+			if (mf != eqMidFreqCached || mq != eqMidQCached || mg != eqMidGainCached)
+			{
+				eq.setMid(mf, mq, mg);
+				eqMidFreqCached = mf;
+				eqMidQCached = mq;
+				eqMidGainCached = mg;
+			}
+
+			for (unsigned int i = 0; i < n_samples; i++)
+			{
+				ports.audio_out[i] = eq.processSample(0, ports.audio_out[i]);
+			}
 		}
 
 		// Convert output level from db

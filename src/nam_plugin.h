@@ -23,6 +23,8 @@
 
 #include <NeuralAudio/NeuralModel.h>
 
+#include "dsp/EQ.h"
+
 #define PlUGIN_URI "http://github.com/mikeoliphant/neural-amp-modeler-lv2"
 #define MODEL_URI PlUGIN_URI "#model"
 
@@ -61,6 +63,13 @@ namespace NAM {
 			float* input_level;
 			float* output_level;
 			float* quality_scale;
+			float* eq_bass;
+			float* eq_mid_freq;
+			float* eq_mid_q;
+			float* eq_mid_gain;
+			float* eq_presence;
+			float* eq_treble;
+			float* eq_air;
 		};
 
 		Ports ports = {};
@@ -77,6 +86,15 @@ namespace NAM {
 		float prevDCInput = 0;
 		float prevDCOutput = 0;
 		float qualityScale = 1.0f;
+
+		nam_dsp::FiveBandEQ eq;
+		float eqBassCached = 0.f;
+		float eqMidFreqCached = 700.f;
+		float eqMidQCached = 0.707f;
+		float eqMidGainCached = 0.f;
+		float eqPresCached = 0.f;
+		float eqTreCached = 0.f;
+		float eqAirCached = 0.f;
 
 		Plugin();
 		~Plugin();
