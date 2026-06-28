@@ -338,9 +338,10 @@ void NAMAudioProcessorEditor::resized()
                 knobs_[gr.ids[i]]->slider.setBounds (cell);
             }
         } else {
-            const int cellW = inside.getWidth() / (int) gr.ids.size();
+            // Vertical stack — one knob per row, full panel width.
+            const int cellH = inside.getHeight() / (int) gr.ids.size();
             for (int idx : gr.ids) {
-                auto cell = inside.removeFromLeft (cellW).reduced (3);
+                auto cell = inside.removeFromTop (cellH).reduced (4, 3);
                 auto lab = cell.removeFromTop (12);
                 knobs_[idx]->label.setBounds (lab);
                 knobs_[idx]->slider.setBounds (cell);
