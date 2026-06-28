@@ -19,6 +19,22 @@ namespace ids {
     constexpr auto irMix         = "ir_mix";
     constexpr auto irBypass      = "ir_bypass";
     constexpr auto modelBypass   = "model_bypass";
+    // Pre-FX
+    constexpr auto gateThresh    = "gate_threshold";
+    constexpr auto gateRelease   = "gate_release";
+    constexpr auto gateBypass    = "gate_bypass";
+    constexpr auto odDrive       = "od_drive";
+    constexpr auto odTone        = "od_tone";
+    constexpr auto odLevel       = "od_level";
+    constexpr auto odBypass      = "od_bypass";
+    constexpr auto distDrive     = "dist_drive";
+    constexpr auto distTone      = "dist_tone";
+    constexpr auto distLevel     = "dist_level";
+    constexpr auto distBypass    = "dist_bypass";
+    constexpr auto hpFreq        = "hp_freq";
+    constexpr auto hpBypass      = "hp_bypass";
+    constexpr auto lnEnabled     = "ln_enabled";
+    constexpr auto lnTargetDB    = "ln_target_db";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -47,6 +63,25 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
+
+    // Pre-FX
+    add (std::make_unique<P>(juce::ParameterID{ids::gateThresh,1},  "Gate Threshold", juce::NormalisableRange<float>(-80.f, 0.f, 0.1f), -60.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::gateRelease,1}, "Gate Release",   juce::NormalisableRange<float>(10.f, 500.f, 1.f), 80.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::gateBypass,1},  "Gate Bypass",    false));
+    add (std::make_unique<P>(juce::ParameterID{ids::odDrive,1},     "OD Drive",       juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.3f));
+    add (std::make_unique<P>(juce::ParameterID{ids::odTone,1},      "OD Tone",        juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::odLevel,1},     "OD Level",       juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::odBypass,1},    "OD Bypass",      true));
+    add (std::make_unique<P>(juce::ParameterID{ids::distDrive,1},   "Dist Drive",     juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.4f));
+    add (std::make_unique<P>(juce::ParameterID{ids::distTone,1},    "Dist Tone",      juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::distLevel,1},   "Dist Level",     juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::distBypass,1},  "Dist Bypass",    true));
+
+    // Master post-cab
+    add (std::make_unique<P>(juce::ParameterID{ids::hpFreq,1},    "HP Freq",   juce::NormalisableRange<float>(10.f, 200.f, 0.5f, 0.5f), 30.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::hpBypass,1},  "HP Bypass", false));
+    add (std::make_unique<B>(juce::ParameterID{ids::lnEnabled,1}, "LN On",     false));
+    add (std::make_unique<P>(juce::ParameterID{ids::lnTargetDB,1},"LN Target", juce::NormalisableRange<float>(-30.f, -6.f, 0.1f), -18.f));
     return layout;
 }
 
@@ -104,6 +139,22 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const bool  irBp = apvts.getRawParameterValue (ids::irBypass)->load() > 0.5f;
     const bool  mdBp = apvts.getRawParameterValue (ids::modelBypass)->load() > 0.5f;
 
+    const float gT  = apvts.getRawParameterValue (ids::gateThresh)->load();
+    const float gR  = apvts.getRawParameterValue (ids::gateRelease)->load();
+    const bool  gBp = apvts.getRawParameterValue (ids::gateBypass)->load() > 0.5f;
+    const float odD = apvts.getRawParameterValue (ids::odDrive)->load();
+    const float odT = apvts.getRawParameterValue (ids::odTone)->load();
+    const float odL = apvts.getRawParameterValue (ids::odLevel)->load();
+    const bool  odBp= apvts.getRawParameterValue (ids::odBypass)->load() > 0.5f;
+    const float dsD = apvts.getRawParameterValue (ids::distDrive)->load();
+    const float dsT = apvts.getRawParameterValue (ids::distTone)->load();
+    const float dsL = apvts.getRawParameterValue (ids::distLevel)->load();
+    const bool  dsBp= apvts.getRawParameterValue (ids::distBypass)->load() > 0.5f;
+    const float hpF = apvts.getRawParameterValue (ids::hpFreq)->load();
+    const bool  hpBp= apvts.getRawParameterValue (ids::hpBypass)->load() > 0.5f;
+    const bool  lnOn= apvts.getRawParameterValue (ids::lnEnabled)->load() > 0.5f;
+    const float lnT = apvts.getRawParameterValue (ids::lnTargetDB)->load();
+
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
         p.setOutputGainDB (out_);
@@ -118,6 +169,11 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setIrMix (mix);
         p.setIrBypass (irBp);
         p.setModelBypass (mdBp);
+        p.setGate (gT, gR, gBp);
+        p.setOverdrive (odD, odT, odL, odBp);
+        p.setDistortion (dsD, dsT, dsL, dsBp);
+        p.setHighPass (hpF, hpBp);
+        p.setLoudnessNorm (lnOn, lnT);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);

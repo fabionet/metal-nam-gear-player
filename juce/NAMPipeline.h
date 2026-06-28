@@ -11,6 +11,7 @@
 #include "EQ.h"
 #include "DepthFilter.h"
 #include "IRConvolver.h"
+#include "PreampFX.h"
 
 class NAMPipeline {
 public:
@@ -38,6 +39,18 @@ public:
     void setModelBypass(bool b)         { modelBypass_   = b; }
     void setQualityScale(float s)       { qualityScale_  = s; }
 
+    // Pre-FX
+    void setGate(float threshDB, float releaseMs, bool byp)
+    { gate_.setThresholdDB(threshDB); gate_.setReleaseMs(releaseMs); gate_.setBypass(byp); }
+    void setOverdrive(float drive, float toneDB, float levelDB, bool byp)
+    { od_.setDrive(drive); od_.setToneDB(toneDB); od_.setLevelDB(levelDB); od_.setBypass(byp); }
+    void setDistortion(float drive, float toneDB, float levelDB, bool byp)
+    { dist_.setDrive(drive); dist_.setToneDB(toneDB); dist_.setLevelDB(levelDB); dist_.setBypass(byp); }
+    void setHighPass(float freqHz, bool byp)
+    { hp_.setFreqHz(freqHz); hp_.setBypass(byp); }
+    void setLoudnessNorm(bool enabled, float targetDB)
+    { loud_.setEnabled(enabled); loud_.setTargetDB(targetDB); }
+
     // --- Model / IR loading (call from non-audio thread) ---
     // Returns true on success. Old model/IR is destroyed.
     bool loadModel(const std::string& path);
@@ -61,6 +74,12 @@ private:
 
     nam_dsp::FiveBandEQ   eq_;
     nam_dsp::DepthFilter  depth_;
+
+    preamp_fx::SmartGate     gate_;
+    preamp_fx::Overdrive     od_;
+    preamp_fx::Distortion    dist_;
+    preamp_fx::HighPass      hp_;
+    preamp_fx::LoudnessNorm  loud_;
 
     // Cached EQ/depth values to avoid recomputing biquad coeffs every block.
     float eqBassDB_   = 0.f,  eqBassCached_   = 999.f;

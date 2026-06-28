@@ -22,8 +22,17 @@ target_sources(NAMCustom PRIVATE
     PluginProcessor.h
     PluginEditor.cpp
     PluginEditor.h
+    NAMLookAndFeel.cpp
+    NAMLookAndFeel.h
     NAMPipeline.cpp
     NAMPipeline.h
+    PreampFX.h
+)
+
+juce_add_binary_data(NAMFonts SOURCES
+    fonts/Nosifer-Regular.ttf
+    fonts/MetalMania-Regular.ttf
+    fonts/PirataOne-Regular.ttf
 )
 
 target_compile_definitions(NAMCustom PUBLIC
@@ -36,6 +45,7 @@ target_compile_definitions(NAMCustom PUBLIC
 target_link_libraries(NAMCustom PRIVATE
     nam_dsp
     NeuralAudio
+    NAMFonts
     juce::juce_audio_utils
     juce::juce_dsp
     juce::juce_audio_processors

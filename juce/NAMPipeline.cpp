@@ -17,6 +17,11 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
 
     eq_.prepare(sampleRate, 1);
     depth_.prepare(sampleRate, 1);
+    gate_.prepare(sampleRate);
+    od_.prepare(sampleRate);
+    dist_.prepare(sampleRate);
+    hp_.prepare(sampleRate);
+    loud_.prepare(sampleRate);
 
     tmp_.assign(static_cast<size_t>(std::max(blockSize, 1)), 0.f);
 
@@ -34,6 +39,11 @@ void NAMPipeline::reset()
 {
     eq_.reset();
     depth_.reset();
+    gate_.reset();
+    od_.reset();
+    dist_.reset();
+    hp_.reset();
+    loud_.reset();
     if (ir_) ir_->reset();
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
@@ -81,6 +91,15 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] = in[i] * desiredIn;
     }
 
+    // --- Pre-FX: Gate → Overdrive → Distortion ---
+    for (int i = 0; i < n; ++i) {
+        float s = out[i];
+        s = gate_.process (s);
+        s = od_.process   (s);
+        s = dist_.process (s);
+        out[i] = s;
+    }
+
     // --- NAM model ---
     if (model_ && !modelBypass_.load()) {
         model_->Process(out, out, n);
@@ -103,6 +122,13 @@ void NAMPipeline::process(const float* in, float* out, int n)
             const float dry = 1.f - mix;
             for (int i = 0; i < n; ++i) out[i] = out[i] * dry + tmp_[i] * mix;
         }
+    }
+
+    // --- Post-cab: High-pass → Loudness Normalization ---
+    for (int i = 0; i < n; ++i) {
+        float s = hp_.process (out[i]);
+        s = loud_.process (s);
+        out[i] = s;
     }
 
     // --- Output gain (smoothed) ---
