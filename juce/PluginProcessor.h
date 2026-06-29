@@ -7,6 +7,8 @@
 
 #include "NAMPipeline.h"
 
+class PresetManager;
+
 class NAMAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -48,7 +50,20 @@ public:
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    PresetManager& getPresetManager() { return *presetManager_; }
+
+    // Stage 8 — meter taps (Editor reads & resets atomically at ~30 Hz).
+    std::atomic<float>& getMeterInL()  noexcept { return meterInL_;  }
+    std::atomic<float>& getMeterInR()  noexcept { return meterInR_;  }
+    std::atomic<float>& getMeterOutL() noexcept { return meterOutL_; }
+    std::atomic<float>& getMeterOutR() noexcept { return meterOutR_; }
+
 private:
+    std::atomic<float> meterInL_  { 0.f };
+    std::atomic<float> meterInR_  { 0.f };
+    std::atomic<float> meterOutL_ { 0.f };
+    std::atomic<float> meterOutR_ { 0.f };
+
     // Two pipelines for 3 channel modes (mono mirror / dual-mono / stereo split).
     std::unique_ptr<NAMPipeline> pipelineL_;
     std::unique_ptr<NAMPipeline> pipelineR_;
@@ -67,6 +82,8 @@ private:
 
     void pushParametersToPipelines();
     void consumePendingSwaps();
+
+    std::unique_ptr<PresetManager> presetManager_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NAMAudioProcessor)
 };

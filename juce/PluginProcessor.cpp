@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PresetManager.h"
 
 namespace ids {
     constexpr auto inputLevel    = "input_level";
@@ -93,6 +94,7 @@ NAMAudioProcessor::NAMAudioProcessor()
 {
     pipelineL_ = std::make_unique<NAMPipeline>();
     pipelineR_ = std::make_unique<NAMPipeline>();
+    presetManager_ = std::make_unique<PresetManager>(*this, apvts);
 }
 
 NAMAudioProcessor::~NAMAudioProcessor()
@@ -206,6 +208,17 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     float* L = buffer.getWritePointer (0);
     float* R = (numCh > 1) ? buffer.getWritePointer (1) : nullptr;
 
+    auto sampleAbsPeak = [] (std::atomic<float>& dst, const float* p, int N) {
+        auto r = juce::FloatVectorOperations::findMinAndMax (p, N);
+        const float peak = juce::jmax (std::abs (r.getStart()), std::abs (r.getEnd()));
+        float cur = dst.load (std::memory_order_relaxed);
+        while (peak > cur && ! dst.compare_exchange_weak (cur, peak, std::memory_order_relaxed)) {}
+    };
+
+    // Input meter taps (pre-DSP).
+    sampleAbsPeak (meterInL_, L, n);
+    if (R) sampleAbsPeak (meterInR_, R, n);
+
     if (numCh == 1 || mode == 0) {
         // Mono: process L, mirror to R.
         pipelineL_->process (L, L, n);
@@ -220,6 +233,10 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         pipelineL_->process (L, L, n);
         if (R) pipelineR_->process (R, R, n);
     }
+
+    // Output meter taps (post-DSP).
+    sampleAbsPeak (meterOutL_, L, n);
+    if (R) sampleAbsPeak (meterOutR_, R, n);
 }
 
 juce::AudioProcessorEditor* NAMAudioProcessor::createEditor()

@@ -8,6 +8,8 @@
 
 #include "PluginProcessor.h"
 #include "NAMLookAndFeel.h"
+#include "PresetPanelComponent.h"
+#include "MeterStripComponent.h"
 
 class NAMAudioProcessorEditor : public juce::AudioProcessorEditor
 {
@@ -36,6 +38,17 @@ private:
     juce::TextButton loadModelBtn { "LOAD .NAM" };
     juce::TextButton loadIRBtn    { "LOAD IR" };
     juce::Label      modelLabel, irLabel;
+
+    // Preset panel + toggle.
+    juce::TextButton    presetsToggleBtn { "PRESETS" };
+    PresetPanelComponent presetPanel;
+    bool                 panelOpen_ = false;
+    void togglePresetPanel();
+
+    // Options button + meters (Stage 8).
+    juce::TextButton optionsBtn { "OPTIONS" };
+    std::unique_ptr<MeterStripComponent> inMeter_, outMeter_;
+    void showOptionsMenu();
 
     // Knobs (indexed by param id).
     std::vector<std::unique_ptr<KnobBox>> knobs_;
@@ -71,6 +84,7 @@ private:
 
     // Layout state for paint() to read.
     juce::Rectangle<int> titleArea_, headerArea_, panelArea_, footerArea_;
+    juce::Rectangle<int> inMeterArea_, outMeterArea_;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> groupPanels_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NAMAudioProcessorEditor)

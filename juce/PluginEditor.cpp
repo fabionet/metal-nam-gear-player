@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "GlobalSettings.h"
 #include <array>
 #include <BinaryData.h>
 
@@ -67,9 +68,29 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
 }
 
 NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
-    : AudioProcessorEditor (&p), processorRef (p)
+    : AudioProcessorEditor (&p), processorRef (p), presetPanel (p.getPresetManager())
 {
     setLookAndFeel (&lnf_);
+
+    // Preset panel (added first so toggle in header sits above it; visibility via toFront).
+    addChildComponent (presetPanel);
+    addAndMakeVisible (presetsToggleBtn);
+    presetsToggleBtn.onClick = [this] { togglePresetPanel(); };
+
+    addAndMakeVisible (optionsBtn);
+    optionsBtn.onClick = [this] { showOptionsMenu(); };
+
+    // Meters — closure reads APVTS choice "channel_mode" (0=Mono → 1 bar, ≥1 → 2 bars).
+    auto isStereoFn = [&p = processorRef]() {
+        auto* v = p.apvts.getRawParameterValue ("channel_mode");
+        return v != nullptr && v->load() > 0.5f;
+    };
+    inMeter_  = std::make_unique<MeterStripComponent> (
+        processorRef.getMeterInL(),  processorRef.getMeterInR(),  isStereoFn);
+    outMeter_ = std::make_unique<MeterStripComponent> (
+        processorRef.getMeterOutL(), processorRef.getMeterOutR(), isStereoFn);
+    addAndMakeVisible (*inMeter_);
+    addAndMakeVisible (*outMeter_);
 
     // Header.
     addAndMakeVisible (loadModelBtn);
@@ -114,7 +135,18 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     lnEnabledAtt  = std::make_unique<BAtt> (processorRef.apvts, "ln_enabled",   lnEnabled);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
-    setSize (1560, 820);
+    setSize (1620, 820);
+}
+
+void NAMAudioProcessorEditor::showOptionsMenu()
+{
+    const int cur = GlobalSettings::get().getMeterDepthDb();
+    juce::PopupMenu m;
+    m.addSectionHeader ("Meter depth");
+    for (int d : { -60, -90, -120 })
+        m.addItem (juce::String (d) + " dB", true, d == cur,
+                   [d] { GlobalSettings::get().setMeterDepthDb (d); });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&optionsBtn));
 }
 
 NAMAudioProcessorEditor::~NAMAudioProcessorEditor()
@@ -246,16 +278,29 @@ void NAMAudioProcessorEditor::paint (juce::Graphics& g)
 void NAMAudioProcessorEditor::resized()
 {
     groupPanels_.clear();
-    auto r = getLocalBounds().reduced (24, 24);
+
+    // Reserve 28-px vertical strips at far left/right for meters (Stage 8).
+    auto full = getLocalBounds();
+    inMeterArea_  = full.removeFromLeft  (28);
+    outMeterArea_ = full.removeFromRight (28);
+    if (inMeter_)  inMeter_ ->setBounds (inMeterArea_ .reduced (2, 24));
+    if (outMeter_) outMeter_->setBounds (outMeterArea_.reduced (2, 24));
+
+    auto r = full.reduced (24, 24);
 
     // Title strip.
     titleArea_ = r.removeFromTop (96);
     r.removeFromTop (4);
 
-    // Header (load model / IR).
+    // Header (load model / IR + presets toggle on far right).
     headerArea_ = r.removeFromTop (38);
     {
         auto h = headerArea_.reduced (2);
+        auto presetCell  = h.removeFromRight (90).reduced (4, 2);
+        presetsToggleBtn.setBounds (presetCell);
+        auto optionsCell = h.removeFromRight (66).reduced (4, 2);
+        optionsBtn.setBounds (optionsCell);
+
         auto left  = h.removeFromLeft (h.getWidth() / 2).reduced (4, 0);
         auto right = h.reduced (4, 0);
         loadModelBtn.setBounds (left.removeFromLeft (110));
@@ -264,6 +309,16 @@ void NAMAudioProcessorEditor::resized()
         loadIRBtn.setBounds (right.removeFromLeft (110));
         right.removeFromLeft (8);
         irLabel.setBounds (right);
+    }
+
+    // Preset panel overlay (positioned offscreen-right when closed, slides in).
+    {
+        const int pw = 320;
+        const int ph = getHeight();
+        const int px = panelOpen_ ? (getWidth() - pw) : getWidth();
+        presetPanel.setBounds (px, 0, pw, ph);
+        presetPanel.toFront (false);
+        presetsToggleBtn.toFront (false);
     }
 
     r.removeFromTop (6);
@@ -387,4 +442,18 @@ void NAMAudioProcessorEditor::refreshLabels()
                         juce::dontSendNotification);
     irLabel   .setText (ip.isEmpty() ? "no IR"    : juce::File (ip).getFileName(),
                         juce::dontSendNotification);
+}
+
+void NAMAudioProcessorEditor::togglePresetPanel()
+{
+    panelOpen_ = ! panelOpen_;
+    const int pw = presetPanel.getWidth() > 0 ? presetPanel.getWidth() : 320;
+    const int targetX = panelOpen_ ? (getWidth() - pw) : getWidth();
+    presetPanel.setVisible (true); // keep visible during slide
+    presetPanel.toFront (false);
+    presetsToggleBtn.toFront (false);
+    juce::Desktop::getInstance().getAnimator().animateComponent (
+        &presetPanel,
+        juce::Rectangle<int> (targetX, 0, pw, getHeight()),
+        1.0f, 200, false, 1.0, 1.0);
 }

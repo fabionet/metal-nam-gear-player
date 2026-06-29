@@ -27,12 +27,30 @@ target_sources(NAMCustom PRIVATE
     NAMPipeline.cpp
     NAMPipeline.h
     PreampFX.h
+    PresetManager.cpp
+    PresetManager.h
+    PresetPanelComponent.cpp
+    PresetPanelComponent.h
+    GlobalSettings.cpp
+    GlobalSettings.h
+    MeterStripComponent.cpp
+    MeterStripComponent.h
 )
 
 juce_add_binary_data(NAMFonts SOURCES
     fonts/Nosifer-Regular.ttf
     fonts/MetalMania-Regular.ttf
     fonts/PirataOne-Regular.ttf
+)
+
+juce_add_binary_data(NAMPresets
+    NAMESPACE NAMPresetData
+    HEADER_NAME NAMPresetData.h
+    SOURCES
+        Presets/Factory/Clean.nampreset
+        Presets/Factory/Crunch.nampreset
+        Presets/Factory/Lead.nampreset
+        Presets/Factory/Bass.nampreset
 )
 
 target_compile_definitions(NAMCustom PUBLIC
@@ -46,6 +64,7 @@ target_link_libraries(NAMCustom PRIVATE
     nam_dsp
     NeuralAudio
     NAMFonts
+    NAMPresets
     juce::juce_audio_utils
     juce::juce_dsp
     juce::juce_audio_processors
