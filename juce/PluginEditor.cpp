@@ -100,19 +100,44 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (*inMeter_);
     addAndMakeVisible (*outMeter_);
 
-    // Header.
-    addAndMakeVisible (loadModelBtn);
-    addAndMakeVisible (loadIRBtn);
-    addAndMakeVisible (modelLabel);
-    addAndMakeVisible (irLabel);
-    for (auto* l : { &modelLabel, &irLabel }) {
-        l->setJustificationType (juce::Justification::centredLeft);
-        l->setFont (juce::Font (juce::FontOptions (11.0f)));
+    // Loader strip (below footer).
+    for (auto* b : { &modelPrevBtn, &modelNextBtn, &modelBrowseBtn,
+                     &irPrevBtn, &irNextBtn, &irBrowseBtn }) {
+        addAndMakeVisible (*b);
+    }
+    for (auto* cb : { &modelCombo, &irCombo }) {
+        addAndMakeVisible (*cb);
+        cb->setTextWhenNothingSelected ("— none —");
+    }
+    for (auto* l : { &modelTitleLabel, &irTitleLabel }) {
+        addAndMakeVisible (*l);
+        l->setJustificationType (juce::Justification::centredRight);
+        l->setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
         l->setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
     }
     refreshLabels();
-    loadModelBtn.onClick = [this] { browseModel(); };
-    loadIRBtn   .onClick = [this] { browseIR(); };
+
+    modelBrowseBtn.onClick = [this] { browseModel(); };
+    irBrowseBtn   .onClick = [this] { browseIR(); };
+    modelPrevBtn  .onClick = [this] { stepCombo (modelCombo, -1); };
+    modelNextBtn  .onClick = [this] { stepCombo (modelCombo, +1); };
+    irPrevBtn     .onClick = [this] { stepCombo (irCombo,    -1); };
+    irNextBtn     .onClick = [this] { stepCombo (irCombo,    +1); };
+
+    modelCombo.onChange = [this] {
+        const int idx = modelCombo.getSelectedItemIndex();
+        if (idx >= 0 && idx < modelFiles_.size()) {
+            juce::File f = modelDir_.getChildFile (modelFiles_[idx]);
+            if (f.existsAsFile()) processorRef.loadModelAsync (f);
+        }
+    };
+    irCombo.onChange = [this] {
+        const int idx = irCombo.getSelectedItemIndex();
+        if (idx >= 0 && idx < irFiles_.size()) {
+            juce::File f = irDir_.getChildFile (irFiles_[idx]);
+            if (f.existsAsFile()) processorRef.loadIRAsync (f);
+        }
+    };
 
     // Knobs.
     knobs_.reserve (kCount);
@@ -159,7 +184,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
     fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
 
-    setSize (1620, 820);
+    setSize (1620, 890);
 }
 
 void NAMAudioProcessorEditor::setActiveTab (Tab t)
@@ -324,27 +349,17 @@ void NAMAudioProcessorEditor::resized()
     titleArea_ = r.removeFromTop (96);
     r.removeFromTop (4);
 
-    // Header (tabs left + load model / IR + presets toggle on far right).
+    // Header (tabs left + presets toggle on far right). Load NAM / IR moved to loader strip.
     headerArea_ = r.removeFromTop (38);
     {
         auto h = headerArea_.reduced (2);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
 
-        // Tab buttons at far left.
         auto tabs = h.removeFromLeft (130).reduced (2, 4);
         mainTabBtn.setBounds (tabs.removeFromLeft (60));
         tabs.removeFromLeft (4);
         fxTabBtn  .setBounds (tabs.removeFromLeft (60));
-
-        auto left  = h.removeFromLeft (h.getWidth() / 2).reduced (4, 0);
-        auto right = h.reduced (4, 0);
-        loadModelBtn.setBounds (left.removeFromLeft (110));
-        left.removeFromLeft (8);
-        modelLabel.setBounds (left);
-        loadIRBtn.setBounds (right.removeFromLeft (110));
-        right.removeFromLeft (8);
-        irLabel.setBounds (right);
     }
 
     // Preset panel overlay (positioned offscreen-right when closed, slides in).
@@ -358,6 +373,34 @@ void NAMAudioProcessorEditor::resized()
     }
 
     r.removeFromTop (6);
+
+    // Loader strip (very bottom): MODEL  ◀ [combo ▾] ▶ [Browse]   |   IR  ◀ [combo ▾] ▶ [Browse]
+    loaderArea_ = r.removeFromBottom (60);
+    {
+        auto strip = loaderArea_.reduced (4, 8);
+        auto half = strip.getWidth() / 2;
+        auto modelStrip = strip.removeFromLeft (half).reduced (4, 0);
+        strip.removeFromLeft (8);
+        auto irStrip    = strip.reduced (4, 0);
+
+        auto layoutOne = [] (juce::Rectangle<int> area,
+                             juce::Label& title,
+                             juce::TextButton& prev, juce::ComboBox& combo,
+                             juce::TextButton& next, juce::TextButton& browse) {
+            title.setBounds  (area.removeFromLeft (60));
+            area.removeFromLeft (4);
+            prev .setBounds  (area.removeFromLeft (28));
+            area.removeFromLeft (2);
+            browse.setBounds (area.removeFromRight (80));
+            area.removeFromRight (2);
+            next .setBounds  (area.removeFromRight (28));
+            area.removeFromRight (2);
+            combo.setBounds  (area);
+        };
+        layoutOne (modelStrip, modelTitleLabel, modelPrevBtn, modelCombo, modelNextBtn, modelBrowseBtn);
+        layoutOne (irStrip,    irTitleLabel,    irPrevBtn,    irCombo,    irNextBtn,    irBrowseBtn);
+    }
+    r.removeFromBottom (4);
 
     // Footer. Bypass toggles depend on active tab.
     footerArea_ = r.removeFromBottom (54);
@@ -490,35 +533,89 @@ void NAMAudioProcessorEditor::resized()
 void NAMAudioProcessorEditor::browseModel()
 {
     chooser = std::make_unique<juce::FileChooser> (
-        "Load NAM model", juce::File(), "*.nam");
+        "Load NAM model", modelDir_.existsAsFile() || modelDir_.isDirectory() ? modelDir_ : juce::File(), "*.nam");
     chooser->launchAsync (juce::FileBrowserComponent::openMode
                             | juce::FileBrowserComponent::canSelectFiles,
         [this] (const juce::FileChooser& fc) {
             auto f = fc.getResult();
-            if (f.existsAsFile()) { processorRef.loadModelAsync (f); refreshLabels(); }
+            if (f.existsAsFile()) {
+                processorRef.loadModelAsync (f);
+                rescanModelDir (f);
+            }
         });
 }
 
 void NAMAudioProcessorEditor::browseIR()
 {
     chooser = std::make_unique<juce::FileChooser> (
-        "Load IR (WAV)", juce::File(), "*.wav");
+        "Load IR (WAV)", irDir_.isDirectory() ? irDir_ : juce::File(), "*.wav");
     chooser->launchAsync (juce::FileBrowserComponent::openMode
                             | juce::FileBrowserComponent::canSelectFiles,
         [this] (const juce::FileChooser& fc) {
             auto f = fc.getResult();
-            if (f.existsAsFile()) { processorRef.loadIRAsync (f); refreshLabels(); }
+            if (f.existsAsFile()) {
+                processorRef.loadIRAsync (f);
+                rescanIRDir (f);
+            }
         });
+}
+
+void NAMAudioProcessorEditor::rescanModelDir (const juce::File& sel)
+{
+    modelDir_ = sel.getParentDirectory();
+    modelFiles_.clear();
+    if (modelDir_.isDirectory()) {
+        juce::Array<juce::File> files;
+        modelDir_.findChildFiles (files, juce::File::findFiles, false, "*.nam");
+        for (auto& f : files) modelFiles_.add (f.getFileName());
+        modelFiles_.sortNatural();
+    }
+    modelCombo.clear (juce::dontSendNotification);
+    for (int i = 0; i < modelFiles_.size(); ++i)
+        modelCombo.addItem (modelFiles_[i], i + 1);
+    const int sIdx = modelFiles_.indexOf (sel.getFileName());
+    if (sIdx >= 0) modelCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+}
+
+void NAMAudioProcessorEditor::rescanIRDir (const juce::File& sel)
+{
+    irDir_ = sel.getParentDirectory();
+    irFiles_.clear();
+    if (irDir_.isDirectory()) {
+        juce::Array<juce::File> files;
+        irDir_.findChildFiles (files, juce::File::findFiles, false, "*.wav");
+        for (auto& f : files) irFiles_.add (f.getFileName());
+        irFiles_.sortNatural();
+    }
+    irCombo.clear (juce::dontSendNotification);
+    for (int i = 0; i < irFiles_.size(); ++i)
+        irCombo.addItem (irFiles_[i], i + 1);
+    const int sIdx = irFiles_.indexOf (sel.getFileName());
+    if (sIdx >= 0) irCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+}
+
+void NAMAudioProcessorEditor::stepCombo (juce::ComboBox& cb, int delta)
+{
+    const int n = cb.getNumItems();
+    if (n <= 0) return;
+    int idx = cb.getSelectedItemIndex();
+    if (idx < 0) idx = 0;
+    idx = ((idx + delta) % n + n) % n;
+    cb.setSelectedItemIndex (idx, juce::sendNotificationSync);
 }
 
 void NAMAudioProcessorEditor::refreshLabels()
 {
     auto mp = processorRef.getCurrentModelPath();
     auto ip = processorRef.getCurrentIRPath();
-    modelLabel.setText (mp.isEmpty() ? "no model" : juce::File (mp).getFileName(),
-                        juce::dontSendNotification);
-    irLabel   .setText (ip.isEmpty() ? "no IR"    : juce::File (ip).getFileName(),
-                        juce::dontSendNotification);
+    if (mp.isNotEmpty()) {
+        juce::File f (mp);
+        if (f.existsAsFile()) rescanModelDir (f);
+    }
+    if (ip.isNotEmpty()) {
+        juce::File f (ip);
+        if (f.existsAsFile()) rescanIRDir (f);
+    }
 }
 
 void NAMAudioProcessorEditor::togglePresetPanel()

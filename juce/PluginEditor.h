@@ -34,10 +34,23 @@ private:
     NAMAudioProcessor& processorRef;
     NAMLookAndFeel     lnf_;
 
-    // Header file loaders.
-    juce::TextButton loadModelBtn { "LOAD .NAM" };
-    juce::TextButton loadIRBtn    { "LOAD IR" };
-    juce::Label      modelLabel, irLabel;
+    // File loader strip (below footer): ◀ [ComboBox ▾] ▶ [Browse]  for NAM and IR.
+    juce::TextButton modelPrevBtn   { "<" };
+    juce::TextButton modelNextBtn   { ">" };
+    juce::TextButton modelBrowseBtn { "Browse" };
+    juce::ComboBox   modelCombo;
+    juce::Label      modelTitleLabel { {}, "MODEL" };
+
+    juce::TextButton irPrevBtn      { "<" };
+    juce::TextButton irNextBtn      { ">" };
+    juce::TextButton irBrowseBtn    { "Browse" };
+    juce::ComboBox   irCombo;
+    juce::Label      irTitleLabel   { {}, "IR" };
+
+    juce::File       modelDir_;
+    juce::File       irDir_;
+    juce::StringArray modelFiles_;
+    juce::StringArray irFiles_;
 
     // Preset panel + toggle.
     juce::TextButton    presetsToggleBtn { "PRESETS" };
@@ -86,6 +99,12 @@ private:
     void browseModel();
     void browseIR();
     void refreshLabels();
+    void rescanModelDir (const juce::File& sel);
+    void rescanIRDir    (const juce::File& sel);
+    void stepCombo (juce::ComboBox& cb, int delta);
+
+    // Layout area for the loader strip (below footer).
+    juce::Rectangle<int> loaderArea_;
 
     // Painting helpers.
     void paintMetalBackground (juce::Graphics&);
