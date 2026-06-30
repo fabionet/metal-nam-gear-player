@@ -46,7 +46,7 @@ private:
     void togglePresetPanel();
 
     // Options button + meters (Stage 8).
-    juce::TextButton optionsBtn { "OPTIONS" };
+    juce::TextButton optionsBtn { "Meeter OPT" };
     std::unique_ptr<MeterStripComponent> inMeter_, outMeter_;
     void showOptionsMenu();
 

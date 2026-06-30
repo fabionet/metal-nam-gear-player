@@ -222,12 +222,13 @@ void NAMAudioProcessorEditor::paintTitle (juce::Graphics& g, juce::Rectangle<int
     juce::Font titleFont (juce::FontOptions().withTypeface (pirataTypeface()).withHeight (62.0f));
     g.setFont (titleFont);
     auto txtBounds = a.toNearestInt();
+    const juce::String txt ("<<[[_METAL NAM PLAYER_]]>>");
     // Shadow.
     g.setColour (juce::Colour (0xff000000).withAlpha (0.8f));
-    g.drawText ("METAL PLUG IN PLAYS", txtBounds.translated (1, 2), juce::Justification::centred);
+    g.drawText (txt, txtBounds.translated (1, 2), juce::Justification::centred);
     // Highlight.
     g.setColour (juce::Colour (0xffffe48a));
-    g.drawText ("METAL PLUG IN PLAYS", txtBounds, juce::Justification::centred);
+    g.drawText (txt, txtBounds, juce::Justification::centred);
 }
 
 void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
@@ -298,8 +299,6 @@ void NAMAudioProcessorEditor::resized()
         auto h = headerArea_.reduced (2);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
-        auto optionsCell = h.removeFromRight (66).reduced (4, 2);
-        optionsBtn.setBounds (optionsCell);
 
         auto left  = h.removeFromLeft (h.getWidth() / 2).reduced (4, 0);
         auto right = h.reduced (4, 0);
@@ -327,10 +326,11 @@ void NAMAudioProcessorEditor::resized()
     footerArea_ = r.removeFromBottom (54);
     {
         auto f = footerArea_.reduced (4, 6);
-        const int cellW = f.getWidth() / 9;
+        const int cellW = f.getWidth() / 10;
         auto modeCell  = f.removeFromLeft (cellW * 2);
         modeLabel.setBounds (modeCell.removeFromLeft (50));
         modeBox  .setBounds (modeCell.reduced (4, 10));
+        optionsBtn.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
         gateBypass.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
         odBypass  .setBounds (f.removeFromLeft (cellW).reduced (6, 10));
         distBypass.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
