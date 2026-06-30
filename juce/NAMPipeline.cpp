@@ -22,6 +22,10 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     dist_.prepare(sampleRate);
     hp_.prepare(sampleRate);
     loud_.prepare(sampleRate);
+    ng_.prepare(sampleRate);
+    delay_.prepare(sampleRate);
+    chorus_.prepare(sampleRate);
+    flanger_.prepare(sampleRate);
 
     tmp_.assign(static_cast<size_t>(std::max(blockSize, 1)), 0.f);
 
@@ -44,6 +48,10 @@ void NAMPipeline::reset()
     dist_.reset();
     hp_.reset();
     loud_.reset();
+    ng_.reset();
+    delay_.reset();
+    chorus_.reset();
+    flanger_.reset();
     if (ir_) ir_->reset();
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
@@ -91,9 +99,10 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] = in[i] * desiredIn;
     }
 
-    // --- Pre-FX: Gate → Overdrive → Distortion ---
+    // --- Pre-FX: NoiseGate → Gate → Overdrive → Distortion ---
     for (int i = 0; i < n; ++i) {
         float s = out[i];
+        s = ng_.process   (s);
         s = gate_.process (s);
         s = od_.process   (s);
         s = dist_.process (s);
@@ -124,10 +133,13 @@ void NAMPipeline::process(const float* in, float* out, int n)
         }
     }
 
-    // --- Post-cab: High-pass → Loudness Normalization ---
+    // --- Post-cab: High-pass → Loudness Normalization → Delay → Chorus → Flanger ---
     for (int i = 0; i < n; ++i) {
         float s = hp_.process (out[i]);
-        s = loud_.process (s);
+        s = loud_.process    (s);
+        s = delay_.process   (s);
+        s = chorus_.process  (s);
+        s = flanger_.process (s);
         out[i] = s;
     }
 

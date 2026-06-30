@@ -51,6 +51,15 @@ public:
     void setLoudnessNorm(bool enabled, float targetDB)
     { loud_.setEnabled(enabled); loud_.setTargetDB(targetDB); }
 
+    void setNoiseGate(float threshDB, float releaseMs, bool byp)
+    { ng_.setThresholdDB(threshDB); ng_.setReleaseMs(releaseMs); ng_.setBypass(byp); }
+    void setDelay(float timeMs, float feedback, float mix, bool byp)
+    { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
+    void setChorus(float rateHz, float depth, float mix, bool byp)
+    { chorus_.setRateHz(rateHz); chorus_.setDepth(depth); chorus_.setMix(mix); chorus_.setBypass(byp); }
+    void setFlanger(float rateHz, float depth, float feedback, float mix, bool byp)
+    { flanger_.setRateHz(rateHz); flanger_.setDepth(depth); flanger_.setFeedback(feedback); flanger_.setMix(mix); flanger_.setBypass(byp); }
+
     // --- Model / IR loading (call from non-audio thread) ---
     // Returns true on success. Old model/IR is destroyed.
     bool loadModel(const std::string& path);
@@ -80,6 +89,10 @@ private:
     preamp_fx::Distortion    dist_;
     preamp_fx::HighPass      hp_;
     preamp_fx::LoudnessNorm  loud_;
+    preamp_fx::NoiseGate     ng_;
+    preamp_fx::DelayFX       delay_;
+    preamp_fx::ChorusFX      chorus_;
+    preamp_fx::FlangerFX     flanger_;
 
     // Cached EQ/depth values to avoid recomputing biquad coeffs every block.
     float eqBassDB_   = 0.f,  eqBassCached_   = 999.f;

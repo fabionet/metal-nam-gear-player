@@ -36,6 +36,24 @@ namespace ids {
     constexpr auto hpBypass      = "hp_bypass";
     constexpr auto lnEnabled     = "ln_enabled";
     constexpr auto lnTargetDB    = "ln_target_db";
+    // NoiseGate (pre-chain)
+    constexpr auto ngThresh      = "ng_threshold";
+    constexpr auto ngRelease     = "ng_release";
+    constexpr auto ngBypass      = "ng_bypass";
+    // Post-cab FX
+    constexpr auto delTime       = "delay_time_ms";
+    constexpr auto delFb         = "delay_feedback";
+    constexpr auto delMix        = "delay_mix";
+    constexpr auto delBypass     = "delay_bypass";
+    constexpr auto chRate        = "chorus_rate_hz";
+    constexpr auto chDepth       = "chorus_depth";
+    constexpr auto chMix         = "chorus_mix";
+    constexpr auto chBypass      = "chorus_bypass";
+    constexpr auto flRate        = "flanger_rate_hz";
+    constexpr auto flDepth       = "flanger_depth";
+    constexpr auto flFb          = "flanger_feedback";
+    constexpr auto flMix         = "flanger_mix";
+    constexpr auto flBypass      = "flanger_bypass";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -83,6 +101,30 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<B>(juce::ParameterID{ids::hpBypass,1},  "HP Bypass", false));
     add (std::make_unique<B>(juce::ParameterID{ids::lnEnabled,1}, "LN On",     false));
     add (std::make_unique<P>(juce::ParameterID{ids::lnTargetDB,1},"LN Target", juce::NormalisableRange<float>(-30.f, -6.f, 0.1f), -18.f));
+
+    // NoiseGate (pre-chain)
+    add (std::make_unique<P>(juce::ParameterID{ids::ngThresh,1},  "NG Threshold", juce::NormalisableRange<float>(-80.f, 0.f, 0.1f), -55.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ngRelease,1}, "NG Release",   juce::NormalisableRange<float>(5.f, 500.f, 1.f), 80.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::ngBypass,1},  "NG Bypass",    false));
+
+    // Delay
+    add (std::make_unique<P>(juce::ParameterID{ids::delTime,1},   "Delay Time",     juce::NormalisableRange<float>(10.f, 2000.f, 1.f, 0.5f), 350.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::delFb,1},     "Delay Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.35f));
+    add (std::make_unique<P>(juce::ParameterID{ids::delMix,1},    "Delay Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
+    add (std::make_unique<B>(juce::ParameterID{ids::delBypass,1}, "Delay Bypass",   true));
+
+    // Chorus
+    add (std::make_unique<P>(juce::ParameterID{ids::chRate,1},   "Chorus Rate",  juce::NormalisableRange<float>(0.05f, 6.f, 0.001f, 0.5f), 0.8f));
+    add (std::make_unique<P>(juce::ParameterID{ids::chDepth,1},  "Chorus Depth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.4f));
+    add (std::make_unique<P>(juce::ParameterID{ids::chMix,1},    "Chorus Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.3f));
+    add (std::make_unique<B>(juce::ParameterID{ids::chBypass,1}, "Chorus Bypass",true));
+
+    // Flanger
+    add (std::make_unique<P>(juce::ParameterID{ids::flRate,1},   "Flanger Rate",     juce::NormalisableRange<float>(0.05f, 6.f, 0.001f, 0.5f), 0.3f));
+    add (std::make_unique<P>(juce::ParameterID{ids::flDepth,1},  "Flanger Depth",    juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::flFb,1},     "Flanger Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.4f));
+    add (std::make_unique<P>(juce::ParameterID{ids::flMix,1},    "Flanger Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
+    add (std::make_unique<B>(juce::ParameterID{ids::flBypass,1}, "Flanger Bypass",   true));
     return layout;
 }
 
@@ -157,6 +199,23 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const bool  lnOn= apvts.getRawParameterValue (ids::lnEnabled)->load() > 0.5f;
     const float lnT = apvts.getRawParameterValue (ids::lnTargetDB)->load();
 
+    const float ngT  = apvts.getRawParameterValue (ids::ngThresh)->load();
+    const float ngR  = apvts.getRawParameterValue (ids::ngRelease)->load();
+    const bool  ngBp = apvts.getRawParameterValue (ids::ngBypass)->load() > 0.5f;
+    const float dT  = apvts.getRawParameterValue (ids::delTime)->load();
+    const float dFb = apvts.getRawParameterValue (ids::delFb)->load();
+    const float dMx = apvts.getRawParameterValue (ids::delMix)->load();
+    const bool  dBp = apvts.getRawParameterValue (ids::delBypass)->load() > 0.5f;
+    const float cR  = apvts.getRawParameterValue (ids::chRate)->load();
+    const float cD  = apvts.getRawParameterValue (ids::chDepth)->load();
+    const float cMx = apvts.getRawParameterValue (ids::chMix)->load();
+    const bool  cBp = apvts.getRawParameterValue (ids::chBypass)->load() > 0.5f;
+    const float fR  = apvts.getRawParameterValue (ids::flRate)->load();
+    const float fD  = apvts.getRawParameterValue (ids::flDepth)->load();
+    const float fFb = apvts.getRawParameterValue (ids::flFb)->load();
+    const float fMx = apvts.getRawParameterValue (ids::flMix)->load();
+    const bool  fBp = apvts.getRawParameterValue (ids::flBypass)->load() > 0.5f;
+
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
         p.setOutputGainDB (out_);
@@ -176,6 +235,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setDistortion (dsD, dsT, dsL, dsBp);
         p.setHighPass (hpF, hpBp);
         p.setLoudnessNorm (lnOn, lnT);
+        p.setNoiseGate (ngT, ngR, ngBp);
+        p.setDelay     (dT, dFb, dMx, dBp);
+        p.setChorus    (cR, cD, cMx, cBp);
+        p.setFlanger   (fR, fD, fFb, fMx, fBp);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);

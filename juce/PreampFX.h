@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <algorithm>
+#include <vector>
 
 namespace preamp_fx {
 
@@ -217,6 +218,194 @@ private:
     float  targetDB_ = -18.f;
     float  rmsCoef_  = 0.f, gainCoef_ = 0.f;
     float  rms_ = 1e-6f, gain_ = 1.f;
+};
+
+// --- Simple NoiseGate (pre-chain) --------------------------------------------
+// Hard threshold downward gate with smoothed gain (release ms controls close).
+class NoiseGate {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        attCoef_ = std::exp (-1.0f / (0.001f * (float) sr_)); // ~1 ms attack
+        updateRelease();
+        env_ = 0.f; gain_ = 1.f;
+    }
+    void reset() { env_ = 0.f; gain_ = 1.f; }
+
+    void setThresholdDB (float dB) { thresholdDB_ = dB; }
+    void setReleaseMs   (float ms) { releaseMs_ = std::max (5.f, ms); updateRelease(); }
+    void setBypass      (bool b)   { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_) return x;
+        const float a = std::fabs (x);
+        const float coef = (a > env_) ? attCoef_ : envRelCoef_;
+        env_ = coef * env_ + (1.f - coef) * a;
+
+        const float thrLin = db2lin (thresholdDB_);
+        const float target = (env_ > thrLin) ? 1.f : 0.f;
+        gain_ = gainCoef_ * gain_ + (1.f - gainCoef_) * target;
+        return x * gain_;
+    }
+private:
+    void updateRelease()
+    {
+        envRelCoef_ = std::exp (-1.0f / (0.001f * releaseMs_ * (float) sr_));
+        // Gain smoothing ~ releaseMs/2.
+        gainCoef_ = std::exp (-1.0f / (0.001f * std::max (5.f, releaseMs_ * 0.5f) * (float) sr_));
+    }
+    double sr_ = 48000.0;
+    float thresholdDB_ = -55.f;
+    float releaseMs_ = 80.f;
+    bool  bypass_ = false;
+    float attCoef_ = 0.f, envRelCoef_ = 0.f, gainCoef_ = 0.f;
+    float env_ = 0.f, gain_ = 1.f;
+};
+
+// --- Delay (mono, simple ring buffer with feedback) --------------------------
+class DelayFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        const int maxSamples = (int) std::ceil (sr_ * 2.5); // 2.5 s headroom
+        buf_.assign ((size_t) maxSamples, 0.f);
+        writeIdx_ = 0;
+    }
+    void reset() { std::fill (buf_.begin(), buf_.end(), 0.f); writeIdx_ = 0; }
+
+    void setTimeMs    (float ms) { timeSamples_ = std::clamp (ms, 1.f, 2000.f) * 0.001f * (float) sr_; }
+    void setFeedback  (float f)  { feedback_ = std::clamp (f, 0.f, 0.9f); }
+    void setMix       (float m)  { mix_ = std::clamp (m, 0.f, 1.f); }
+    void setBypass    (bool b)   { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_ || buf_.empty()) return x;
+        const int N = (int) buf_.size();
+        const float ts = std::clamp (timeSamples_, 1.f, (float) N - 2.f);
+        // Linear interp read.
+        float readPos = (float) writeIdx_ - ts;
+        while (readPos < 0.f) readPos += (float) N;
+        const int i0 = (int) readPos;
+        const int i1 = (i0 + 1) % N;
+        const float frac = readPos - (float) i0;
+        const float y = buf_[(size_t) i0] * (1.f - frac) + buf_[(size_t) i1] * frac;
+        // Write input + feedback.
+        buf_[(size_t) writeIdx_] = x + y * feedback_;
+        writeIdx_ = (writeIdx_ + 1) % N;
+        return x * (1.f - mix_) + y * mix_;
+    }
+private:
+    double sr_ = 48000.0;
+    std::vector<float> buf_;
+    int   writeIdx_ = 0;
+    float timeSamples_ = 0.f;
+    float feedback_ = 0.35f;
+    float mix_ = 0.25f;
+    bool  bypass_ = true;
+};
+
+// --- Chorus (one voice, modulated short delay) -------------------------------
+class ChorusFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        const int N = (int) std::ceil (sr_ * 0.05); // 50 ms
+        buf_.assign ((size_t) N, 0.f);
+        writeIdx_ = 0;
+        phase_ = 0.f;
+    }
+    void reset() { std::fill (buf_.begin(), buf_.end(), 0.f); writeIdx_ = 0; phase_ = 0.f; }
+
+    void setRateHz (float r) { rateHz_ = std::clamp (r, 0.01f, 10.f); }
+    void setDepth  (float d) { depth_ = std::clamp (d, 0.f, 1.f); }
+    void setMix    (float m) { mix_ = std::clamp (m, 0.f, 1.f); }
+    void setBypass (bool b)  { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_ || buf_.empty()) return x;
+        const int N = (int) buf_.size();
+        phase_ += 2.f * (float) M_PI * rateHz_ / (float) sr_;
+        if (phase_ > 2.f * (float) M_PI) phase_ -= 2.f * (float) M_PI;
+        // Base ~15ms + ±10ms * depth.
+        const float baseMs = 15.f;
+        const float modMs  = 10.f * depth_ * std::sin (phase_);
+        const float delaySamples = std::clamp ((baseMs + modMs) * 0.001f * (float) sr_, 1.f, (float) N - 2.f);
+        float readPos = (float) writeIdx_ - delaySamples;
+        while (readPos < 0.f) readPos += (float) N;
+        const int i0 = (int) readPos;
+        const int i1 = (i0 + 1) % N;
+        const float frac = readPos - (float) i0;
+        const float y = buf_[(size_t) i0] * (1.f - frac) + buf_[(size_t) i1] * frac;
+        buf_[(size_t) writeIdx_] = x;
+        writeIdx_ = (writeIdx_ + 1) % N;
+        return x * (1.f - mix_) + y * mix_;
+    }
+private:
+    double sr_ = 48000.0;
+    std::vector<float> buf_;
+    int   writeIdx_ = 0;
+    float rateHz_ = 0.8f;
+    float depth_ = 0.4f;
+    float mix_ = 0.3f;
+    float phase_ = 0.f;
+    bool  bypass_ = true;
+};
+
+// --- Flanger (very short delay + feedback + LFO) -----------------------------
+class FlangerFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        const int N = (int) std::ceil (sr_ * 0.025); // 25 ms
+        buf_.assign ((size_t) N, 0.f);
+        writeIdx_ = 0;
+        phase_ = 0.f;
+    }
+    void reset() { std::fill (buf_.begin(), buf_.end(), 0.f); writeIdx_ = 0; phase_ = 0.f; }
+
+    void setRateHz   (float r) { rateHz_ = std::clamp (r, 0.01f, 10.f); }
+    void setDepth    (float d) { depth_ = std::clamp (d, 0.f, 1.f); }
+    void setFeedback (float f) { feedback_ = std::clamp (f, 0.f, 0.9f); }
+    void setMix      (float m) { mix_ = std::clamp (m, 0.f, 1.f); }
+    void setBypass   (bool b)  { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_ || buf_.empty()) return x;
+        const int N = (int) buf_.size();
+        phase_ += 2.f * (float) M_PI * rateHz_ / (float) sr_;
+        if (phase_ > 2.f * (float) M_PI) phase_ -= 2.f * (float) M_PI;
+        // Base ~3ms + ±2.5ms * depth (very short).
+        const float baseMs = 3.f;
+        const float modMs  = 2.5f * depth_ * std::sin (phase_);
+        const float delaySamples = std::clamp ((baseMs + modMs) * 0.001f * (float) sr_, 1.f, (float) N - 2.f);
+        float readPos = (float) writeIdx_ - delaySamples;
+        while (readPos < 0.f) readPos += (float) N;
+        const int i0 = (int) readPos;
+        const int i1 = (i0 + 1) % N;
+        const float frac = readPos - (float) i0;
+        const float y = buf_[(size_t) i0] * (1.f - frac) + buf_[(size_t) i1] * frac;
+        buf_[(size_t) writeIdx_] = x + y * feedback_;
+        writeIdx_ = (writeIdx_ + 1) % N;
+        return x * (1.f - mix_) + y * mix_;
+    }
+private:
+    double sr_ = 48000.0;
+    std::vector<float> buf_;
+    int   writeIdx_ = 0;
+    float rateHz_ = 0.3f;
+    float depth_ = 0.5f;
+    float feedback_ = 0.4f;
+    float mix_ = 0.25f;
+    float phase_ = 0.f;
+    bool  bypass_ = true;
 };
 
 } // namespace preamp_fx
