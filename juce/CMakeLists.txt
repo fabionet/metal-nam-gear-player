@@ -51,6 +51,10 @@ juce_add_binary_data(NAMPresets
         Presets/Factory/Crunch.nampreset
         Presets/Factory/Lead.nampreset
         Presets/Factory/Bass.nampreset
+        Presets/Factory/ModernDjent.nampreset
+        Presets/Factory/ThrashRhythm.nampreset
+        Presets/Factory/DoomSludge.nampreset
+        Presets/Factory/BlackMetal.nampreset
 )
 
 target_compile_definitions(NAMCustom PUBLIC
