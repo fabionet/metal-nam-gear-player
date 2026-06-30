@@ -56,13 +56,24 @@ private:
     // Bypass toggles.
     juce::ToggleButton ampBypass  { "AMP" };
     juce::ToggleButton irBypass   { "CAB" };
+    juce::ToggleButton ngBypass   { "NG" };
     juce::ToggleButton gateBypass { "GATE" };
     juce::ToggleButton odBypass   { "OD" };
     juce::ToggleButton distBypass { "DIST" };
     juce::ToggleButton hpBypass   { "HP" };
     juce::ToggleButton lnEnabled  { "LN" };
-    std::unique_ptr<BAtt> ampBypassAtt, irBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
-    std::unique_ptr<BAtt> hpBypassAtt, lnEnabledAtt;
+    juce::ToggleButton delBypass  { "DELAY" };
+    juce::ToggleButton chBypass   { "CHOR" };
+    juce::ToggleButton flBypass   { "FLAN" };
+    std::unique_ptr<BAtt> ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
+    std::unique_ptr<BAtt> hpBypassAtt, lnEnabledAtt, delBypassAtt, chBypassAtt, flBypassAtt;
+
+    // Tab switcher (MAIN / FX).
+    juce::TextButton mainTabBtn { "MAIN" };
+    juce::TextButton fxTabBtn   { "FX" };
+    enum class Tab { Main, Fx };
+    Tab activeTab_ = Tab::Main;
+    void setActiveTab (Tab t);
 
     // Mode.
     juce::ComboBox modeBox;

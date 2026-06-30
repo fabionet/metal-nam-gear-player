@@ -36,6 +36,22 @@
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="1"/>
       <PARAM id="ln_target_db" value="-14"/>
+      <PARAM id="ng_threshold" value="-55"/>
+      <PARAM id="ng_release" value="80"/>
+      <PARAM id="ng_bypass" value="0"/>
+      <PARAM id="delay_time_ms" value="350"/>
+      <PARAM id="delay_feedback" value="0.35"/>
+      <PARAM id="delay_mix" value="0.25"/>
+      <PARAM id="delay_bypass" value="1"/>
+      <PARAM id="chorus_rate_hz" value="0.8"/>
+      <PARAM id="chorus_depth" value="0.4"/>
+      <PARAM id="chorus_mix" value="0.3"/>
+      <PARAM id="chorus_bypass" value="1"/>
+      <PARAM id="flanger_rate_hz" value="0.3"/>
+      <PARAM id="flanger_depth" value="0.5"/>
+      <PARAM id="flanger_feedback" value="0.4"/>
+      <PARAM id="flanger_mix" value="0.25"/>
+      <PARAM id="flanger_bypass" value="1"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

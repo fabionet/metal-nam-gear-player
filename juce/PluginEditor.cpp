@@ -21,6 +21,7 @@ namespace {
 namespace {
     // Indices into knobs_ vector — must match the order of addKnob calls below.
     enum K {
+        kNgThresh, kNgRelease,
         kGateThresh, kGateRelease,
         kOdDrive, kOdTone, kOdLevel,
         kDistDrive, kDistTone, kDistLevel,
@@ -29,11 +30,15 @@ namespace {
         kDepth, kRes, kResFreq,
         kIrMix, kQuality,
         kHpFreq, kLnTarget,
+        kDelTime, kDelFb, kDelMix,
+        kChRate, kChDepth, kChMix,
+        kFlRate, kFlDepth, kFlFb, kFlMix,
         kCount
     };
 
     struct KnobDef { const char* id; const char* label; };
     constexpr std::array<KnobDef, kCount> kDefs {{
+        {"ng_threshold",   "THRESH"}, {"ng_release",  "RELEASE"},
         {"gate_threshold", "THRESH"}, {"gate_release", "RELEASE"},
         {"od_drive",       "DRIVE"},  {"od_tone",     "TONE"},   {"od_level",  "LEVEL"},
         {"dist_drive",     "DRIVE"},  {"dist_tone",   "TONE"},   {"dist_level","LEVEL"},
@@ -43,7 +48,10 @@ namespace {
         {"eq_air",         "AIR"},
         {"depth",          "DEPTH"},  {"resonance",   "RES"},    {"resonance_freq","RES F"},
         {"ir_mix",         "IR MIX"}, {"quality_scale","QUAL"},
-        {"hp_freq",        "HP FRQ"}, {"ln_target_db", "LN dB"}
+        {"hp_freq",        "HP FRQ"}, {"ln_target_db", "LN dB"},
+        {"delay_time_ms",  "TIME"},   {"delay_feedback","FBK"},  {"delay_mix", "MIX"},
+        {"chorus_rate_hz", "RATE"},   {"chorus_depth","DEPTH"},  {"chorus_mix","MIX"},
+        {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"}
     }};
 }
 
@@ -122,20 +130,43 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeLabel.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
-    for (auto* b : { &ampBypass, &irBypass, &gateBypass, &odBypass, &distBypass, &hpBypass, &lnEnabled }) {
+    for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
+                     &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass }) {
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
     }
     ampBypassAtt  = std::make_unique<BAtt> (processorRef.apvts, "model_bypass", ampBypass);
     irBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "ir_bypass",    irBypass);
+    ngBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "ng_bypass",    ngBypass);
     gateBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "gate_bypass",  gateBypass);
     odBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "od_bypass",    odBypass);
     distBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "dist_bypass",  distBypass);
     hpBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "hp_bypass",    hpBypass);
     lnEnabledAtt  = std::make_unique<BAtt> (processorRef.apvts, "ln_enabled",   lnEnabled);
+    delBypassAtt  = std::make_unique<BAtt> (processorRef.apvts, "delay_bypass", delBypass);
+    chBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "chorus_bypass",chBypass);
+    flBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "flanger_bypass",flBypass);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
+    // Tab buttons.
+    addAndMakeVisible (mainTabBtn);
+    addAndMakeVisible (fxTabBtn);
+    mainTabBtn.setClickingTogglesState (true);
+    fxTabBtn  .setClickingTogglesState (true);
+    mainTabBtn.setRadioGroupId (0xCA11);
+    fxTabBtn  .setRadioGroupId (0xCA11);
+    mainTabBtn.setToggleState (true, juce::dontSendNotification);
+    mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
+    fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
+
     setSize (1620, 820);
+}
+
+void NAMAudioProcessorEditor::setActiveTab (Tab t)
+{
+    activeTab_ = t;
+    resized();
+    repaint();
 }
 
 void NAMAudioProcessorEditor::showOptionsMenu()
@@ -293,12 +324,18 @@ void NAMAudioProcessorEditor::resized()
     titleArea_ = r.removeFromTop (96);
     r.removeFromTop (4);
 
-    // Header (load model / IR + presets toggle on far right).
+    // Header (tabs left + load model / IR + presets toggle on far right).
     headerArea_ = r.removeFromTop (38);
     {
         auto h = headerArea_.reduced (2);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
+
+        // Tab buttons at far left.
+        auto tabs = h.removeFromLeft (130).reduced (2, 4);
+        mainTabBtn.setBounds (tabs.removeFromLeft (60));
+        tabs.removeFromLeft (4);
+        fxTabBtn  .setBounds (tabs.removeFromLeft (60));
 
         auto left  = h.removeFromLeft (h.getWidth() / 2).reduced (4, 0);
         auto right = h.reduced (4, 0);
@@ -322,22 +359,40 @@ void NAMAudioProcessorEditor::resized()
 
     r.removeFromTop (6);
 
-    // Footer.
+    // Footer. Bypass toggles depend on active tab.
     footerArea_ = r.removeFromBottom (54);
     {
         auto f = footerArea_.reduced (4, 6);
-        const int cellW = f.getWidth() / 10;
+        const int cellW = f.getWidth() / 12;
         auto modeCell  = f.removeFromLeft (cellW * 2);
         modeLabel.setBounds (modeCell.removeFromLeft (50));
         modeBox  .setBounds (modeCell.reduced (4, 10));
         optionsBtn.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        gateBypass.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        odBypass  .setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        distBypass.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        ampBypass .setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        irBypass  .setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        hpBypass  .setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        lnEnabled .setBounds (f.reduced (6, 10));
+
+        auto hideBtn = [] (juce::ToggleButton& b) { b.setVisible (false); };
+        auto placeBtn = [&] (juce::ToggleButton& b) {
+            b.setVisible (true);
+            b.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
+        };
+
+        if (activeTab_ == Tab::Main) {
+            placeBtn (ngBypass);
+            placeBtn (gateBypass);
+            placeBtn (odBypass);
+            placeBtn (distBypass);
+            placeBtn (ampBypass);
+            placeBtn (irBypass);
+            placeBtn (hpBypass);
+            placeBtn (lnEnabled);
+            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass);
+        } else {
+            placeBtn (delBypass);
+            placeBtn (chBypass);
+            placeBtn (flBypass);
+            hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
+            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (irBypass);
+            hideBtn (hpBypass); hideBtn (lnEnabled);
+        }
     }
 
     r.removeFromBottom (6);
@@ -345,18 +400,34 @@ void NAMAudioProcessorEditor::resized()
     // Main knob panel.
     panelArea_ = r;
 
-    // Define groups (knob indices + title).
+    // Define groups (knob indices + title) per active tab.
     struct Group { juce::String name; std::vector<int> ids; };
-    std::vector<Group> groups = {
-        { "GATE",       { kGateThresh, kGateRelease } },
-        { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
-        { "DISTORTION", { kDistDrive, kDistTone, kDistLevel } },
-        { "AMP",        { kInput, kOutput } },
-        { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
-        { "POWER",      { kDepth, kRes, kResFreq } },
-        { "CAB",        { kIrMix, kQuality } },
-        { "MASTER",     { kHpFreq, kLnTarget } },
-    };
+    std::vector<Group> groups;
+    if (activeTab_ == Tab::Main) {
+        groups = {
+            { "NGATE",      { kNgThresh, kNgRelease } },
+            { "GATE",       { kGateThresh, kGateRelease } },
+            { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
+            { "DISTORTION", { kDistDrive, kDistTone, kDistLevel } },
+            { "AMP",        { kInput, kOutput } },
+            { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
+            { "POWER",      { kDepth, kRes, kResFreq } },
+            { "CAB",        { kIrMix, kQuality } },
+            { "MASTER",     { kHpFreq, kLnTarget } },
+        };
+    } else {
+        groups = {
+            { "DELAY",   { kDelTime, kDelFb, kDelMix } },
+            { "CHORUS",  { kChRate, kChDepth, kChMix } },
+            { "FLANGER", { kFlRate, kFlDepth, kFlFb, kFlMix } },
+        };
+    }
+
+    // Hide all knobs first; visible-tab ones will be re-placed below.
+    for (auto& kb : knobs_) {
+        kb->slider.setVisible (false);
+        kb->label .setVisible (false);
+    }
 
     // Total knobs across all groups: 2+3+3+2+7+3+2 = 22 (ok, kCount)
     int totalKnobs = 0; for (auto& g : groups) totalKnobs += (int) g.ids.size();
@@ -375,6 +446,12 @@ void NAMAudioProcessorEditor::resized()
 
         auto inside = panel.reduced (6, 4);
         inside.removeFromTop (30); // title strip
+
+        // Show knobs in this group.
+        for (int idx : gr.ids) {
+            knobs_[idx]->slider.setVisible (true);
+            knobs_[idx]->label .setVisible (true);
+        }
 
         // For groups with many knobs (EQ), wrap into 2 rows.
         if ((int) gr.ids.size() > 4) {
