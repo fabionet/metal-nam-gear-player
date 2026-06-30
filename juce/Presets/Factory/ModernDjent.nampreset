@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NAMPreset name="ModernDjent" version="1" lockModel="1">
+  <ModelPath></ModelPath>
+  <IRPath></IRPath>
+  <Parameters>
+    <PARAMS>
+      <PARAM id="input_level" value="2"/>
+      <PARAM id="output_level" value="0"/>
+      <PARAM id="eq_bass" value="3"/>
+      <PARAM id="eq_mid_freq" value="500"/>
+      <PARAM id="eq_mid_q" value="1.5"/>
+      <PARAM id="eq_mid_gain" value="-6"/>
+      <PARAM id="eq_presence" value="5"/>
+      <PARAM id="eq_treble" value="2"/>
+      <PARAM id="eq_air" value="2"/>
+      <PARAM id="depth" value="4"/>
+      <PARAM id="resonance" value="1"/>
+      <PARAM id="resonance_freq" value="95"/>
+      <PARAM id="channel_mode" value="0"/>
+      <PARAM id="quality_scale" value="1"/>
+      <PARAM id="ir_mix" value="1"/>
+      <PARAM id="ir_bypass" value="0"/>
+      <PARAM id="model_bypass" value="0"/>
+      <PARAM id="gate_threshold" value="-40"/>
+      <PARAM id="gate_release" value="40"/>
+      <PARAM id="gate_bypass" value="0"/>
+      <PARAM id="od_drive" value="0.15"/>
+      <PARAM id="od_tone" value="0.7"/>
+      <PARAM id="od_level" value="5"/>
+      <PARAM id="od_bypass" value="0"/>
+      <PARAM id="dist_drive" value="0"/>
+      <PARAM id="dist_tone" value="0"/>
+      <PARAM id="dist_level" value="0"/>
+      <PARAM id="dist_bypass" value="1"/>
+      <PARAM id="hp_freq" value="120"/>
+      <PARAM id="hp_bypass" value="0"/>
+      <PARAM id="ln_enabled" value="1"/>
+      <PARAM id="ln_target_db" value="-12"/>
+    </PARAMS>
+  </Parameters>
+</NAMPreset>
