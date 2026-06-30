@@ -63,6 +63,11 @@ private:
     std::unique_ptr<MeterStripComponent> inMeter_, outMeter_;
     void showOptionsMenu();
 
+    // Zoom selector (Stage 11) — header button, popup menu with 25/50/75/100/150/200%.
+    juce::TextButton zoomBtn { "Zoom" };
+    void showZoomMenu();
+    void applyUiScale (int percent);
+
     // Knobs (indexed by param id).
     std::vector<std::unique_ptr<KnobBox>> knobs_;
 

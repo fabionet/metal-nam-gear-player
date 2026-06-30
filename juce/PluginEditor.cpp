@@ -88,6 +88,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (optionsBtn);
     optionsBtn.onClick = [this] { showOptionsMenu(); };
 
+    addAndMakeVisible (zoomBtn);
+    zoomBtn.onClick = [this] { showZoomMenu(); };
+
     // Meters — closure reads APVTS choice "channel_mode" (0=Mono → 1 bar, ≥1 → 2 bars).
     auto isStereoFn = [&p = processorRef]() {
         auto* v = p.apvts.getRawParameterValue ("channel_mode");
@@ -184,7 +187,31 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
     fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
 
-    setSize (1620, 890);
+    applyUiScale (GlobalSettings::get().getUiScalePercent());
+}
+
+void NAMAudioProcessorEditor::applyUiScale (int percent)
+{
+    if (percent != 25 && percent != 50 && percent != 75 &&
+        percent != 100 && percent != 150 && percent != 200)
+        percent = 100;
+    const int w = juce::roundToInt (1620.0 * percent / 100.0);
+    const int h = juce::roundToInt ( 890.0 * percent / 100.0);
+    setSize (w, h);
+}
+
+void NAMAudioProcessorEditor::showZoomMenu()
+{
+    const int cur = GlobalSettings::get().getUiScalePercent();
+    juce::PopupMenu m;
+    m.addSectionHeader ("Window scale");
+    for (int s : { 25, 50, 75, 100, 150, 200 })
+        m.addItem (juce::String (s) + " %", true, s == cur,
+                   [this, s] {
+                       GlobalSettings::get().setUiScalePercent (s);
+                       applyUiScale (s);
+                   });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&zoomBtn));
 }
 
 void NAMAudioProcessorEditor::setActiveTab (Tab t)
@@ -355,6 +382,8 @@ void NAMAudioProcessorEditor::resized()
         auto h = headerArea_.reduced (2);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
+        auto zoomCell = h.removeFromRight (70).reduced (4, 2);
+        zoomBtn.setBounds (zoomCell);
 
         auto tabs = h.removeFromLeft (130).reduced (2, 4);
         mainTabBtn.setBounds (tabs.removeFromLeft (60));

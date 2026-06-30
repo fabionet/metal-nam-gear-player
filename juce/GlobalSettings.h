@@ -12,6 +12,10 @@ public:
     int  getMeterDepthDb() const;
     void setMeterDepthDb (int v);
 
+    // UI scale in percent: one of 25, 50, 75, 100 (default), 150, 200.
+    int  getUiScalePercent() const;
+    void setUiScalePercent (int v);
+
 private:
     GlobalSettings();
     juce::ApplicationProperties props_;
