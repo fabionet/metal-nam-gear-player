@@ -12,6 +12,7 @@ namespace ids {
     constexpr auto eqPresence    = "eq_presence";
     constexpr auto eqTreble      = "eq_treble";
     constexpr auto eqAir         = "eq_air";
+    constexpr auto eqBypass      = "eq_bypass";
     constexpr auto depth         = "depth";
     constexpr auto resonance     = "resonance";
     constexpr auto resonanceFreq = "resonance_freq";
@@ -74,6 +75,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::eqPresence,1},    "Presence", juce::NormalisableRange<float>(-15.f, 15.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::eqTreble,1},      "Treble",   juce::NormalisableRange<float>(-15.f, 15.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::eqAir,1},         "Air",      juce::NormalisableRange<float>(-15.f, 15.f, 0.01f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::eqBypass,1},      "EQ Bypass", false));
     add (std::make_unique<P>(juce::ParameterID{ids::depth,1},         "Depth",    juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonance,1},     "Resonance",juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonanceFreq,1}, "Res Freq", juce::NormalisableRange<float>(60.f, 250.f, 1.f, 0.5f), 100.f));
@@ -168,13 +170,15 @@ void NAMAudioProcessor::pushParametersToPipelines()
 {
     const float in_ = apvts.getRawParameterValue (ids::inputLevel)->load();
     const float out_ = apvts.getRawParameterValue (ids::outputLevel)->load();
-    const float bass = apvts.getRawParameterValue (ids::eqBass)->load();
+    float bass = apvts.getRawParameterValue (ids::eqBass)->load();
     const float midF = apvts.getRawParameterValue (ids::eqMidFreq)->load();
     const float midQ = apvts.getRawParameterValue (ids::eqMidQ)->load();
-    const float midG = apvts.getRawParameterValue (ids::eqMidGain)->load();
-    const float pres = apvts.getRawParameterValue (ids::eqPresence)->load();
-    const float treb = apvts.getRawParameterValue (ids::eqTreble)->load();
-    const float air  = apvts.getRawParameterValue (ids::eqAir)->load();
+    float midG = apvts.getRawParameterValue (ids::eqMidGain)->load();
+    float pres = apvts.getRawParameterValue (ids::eqPresence)->load();
+    float treb = apvts.getRawParameterValue (ids::eqTreble)->load();
+    float air  = apvts.getRawParameterValue (ids::eqAir)->load();
+    const bool  eqBp = apvts.getRawParameterValue (ids::eqBypass)->load() > 0.5f;
+    if (eqBp) { bass = midG = pres = treb = air = 0.f; }
     const float dep  = apvts.getRawParameterValue (ids::depth)->load();
     const float res  = apvts.getRawParameterValue (ids::resonance)->load();
     const float resF = apvts.getRawParameterValue (ids::resonanceFreq)->load();

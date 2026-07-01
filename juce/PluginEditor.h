@@ -78,13 +78,14 @@ private:
     juce::ToggleButton gateBypass { "GATE" };
     juce::ToggleButton odBypass   { "OD" };
     juce::ToggleButton distBypass { "DIST" };
+    juce::ToggleButton eqBypass   { "EQ" };
     juce::ToggleButton hpBypass   { "HP" };
     juce::ToggleButton lnEnabled  { "LN" };
     juce::ToggleButton delBypass  { "DELAY" };
     juce::ToggleButton chBypass   { "CHOR" };
     juce::ToggleButton flBypass   { "FLAN" };
     std::unique_ptr<BAtt> ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
-    std::unique_ptr<BAtt> hpBypassAtt, lnEnabledAtt, delBypassAtt, chBypassAtt, flBypassAtt;
+    std::unique_ptr<BAtt> hpBypassAtt, lnEnabledAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt;
 
     // Tab switcher (MAIN / FX).
     juce::TextButton mainTabBtn { "MAIN" };

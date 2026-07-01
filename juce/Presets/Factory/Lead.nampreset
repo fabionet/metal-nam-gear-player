@@ -13,6 +13,7 @@
       <PARAM id="eq_presence" value="3"/>
       <PARAM id="eq_treble" value="1"/>
       <PARAM id="eq_air" value="0"/>
+      <PARAM id="eq_bypass" value="0"/>
       <PARAM id="depth" value="1"/>
       <PARAM id="resonance" value="0"/>
       <PARAM id="resonance_freq" value="100"/>
