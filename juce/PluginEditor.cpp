@@ -163,18 +163,18 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
     }
-    ampBypassAtt  = std::make_unique<BAtt> (processorRef.apvts, "model_bypass", ampBypass);
-    irBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "ir_bypass",    irBypass);
-    ngBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "ng_bypass",    ngBypass);
-    gateBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "gate_bypass",  gateBypass);
-    odBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "od_bypass",    odBypass);
-    distBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "dist_bypass",  distBypass);
-    eqBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "eq_bypass",    eqBypass);
-    hpBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "hp_bypass",    hpBypass);
+    ampBypassAtt  = std::make_unique<InvertBypassBinding> (processorRef.apvts, "model_bypass", ampBypass);
+    irBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_bypass",    irBypass);
+    ngBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ng_bypass",    ngBypass);
+    gateBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "gate_bypass",  gateBypass);
+    odBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "od_bypass",    odBypass);
+    distBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "dist_bypass",  distBypass);
+    eqBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "eq_bypass",    eqBypass);
+    hpBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "hp_bypass",    hpBypass);
     lnEnabledAtt  = std::make_unique<BAtt> (processorRef.apvts, "ln_enabled",   lnEnabled);
-    delBypassAtt  = std::make_unique<BAtt> (processorRef.apvts, "delay_bypass", delBypass);
-    chBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "chorus_bypass",chBypass);
-    flBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "flanger_bypass",flBypass);
+    delBypassAtt  = std::make_unique<InvertBypassBinding> (processorRef.apvts, "delay_bypass", delBypass);
+    chBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "chorus_bypass",chBypass);
+    flBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "flanger_bypass",flBypass);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
     // Tab buttons.

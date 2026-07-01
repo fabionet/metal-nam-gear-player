@@ -25,6 +25,28 @@ private:
     using CAtt = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     using BAtt = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
+    // Adapter: makes a ToggleButton represent the INVERSE of a bool
+    // `xxx_bypass` parameter — checked = active, unchecked = bypass.
+    struct InvertBypassBinding {
+        juce::ToggleButton& btn;
+        juce::ParameterAttachment att;
+        InvertBypassBinding (juce::AudioProcessorValueTreeState& apvts,
+                             const juce::String& paramId,
+                             juce::ToggleButton& b)
+          : btn (b),
+            att (*apvts.getParameter (paramId),
+                 [this] (float v) {
+                     btn.setToggleState (v < 0.5f, juce::dontSendNotification);
+                 })
+        {
+            btn.onClick = [this] {
+                att.setValueAsCompleteGesture (btn.getToggleState() ? 0.0f : 1.0f);
+            };
+            att.sendInitialUpdate();
+        }
+    };
+    using IBypass = std::unique_ptr<InvertBypassBinding>;
+
     struct KnobBox {
         juce::Slider slider;
         juce::Label  label;
@@ -84,8 +106,9 @@ private:
     juce::ToggleButton delBypass  { "DELAY" };
     juce::ToggleButton chBypass   { "CHOR" };
     juce::ToggleButton flBypass   { "FLAN" };
-    std::unique_ptr<BAtt> ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
-    std::unique_ptr<BAtt> hpBypassAtt, lnEnabledAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt;
+    IBypass ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
+    IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt;
+    std::unique_ptr<BAtt> lnEnabledAtt; // LN uses `ln_enabled` (already active-semantics), keep direct.
 
     // Tab switcher (MAIN / FX).
     juce::TextButton mainTabBtn { "MAIN" };
