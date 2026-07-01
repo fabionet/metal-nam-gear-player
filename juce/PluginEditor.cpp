@@ -191,10 +191,25 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     applyUiScale (GlobalSettings::get().getUiScalePercent());
 }
 
+// Sub-FullHD guard: on displays narrower than 1400 px (typical non-FullHD
+// laptop panels and some 4K in fractional scaling) the 100/150/200% window
+// sizes overflow the screen. Force the fit-safe 75% and lock the higher
+// entries out of the menu.
+static constexpr int kSubFullHDThreshold = 1400;
+
+static int primaryDisplayWidthPx()
+{
+    if (auto* d = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        return d->userArea.getWidth();
+    return kSubFullHDThreshold; // permissive fallback: assume FullHD
+}
+
 void NAMAudioProcessorEditor::applyUiScale (int percent)
 {
     if (percent != 75 && percent != 100 && percent != 150 && percent != 200)
         percent = 100;
+    if (primaryDisplayWidthPx() < kSubFullHDThreshold && percent > 75)
+        percent = 75;
     const int w = juce::roundToInt (1620.0 * percent / 100.0);
     const int h = juce::roundToInt ( 890.0 * percent / 100.0);
     setSize (w, h);
@@ -203,14 +218,18 @@ void NAMAudioProcessorEditor::applyUiScale (int percent)
 void NAMAudioProcessorEditor::showZoomMenu()
 {
     const int cur = GlobalSettings::get().getUiScalePercent();
+    const bool subFullHD = primaryDisplayWidthPx() < kSubFullHDThreshold;
     juce::PopupMenu m;
-    m.addSectionHeader ("Window scale");
-    for (int s : { 75, 100, 150, 200 })
-        m.addItem (juce::String (s) + " %", true, s == cur,
+    m.addSectionHeader (subFullHD ? "Window scale (sub-FullHD: only 75%)"
+                                  : "Window scale");
+    for (int s : { 75, 100, 150, 200 }) {
+        const bool enabled = (s == 75) || ! subFullHD;
+        m.addItem (juce::String (s) + " %", enabled, s == cur,
                    [this, s] {
                        GlobalSettings::get().setUiScalePercent (s);
                        applyUiScale (s);
                    });
+    }
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&zoomBtn));
 }
 
