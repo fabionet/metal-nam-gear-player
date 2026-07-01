@@ -1,0 +1,23 @@
+diff --git a/extras/Build/CMake/JUCEUtils.cmake b/extras/Build/CMake/JUCEUtils.cmake
+index ac995f0..6858b93 100644
+--- a/extras/Build/CMake/JUCEUtils.cmake
++++ b/extras/Build/CMake/JUCEUtils.cmake
+@@ -1062,10 +1062,16 @@ function(juce_enable_vst3_manifest_step shared_code_target)
+ 
+     get_target_property(target_version_string ${shared_code_target} JUCE_VERSION)
+ 
+-    # Use the helper tool to write out the moduleinfo.json
++    # Use the helper tool to write out the moduleinfo.json.
++    # Under MinGW cross-compilation the helper is a Windows PE, so launch it via wine.
++    if(MINGW)
++        set(_juce_vst3_helper_launcher wine)
++    else()
++        set(_juce_vst3_helper_launcher "")
++    endif()
+     add_custom_command(TARGET ${target_name} POST_BUILD
+         COMMAND ${CMAKE_COMMAND} -E make_directory "${product}/Contents/Resources"
+-        COMMAND juce_vst3_helper
++        COMMAND ${_juce_vst3_helper_launcher} $<TARGET_FILE:juce_vst3_helper>
+             -create
+             -version "${target_version_string}"
+             -path "${product}"
