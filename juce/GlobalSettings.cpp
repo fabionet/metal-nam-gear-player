@@ -48,3 +48,33 @@ void GlobalSettings::setUiScalePercent (int v)
         p->saveIfNeeded();
     }
 }
+
+juce::String GlobalSettings::getLastModelDir() const
+{
+    if (auto* p = const_cast<GlobalSettings*> (this)->props_.getUserSettings())
+        return p->getValue ("lastModelDir", "");
+    return {};
+}
+
+void GlobalSettings::setLastModelDir (const juce::String& path)
+{
+    if (auto* p = props_.getUserSettings()) {
+        p->setValue ("lastModelDir", path);
+        p->saveIfNeeded();
+    }
+}
+
+juce::String GlobalSettings::getLastIRDir() const
+{
+    if (auto* p = const_cast<GlobalSettings*> (this)->props_.getUserSettings())
+        return p->getValue ("lastIRDir", "");
+    return {};
+}
+
+void GlobalSettings::setLastIRDir (const juce::String& path)
+{
+    if (auto* p = props_.getUserSettings()) {
+        p->setValue ("lastIRDir", path);
+        p->saveIfNeeded();
+    }
+}

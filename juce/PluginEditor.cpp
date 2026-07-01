@@ -561,8 +561,14 @@ void NAMAudioProcessorEditor::resized()
 
 void NAMAudioProcessorEditor::browseModel()
 {
+    juce::File start = modelDir_.isDirectory() ? modelDir_ : juce::File();
+    if (start == juce::File()) {
+        auto persisted = GlobalSettings::get().getLastModelDir();
+        if (persisted.isNotEmpty() && juce::File (persisted).isDirectory())
+            start = juce::File (persisted);
+    }
     chooser = std::make_unique<juce::FileChooser> (
-        "Load NAM model", modelDir_.existsAsFile() || modelDir_.isDirectory() ? modelDir_ : juce::File(), "*.nam");
+        "Load NAM model", start, "*.nam");
     chooser->launchAsync (juce::FileBrowserComponent::openMode
                             | juce::FileBrowserComponent::canSelectFiles,
         [this] (const juce::FileChooser& fc) {
@@ -576,8 +582,14 @@ void NAMAudioProcessorEditor::browseModel()
 
 void NAMAudioProcessorEditor::browseIR()
 {
+    juce::File start = irDir_.isDirectory() ? irDir_ : juce::File();
+    if (start == juce::File()) {
+        auto persisted = GlobalSettings::get().getLastIRDir();
+        if (persisted.isNotEmpty() && juce::File (persisted).isDirectory())
+            start = juce::File (persisted);
+    }
     chooser = std::make_unique<juce::FileChooser> (
-        "Load IR (WAV)", irDir_.isDirectory() ? irDir_ : juce::File(), "*.wav");
+        "Load IR (WAV)", start, "*.wav");
     chooser->launchAsync (juce::FileBrowserComponent::openMode
                             | juce::FileBrowserComponent::canSelectFiles,
         [this] (const juce::FileChooser& fc) {
@@ -592,6 +604,8 @@ void NAMAudioProcessorEditor::browseIR()
 void NAMAudioProcessorEditor::rescanModelDir (const juce::File& sel)
 {
     modelDir_ = sel.getParentDirectory();
+    if (modelDir_.isDirectory())
+        GlobalSettings::get().setLastModelDir (modelDir_.getFullPathName());
     modelFiles_.clear();
     if (modelDir_.isDirectory()) {
         juce::Array<juce::File> files;
@@ -609,6 +623,8 @@ void NAMAudioProcessorEditor::rescanModelDir (const juce::File& sel)
 void NAMAudioProcessorEditor::rescanIRDir (const juce::File& sel)
 {
     irDir_ = sel.getParentDirectory();
+    if (irDir_.isDirectory())
+        GlobalSettings::get().setLastIRDir (irDir_.getFullPathName());
     irFiles_.clear();
     if (irDir_.isDirectory()) {
         juce::Array<juce::File> files;

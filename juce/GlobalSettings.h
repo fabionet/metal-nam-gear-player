@@ -16,6 +16,12 @@ public:
     int  getUiScalePercent() const;
     void setUiScalePercent (int v);
 
+    // Last directory used in the model / IR file chooser (Stage 12).
+    juce::String getLastModelDir() const;
+    void         setLastModelDir (const juce::String& path);
+    juce::String getLastIRDir() const;
+    void         setLastIRDir (const juce::String& path);
+
 private:
     GlobalSettings();
     juce::ApplicationProperties props_;
