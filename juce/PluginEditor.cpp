@@ -159,7 +159,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
     for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
-                     &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass }) {
+                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass }) {
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
     }
@@ -169,6 +169,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     gateBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "gate_bypass",  gateBypass);
     odBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "od_bypass",    odBypass);
     distBypassAtt = std::make_unique<BAtt> (processorRef.apvts, "dist_bypass",  distBypass);
+    eqBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "eq_bypass",    eqBypass);
     hpBypassAtt   = std::make_unique<BAtt> (processorRef.apvts, "hp_bypass",    hpBypass);
     lnEnabledAtt  = std::make_unique<BAtt> (processorRef.apvts, "ln_enabled",   lnEnabled);
     delBypassAtt  = std::make_unique<BAtt> (processorRef.apvts, "delay_bypass", delBypass);
@@ -192,8 +193,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
 
 void NAMAudioProcessorEditor::applyUiScale (int percent)
 {
-    if (percent != 25 && percent != 50 && percent != 75 &&
-        percent != 100 && percent != 150 && percent != 200)
+    if (percent != 75 && percent != 100 && percent != 150 && percent != 200)
         percent = 100;
     const int w = juce::roundToInt (1620.0 * percent / 100.0);
     const int h = juce::roundToInt ( 890.0 * percent / 100.0);
@@ -205,7 +205,7 @@ void NAMAudioProcessorEditor::showZoomMenu()
     const int cur = GlobalSettings::get().getUiScalePercent();
     juce::PopupMenu m;
     m.addSectionHeader ("Window scale");
-    for (int s : { 25, 50, 75, 100, 150, 200 })
+    for (int s : { 75, 100, 150, 200 })
         m.addItem (juce::String (s) + " %", true, s == cur,
                    [this, s] {
                        GlobalSettings::get().setUiScalePercent (s);
@@ -453,6 +453,7 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (odBypass);
             placeBtn (distBypass);
             placeBtn (ampBypass);
+            placeBtn (eqBypass);
             placeBtn (irBypass);
             placeBtn (hpBypass);
             placeBtn (lnEnabled);
@@ -462,7 +463,7 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (chBypass);
             placeBtn (flBypass);
             hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
-            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (irBypass);
+            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
             hideBtn (hpBypass); hideBtn (lnEnabled);
         }
     }

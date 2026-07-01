@@ -35,14 +35,17 @@ void GlobalSettings::setMeterDepthDb (int v)
 
 int GlobalSettings::getUiScalePercent() const
 {
+    int v = 100;
     if (auto* p = const_cast<GlobalSettings*> (this)->props_.getUserSettings())
-        return p->getIntValue ("uiScalePercent", 100);
-    return 100;
+        v = p->getIntValue ("uiScalePercent", 100);
+    // Migrate previously-persisted 25/50 (dropped 2026-07-01) to 100.
+    if (v != 75 && v != 100 && v != 150 && v != 200) v = 100;
+    return v;
 }
 
 void GlobalSettings::setUiScalePercent (int v)
 {
-    if (v != 25 && v != 50 && v != 75 && v != 100 && v != 150 && v != 200) v = 100;
+    if (v != 75 && v != 100 && v != 150 && v != 200) v = 100;
     if (auto* p = props_.getUserSettings()) {
         p->setValue ("uiScalePercent", v);
         p->saveIfNeeded();
