@@ -34,6 +34,7 @@ namespace {
         kChRate, kChDepth, kChMix,
         kFlRate, kFlDepth, kFlFb, kFlMix,
         kRvRoom, kRvDamp, kRvMix,
+        kIrHp, kIrLp, kIrTrim,
         kCount
     };
 
@@ -53,7 +54,8 @@ namespace {
         {"delay_time_ms",  "TIME"},   {"delay_feedback","FBK"},  {"delay_mix", "MIX"},
         {"chorus_rate_hz", "RATE"},   {"chorus_depth","DEPTH"},  {"chorus_mix","MIX"},
         {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"},
-        {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"}
+        {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"},
+        {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"}
     }};
 }
 
@@ -92,6 +94,20 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
 
     addAndMakeVisible (zoomBtn);
     zoomBtn.onClick = [this] { showZoomMenu(); };
+
+    addAndMakeVisible (osBtn);
+    osBtn.setClickingTogglesState (true);
+    osBtn.setToggleState (false, juce::dontSendNotification);
+    osBtn.setTooltip ("Real 2x oversampling (higher CPU, cleaner highs)");
+    osBtn.onClick = [this] {
+        processorRef.setOversamplingEnabled (osBtn.getToggleState());
+    };
+
+    addAndMakeVisible (infoBtn);
+    infoBtn.setTooltip ("Info / Credits / Guides / Donate");
+    infoBtn.onClick = [this] { showInfoPopup(); };
+
+    addAndMakeVisible (cpuMeter_);
 
     // Meters — closure reads APVTS choice "channel_mode" (0=Mono → 1 bar, ≥1 → 2 bars).
     auto isStereoFn = [&p = processorRef]() {
@@ -161,7 +177,8 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
     for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
-                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass }) {
+                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass,
+                     &irHpBypass, &irLpBypass, &irPhaseInv }) {
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
     }
@@ -178,6 +195,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     chBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "chorus_bypass",chBypass);
     flBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "flanger_bypass",flBypass);
     rvBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "reverb_bypass", rvBypass);
+    irHpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_hp_bypass",  irHpBypass);
+    irLpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_lp_bypass",  irLpBypass);
+    irPhaseInvAtt = std::make_unique<BAtt> (processorRef.apvts, "ir_phase_inv", irPhaseInv);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
     // Tab buttons.
@@ -327,7 +347,7 @@ void NAMAudioProcessorEditor::paintTitle (juce::Graphics& g, juce::Rectangle<int
     juce::Font titleFont (juce::FontOptions().withTypeface (pirataTypeface()).withHeight (62.0f));
     g.setFont (titleFont);
     auto txtBounds = a.toNearestInt();
-    const juce::String txt ("<<[[_METAL NAM PLAYER_]]>>");
+    const juce::String txt ("..::METAL NAM GEAR PLAYER::..");
     // Shadow.
     g.setColour (juce::Colour (0xff000000).withAlpha (0.8f));
     g.drawText (txt, txtBounds.translated (1, 2), juce::Justification::centred);
@@ -402,10 +422,16 @@ void NAMAudioProcessorEditor::resized()
     headerArea_ = r.removeFromTop (38);
     {
         auto h = headerArea_.reduced (2);
+        auto zoomCell    = h.removeFromRight (70).reduced (4, 4);
+        zoomBtn.setBounds (zoomCell);
+        auto cpuCell     = h.removeFromRight (110).reduced (4, 4);
+        cpuMeter_.setBounds (cpuCell);
+        auto osCell      = h.removeFromRight (60).reduced (4, 4);
+        osBtn.setBounds (osCell);
+        auto infoCell    = h.removeFromRight (40).reduced (4, 4);
+        infoBtn.setBounds (infoCell);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
-        auto zoomCell = h.removeFromRight (70).reduced (4, 2);
-        zoomBtn.setBounds (zoomCell);
 
         auto tabs = h.removeFromLeft (130).reduced (2, 4);
         mainTabBtn.setBounds (tabs.removeFromLeft (60));
@@ -479,6 +505,9 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (irBypass);
             placeBtn (hpBypass);
             placeBtn (lnEnabled);
+            placeBtn (irHpBypass);
+            placeBtn (irLpBypass);
+            placeBtn (irPhaseInv);
             hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass);
         } else {
             placeBtn (delBypass);
@@ -488,6 +517,7 @@ void NAMAudioProcessorEditor::resized()
             hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
             hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
             hideBtn (hpBypass); hideBtn (lnEnabled);
+            hideBtn (irHpBypass); hideBtn (irLpBypass); hideBtn (irPhaseInv);
         }
     }
 
@@ -509,6 +539,7 @@ void NAMAudioProcessorEditor::resized()
             { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
             { "POWER",      { kDepth, kRes, kResFreq } },
             { "CAB",        { kIrMix, kQuality } },
+            { "IR TOOLS",   { kIrHp, kIrLp, kIrTrim } },
             { "MASTER",     { kHpFreq, kLnTarget } },
         };
     } else {
@@ -700,4 +731,73 @@ void NAMAudioProcessorEditor::togglePresetPanel()
         &presetPanel,
         juce::Rectangle<int> (targetX, 0, pw, getHeight()),
         1.0f, 200, false, 1.0, 1.0);
+}
+
+void NAMAudioProcessorEditor::showInfoPopup()
+{
+    struct InfoContent : public juce::Component {
+        juce::Label title, version;
+        juce::TextEditor credits;
+        juce::TextButton quickBtn, techBtn, donateBtn;
+        InfoContent() {
+            title.setText ("..::METAL NAM GEAR PLAYER::..", juce::dontSendNotification);
+            title.setJustificationType (juce::Justification::centred);
+            title.setFont (juce::Font (juce::FontOptions().withHeight (22.f).withStyle ("Bold")));
+            version.setText ("Version 1.0.0-dev", juce::dontSendNotification);
+            version.setJustificationType (juce::Justification::centred);
+            credits.setMultiLine (true);
+            credits.setReadOnly (true);
+            credits.setScrollbarsShown (true);
+            credits.setText (
+                "Fork chain:\n"
+                "- Neural Amp Modeler (Steven Atkinson) - MIT\n"
+                "- neural-amp-modeler-lv2 (Mike Oliphant) - GPL-3.0\n"
+                "- NeuralAudio (Mike Oliphant) - MIT\n"
+                "- JUCE (Raw Material Software) - GPL-3.0\n"
+                "- VST3 SDK (Steinberg) - GPL-3.0\n"
+                "- This fork by fabionet - GPL-3.0\n");
+            quickBtn .setButtonText ("Guida Rapida (PDF)");
+            techBtn  .setButtonText ("Guida Tecnica (PDF)");
+            donateBtn.setButtonText ("Donation");
+            quickBtn.onClick = [] {
+                juce::URL ("file:///home/fabionet/Documenti/nam-guide-quick.pdf").launchInDefaultBrowser();
+            };
+            techBtn.onClick = [] {
+                juce::URL ("file:///home/fabionet/Documenti/nam-guide-technical.pdf").launchInDefaultBrowser();
+            };
+            donateBtn.onClick = [] {
+                juce::URL ("https://example.com/donate").launchInDefaultBrowser();
+            };
+            addAndMakeVisible (title);
+            addAndMakeVisible (version);
+            addAndMakeVisible (credits);
+            addAndMakeVisible (quickBtn);
+            addAndMakeVisible (techBtn);
+            addAndMakeVisible (donateBtn);
+            setSize (480, 360);
+        }
+        void resized() override {
+            auto r = getLocalBounds().reduced (12);
+            title.setBounds (r.removeFromTop (28));
+            version.setBounds (r.removeFromTop (20));
+            r.removeFromTop (8);
+            auto btnRow = r.removeFromBottom (30);
+            const int bw = btnRow.getWidth() / 3 - 4;
+            quickBtn .setBounds (btnRow.removeFromLeft (bw));
+            btnRow.removeFromLeft (6);
+            techBtn  .setBounds (btnRow.removeFromLeft (bw));
+            btnRow.removeFromLeft (6);
+            donateBtn.setBounds (btnRow);
+            r.removeFromBottom (8);
+            credits.setBounds (r);
+        }
+    };
+    juce::DialogWindow::LaunchOptions opts;
+    opts.dialogTitle = "Info";
+    opts.dialogBackgroundColour = juce::Colour (0xff1a1a1a);
+    opts.escapeKeyTriggersCloseButton = true;
+    opts.useNativeTitleBar = true;
+    opts.resizable = false;
+    opts.content.setOwned (new InfoContent());
+    opts.launchAsync();
 }

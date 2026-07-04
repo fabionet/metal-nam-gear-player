@@ -27,6 +27,8 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     chorus_.prepare(sampleRate);
     flanger_.prepare(sampleRate);
     reverb_.prepare(sampleRate);
+    irHp_.reset();
+    irLp_.reset();
 
     tmp_.assign(static_cast<size_t>(std::max(blockSize, 1)), 0.f);
 
@@ -54,6 +56,8 @@ void NAMPipeline::reset()
     chorus_.reset();
     flanger_.reset();
     reverb_.reset();
+    irHp_.reset();
+    irLp_.reset();
     if (ir_) ir_->reset();
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
@@ -135,10 +139,15 @@ void NAMPipeline::process(const float* in, float* out, int n)
         }
     }
 
-    // --- Post-cab: High-pass → Loudness Normalization → Delay → Chorus → Flanger → Reverb ---
+    // --- Post-cab: IR tools (phase/HP/LP/trim) → High-pass → Loudness Normalization → Delay → Chorus → Flanger → Reverb ---
     for (int i = 0; i < n; ++i) {
-        float s = hp_.process (out[i]);
-        s = loud_.process    (s);
+        float s = out[i];
+        if (irPhaseInv_) s = -s;
+        s = irHp_.process (s);
+        s = irLp_.process (s);
+        s *= irTrimGain_;
+        s = hp_.process   (s);
+        s = loud_.process (s);
         s = delay_.process   (s);
         s = chorus_.process  (s);
         s = flanger_.process (s);
@@ -188,3 +197,15 @@ void NAMPipeline::clearIR()    { ir_.reset(); }
 
 float NAMPipeline::modelInputDBAdjustment()  const { return model_ ? model_->GetRecommendedInputDBAdjustment()  : 0.f; }
 float NAMPipeline::modelOutputDBAdjustment() const { return model_ ? model_->GetRecommendedOutputDBAdjustment() : 0.f; }
+
+void NAMPipeline::setIRTools(float hpFreqHz, bool hpBypass,
+                             float lpFreqHz, bool lpBypass,
+                             float trimDb,   bool phaseInv)
+{
+    irHp_.setCutoff (hpFreqHz, sampleRate_);
+    irHp_.setBypass (hpBypass);
+    irLp_.setCutoff (lpFreqHz, sampleRate_);
+    irLp_.setBypass (lpBypass);
+    irTrimGain_ = std::pow (10.0f, trimDb * 0.05f);
+    irPhaseInv_ = phaseInv;
+}

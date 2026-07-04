@@ -480,4 +480,64 @@ private:
     bool  bypass_   = true;
 };
 
+// -------- Butterworth 2nd-order biquad (TDF-II) --------------------------
+class Biquad2 {
+public:
+    void setBypass (bool b) { bypass_ = b; }
+    void reset ()           { z1_ = z2_ = 0.f; }
+    float process (float x)
+    {
+        if (bypass_) return x;
+        const float y = b0_ * x + z1_;
+        z1_ = b1_ * x - a1_ * y + z2_;
+        z2_ = b2_ * x - a2_ * y;
+        return y;
+    }
+protected:
+    float b0_ = 1.f, b1_ = 0.f, b2_ = 0.f, a1_ = 0.f, a2_ = 0.f;
+    float z1_ = 0.f, z2_ = 0.f;
+    bool  bypass_ = true;
+
+    void setLowPass (float fcHz, double sr)
+    {
+        const double w0 = 2.0 * M_PI * (double) fcHz / sr;
+        const double cosw = std::cos (w0);
+        const double sinw = std::sin (w0);
+        const double alpha = sinw / (2.0 * 0.70710678); // Q = 1/sqrt(2)
+        const double b0 = (1.0 - cosw) * 0.5;
+        const double b1 =  1.0 - cosw;
+        const double b2 = (1.0 - cosw) * 0.5;
+        const double a0 =  1.0 + alpha;
+        const double a1 = -2.0 * cosw;
+        const double a2 =  1.0 - alpha;
+        b0_ = (float) (b0 / a0); b1_ = (float) (b1 / a0); b2_ = (float) (b2 / a0);
+        a1_ = (float) (a1 / a0); a2_ = (float) (a2 / a0);
+    }
+    void setHighPass (float fcHz, double sr)
+    {
+        const double w0 = 2.0 * M_PI * (double) fcHz / sr;
+        const double cosw = std::cos (w0);
+        const double sinw = std::sin (w0);
+        const double alpha = sinw / (2.0 * 0.70710678);
+        const double b0 =  (1.0 + cosw) * 0.5;
+        const double b1 = -(1.0 + cosw);
+        const double b2 =  (1.0 + cosw) * 0.5;
+        const double a0 =  1.0 + alpha;
+        const double a1 = -2.0 * cosw;
+        const double a2 =  1.0 - alpha;
+        b0_ = (float) (b0 / a0); b1_ = (float) (b1 / a0); b2_ = (float) (b2 / a0);
+        a1_ = (float) (a1 / a0); a2_ = (float) (a2 / a0);
+    }
+};
+
+class BiquadHPF : public Biquad2 {
+public:
+    void setCutoff (float fcHz, double sr) { setHighPass (fcHz, sr); }
+};
+
+class BiquadLPF : public Biquad2 {
+public:
+    void setCutoff (float fcHz, double sr) { setLowPass (fcHz, sr); }
+};
+
 } // namespace preamp_fx

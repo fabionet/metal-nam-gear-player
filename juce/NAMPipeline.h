@@ -61,6 +61,9 @@ public:
     { flanger_.setRateHz(rateHz); flanger_.setDepth(depth); flanger_.setFeedback(feedback); flanger_.setMix(mix); flanger_.setBypass(byp); }
     void setReverb(float room, float damping, float mix, bool byp)
     { reverb_.setRoomSize(room); reverb_.setDamping(damping); reverb_.setMix(mix); reverb_.setBypass(byp); }
+    void setIRTools(float hpFreqHz, bool hpBypass,
+                    float lpFreqHz, bool lpBypass,
+                    float trimDb,   bool phaseInv);
 
     // --- Model / IR loading (call from non-audio thread) ---
     // Returns true on success. Old model/IR is destroyed.
@@ -96,6 +99,12 @@ private:
     preamp_fx::ChorusFX      chorus_;
     preamp_fx::FlangerFX     flanger_;
     preamp_fx::ReverbFX      reverb_;
+
+    // IR post-processing tools (Fase 2a).
+    preamp_fx::BiquadHPF     irHp_;
+    preamp_fx::BiquadLPF     irLp_;
+    float irTrimGain_ = 1.f;
+    bool  irPhaseInv_ = false;
 
     // Cached EQ/depth values to avoid recomputing biquad coeffs every block.
     float eqBassDB_   = 0.f,  eqBassCached_   = 999.f;
