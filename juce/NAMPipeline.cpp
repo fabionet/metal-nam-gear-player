@@ -26,6 +26,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     delay_.prepare(sampleRate);
     chorus_.prepare(sampleRate);
     flanger_.prepare(sampleRate);
+    reverb_.prepare(sampleRate);
 
     tmp_.assign(static_cast<size_t>(std::max(blockSize, 1)), 0.f);
 
@@ -52,6 +53,7 @@ void NAMPipeline::reset()
     delay_.reset();
     chorus_.reset();
     flanger_.reset();
+    reverb_.reset();
     if (ir_) ir_->reset();
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
@@ -133,13 +135,14 @@ void NAMPipeline::process(const float* in, float* out, int n)
         }
     }
 
-    // --- Post-cab: High-pass → Loudness Normalization → Delay → Chorus → Flanger ---
+    // --- Post-cab: High-pass → Loudness Normalization → Delay → Chorus → Flanger → Reverb ---
     for (int i = 0; i < n; ++i) {
         float s = hp_.process (out[i]);
         s = loud_.process    (s);
         s = delay_.process   (s);
         s = chorus_.process  (s);
         s = flanger_.process (s);
+        s = reverb_.process  (s);
         out[i] = s;
     }
 

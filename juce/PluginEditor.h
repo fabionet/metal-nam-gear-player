@@ -106,8 +106,9 @@ private:
     juce::ToggleButton delBypass  { "DELAY" };
     juce::ToggleButton chBypass   { "CHOR" };
     juce::ToggleButton flBypass   { "FLAN" };
+    juce::ToggleButton rvBypass   { "REV" };
     IBypass ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
-    IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt;
+    IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt, rvBypassAtt;
     std::unique_ptr<BAtt> lnEnabledAtt; // LN uses `ln_enabled` (already active-semantics), keep direct.
 
     // Tab switcher (MAIN / FX).

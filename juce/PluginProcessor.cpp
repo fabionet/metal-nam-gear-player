@@ -55,6 +55,10 @@ namespace ids {
     constexpr auto flFb          = "flanger_feedback";
     constexpr auto flMix         = "flanger_mix";
     constexpr auto flBypass      = "flanger_bypass";
+    constexpr auto rvRoom        = "reverb_room";
+    constexpr auto rvDamping     = "reverb_damping";
+    constexpr auto rvMix         = "reverb_mix";
+    constexpr auto rvBypass      = "reverb_bypass";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -127,6 +131,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::flFb,1},     "Flanger Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.4f));
     add (std::make_unique<P>(juce::ParameterID{ids::flMix,1},    "Flanger Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::flBypass,1}, "Flanger Bypass",   true));
+
+    // Reverb
+    add (std::make_unique<P>(juce::ParameterID{ids::rvRoom,1},    "Reverb Room",    juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::rvDamping,1}, "Reverb Damping", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::rvMix,1},     "Reverb Mix",     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
+    add (std::make_unique<B>(juce::ParameterID{ids::rvBypass,1},  "Reverb Bypass",  true));
     return layout;
 }
 
@@ -219,6 +229,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float fFb = apvts.getRawParameterValue (ids::flFb)->load();
     const float fMx = apvts.getRawParameterValue (ids::flMix)->load();
     const bool  fBp = apvts.getRawParameterValue (ids::flBypass)->load() > 0.5f;
+    const float rvRm = apvts.getRawParameterValue (ids::rvRoom)->load();
+    const float rvDp = apvts.getRawParameterValue (ids::rvDamping)->load();
+    const float rvMx = apvts.getRawParameterValue (ids::rvMix)->load();
+    const bool  rvBp = apvts.getRawParameterValue (ids::rvBypass)->load() > 0.5f;
 
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
@@ -243,6 +257,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setDelay     (dT, dFb, dMx, dBp);
         p.setChorus    (cR, cD, cMx, cBp);
         p.setFlanger   (fR, fD, fFb, fMx, fBp);
+        p.setReverb    (rvRm, rvDp, rvMx, rvBp);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);

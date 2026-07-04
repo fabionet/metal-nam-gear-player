@@ -33,6 +33,7 @@ namespace {
         kDelTime, kDelFb, kDelMix,
         kChRate, kChDepth, kChMix,
         kFlRate, kFlDepth, kFlFb, kFlMix,
+        kRvRoom, kRvDamp, kRvMix,
         kCount
     };
 
@@ -51,7 +52,8 @@ namespace {
         {"hp_freq",        "HP FRQ"}, {"ln_target_db", "LN dB"},
         {"delay_time_ms",  "TIME"},   {"delay_feedback","FBK"},  {"delay_mix", "MIX"},
         {"chorus_rate_hz", "RATE"},   {"chorus_depth","DEPTH"},  {"chorus_mix","MIX"},
-        {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"}
+        {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"},
+        {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"}
     }};
 }
 
@@ -159,7 +161,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
     for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
-                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass }) {
+                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass }) {
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
     }
@@ -175,6 +177,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     delBypassAtt  = std::make_unique<InvertBypassBinding> (processorRef.apvts, "delay_bypass", delBypass);
     chBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "chorus_bypass",chBypass);
     flBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "flanger_bypass",flBypass);
+    rvBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "reverb_bypass", rvBypass);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
     // Tab buttons.
@@ -476,11 +479,12 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (irBypass);
             placeBtn (hpBypass);
             placeBtn (lnEnabled);
-            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass);
+            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass);
         } else {
             placeBtn (delBypass);
             placeBtn (chBypass);
             placeBtn (flBypass);
+            placeBtn (rvBypass);
             hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
             hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
             hideBtn (hpBypass); hideBtn (lnEnabled);
@@ -512,6 +516,7 @@ void NAMAudioProcessorEditor::resized()
             { "DELAY",   { kDelTime, kDelFb, kDelMix } },
             { "CHORUS",  { kChRate, kChDepth, kChMix } },
             { "FLANGER", { kFlRate, kFlDepth, kFlFb, kFlMix } },
+            { "REVERB",  { kRvRoom, kRvDamp, kRvMix } },
         };
     }
 

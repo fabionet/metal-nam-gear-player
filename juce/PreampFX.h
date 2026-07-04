@@ -408,4 +408,76 @@ private:
     bool  bypass_ = true;
 };
 
+// --- Reverb (Freeverb-style mono, 8 comb + 4 allpass) ------------------------
+class ReverbFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        const double scale = sr_ / 44100.0;
+        static const int combLenRef[kNComb] = { 1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617 };
+        static const int allpLenRef[kNAllp] = { 225, 341, 441, 556 };
+        for (int i = 0; i < kNComb; ++i) {
+            comb_[i].len = std::max (1, (int) std::round (combLenRef[i] * scale));
+            comb_[i].buf.assign ((size_t) comb_[i].len, 0.f);
+            comb_[i].idx = 0;
+            comb_[i].lpz = 0.f;
+        }
+        for (int i = 0; i < kNAllp; ++i) {
+            allp_[i].len = std::max (1, (int) std::round (allpLenRef[i] * scale));
+            allp_[i].buf.assign ((size_t) allp_[i].len, 0.f);
+            allp_[i].idx = 0;
+        }
+    }
+    void reset()
+    {
+        for (auto& c : comb_) { std::fill (c.buf.begin(), c.buf.end(), 0.f); c.idx = 0; c.lpz = 0.f; }
+        for (auto& a : allp_) { std::fill (a.buf.begin(), a.buf.end(), 0.f); a.idx = 0; }
+    }
+
+    void setRoomSize (float r) { roomSize_ = std::clamp (r, 0.f, 1.f); }
+    void setDamping  (float d) { damping_  = std::clamp (d, 0.f, 1.f); }
+    void setMix      (float m) { mix_      = std::clamp (m, 0.f, 1.f); }
+    void setBypass   (bool  b) { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_) return x;
+        const float fb   = 0.7f + roomSize_ * 0.28f; // 0.70 .. 0.98
+        const float damp = damping_ * 0.4f;          // 0 .. 0.4
+        const float input = x * 0.015f;              // Freeverb fixed input gain
+        float sum = 0.f;
+        for (int i = 0; i < kNComb; ++i) {
+            auto& c = comb_[i];
+            const float y = c.buf[(size_t) c.idx];
+            c.lpz = y * (1.f - damp) + c.lpz * damp;
+            c.buf[(size_t) c.idx] = input + c.lpz * fb;
+            c.idx = (c.idx + 1) % c.len;
+            sum += y;
+        }
+        float y = sum;
+        for (int i = 0; i < kNAllp; ++i) {
+            auto& a = allp_[i];
+            const float bufout = a.buf[(size_t) a.idx];
+            const float in = y;
+            a.buf[(size_t) a.idx] = in + bufout * 0.5f;
+            a.idx = (a.idx + 1) % a.len;
+            y = bufout - in;
+        }
+        return x * (1.f - mix_) + y * mix_;
+    }
+private:
+    static constexpr int kNComb = 8;
+    static constexpr int kNAllp = 4;
+    struct Comb { std::vector<float> buf; int len = 0, idx = 0; float lpz = 0.f; };
+    struct Allp { std::vector<float> buf; int len = 0, idx = 0; };
+    Comb comb_[kNComb];
+    Allp allp_[kNAllp];
+    double sr_ = 48000.0;
+    float roomSize_ = 0.5f;
+    float damping_  = 0.5f;
+    float mix_      = 0.25f;
+    bool  bypass_   = true;
+};
+
 } // namespace preamp_fx
