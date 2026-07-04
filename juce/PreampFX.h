@@ -540,4 +540,40 @@ public:
     void setCutoff (float fcHz, double sr) { setLowPass (fcHz, sr); }
 };
 
+// --- Tremolo (LFO amplitude modulation) --------------------------------------
+class TremoloFX {
+public:
+    void setBypass (bool b)    { bypass_ = b; }
+    void setRateHz (float r)   { rateHz_  = std::clamp (r, 0.05f, 20.f); updatePhaseInc(); }
+    void setDepth  (float d)   { depth_   = std::clamp (d, 0.f, 1.f); }
+    void setShape  (float s)   { shape_   = std::clamp (s, 0.f, 1.f); } // 0=sine, 1=square-ish
+    void prepare (double sr)   { sr_ = sr; phase_ = 0.f; updatePhaseInc(); }
+    void reset ()              { phase_ = 0.f; }
+    float process (float x)
+    {
+        if (bypass_) return x;
+        // LFO: sine → square blend via tanh compression on sine.
+        const float s = std::sin (phase_);
+        const float sq = std::tanh (s * 6.f);
+        const float lfo = s * (1.f - shape_) + sq * shape_;
+        // Map LFO from [-1..+1] to [1-depth .. 1] (unipolar downward modulation).
+        const float gain = 1.f - depth_ * 0.5f * (1.f - lfo);
+        phase_ += phaseInc_;
+        if (phase_ >= 6.2831853f) phase_ -= 6.2831853f;
+        return x * gain;
+    }
+private:
+    void updatePhaseInc()
+    {
+        phaseInc_ = (float) (2.0 * 3.141592653589793 * (double) rateHz_ / std::max (1.0, sr_));
+    }
+    bool  bypass_ = true;
+    float rateHz_ = 4.f;
+    float depth_  = 0.5f;
+    float shape_  = 0.f;
+    double sr_ = 48000.0;
+    float phase_ = 0.f;
+    float phaseInc_ = 0.f;
+};
+
 } // namespace preamp_fx

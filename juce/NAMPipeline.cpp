@@ -27,6 +27,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     chorus_.prepare(sampleRate);
     flanger_.prepare(sampleRate);
     reverb_.prepare(sampleRate);
+    tremolo_.prepare(sampleRate);
     irHp_.reset();
     irLp_.reset();
 
@@ -56,6 +57,7 @@ void NAMPipeline::reset()
     chorus_.reset();
     flanger_.reset();
     reverb_.reset();
+    tremolo_.reset();
     irHp_.reset();
     irLp_.reset();
     if (ir_) ir_->reset();
@@ -152,6 +154,7 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = chorus_.process  (s);
         s = flanger_.process (s);
         s = reverb_.process  (s);
+        s = tremolo_.process (s);
         out[i] = s;
     }
 

@@ -59,6 +59,11 @@ namespace ids {
     constexpr auto rvDamping     = "reverb_damping";
     constexpr auto rvMix         = "reverb_mix";
     constexpr auto rvBypass      = "reverb_bypass";
+    // Tremolo
+    constexpr auto trRate        = "tremolo_rate_hz";
+    constexpr auto trDepth       = "tremolo_depth";
+    constexpr auto trShape       = "tremolo_shape";
+    constexpr auto trBypass      = "tremolo_bypass";
     // IR tools (Fase 2a)
     constexpr auto irHpFreq      = "ir_hp_freq";
     constexpr auto irHpBypass    = "ir_hp_bypass";
@@ -144,6 +149,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::rvDamping,1}, "Reverb Damping", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
     add (std::make_unique<P>(juce::ParameterID{ids::rvMix,1},     "Reverb Mix",     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::rvBypass,1},  "Reverb Bypass",  true));
+
+    // Tremolo
+    add (std::make_unique<P>(juce::ParameterID{ids::trRate,1},   "Tremolo Rate",  juce::NormalisableRange<float>(0.05f, 20.f, 0.01f, 0.3f), 4.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::trDepth,1},  "Tremolo Depth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::trShape,1},  "Tremolo Shape", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::trBypass,1}, "Tremolo Bypass", true));
 
     // IR tools
     add (std::make_unique<P>(juce::ParameterID{ids::irHpFreq,1},   "IR HP",        juce::NormalisableRange<float>(20.f, 500.f, 0.5f, 0.3f), 80.f));
@@ -269,6 +280,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float rvDp = apvts.getRawParameterValue (ids::rvDamping)->load();
     const float rvMx = apvts.getRawParameterValue (ids::rvMix)->load();
     const bool  rvBp = apvts.getRawParameterValue (ids::rvBypass)->load() > 0.5f;
+    const float trRt = apvts.getRawParameterValue (ids::trRate)->load();
+    const float trDp = apvts.getRawParameterValue (ids::trDepth)->load();
+    const float trSh = apvts.getRawParameterValue (ids::trShape)->load();
+    const bool  trBp = apvts.getRawParameterValue (ids::trBypass)->load() > 0.5f;
     const float irHp  = apvts.getRawParameterValue (ids::irHpFreq)->load();
     const bool  irHpB = apvts.getRawParameterValue (ids::irHpBypass)->load() > 0.5f;
     const float irLp  = apvts.getRawParameterValue (ids::irLpFreq)->load();
@@ -300,6 +315,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setChorus    (cR, cD, cMx, cBp);
         p.setFlanger   (fR, fD, fFb, fMx, fBp);
         p.setReverb    (rvRm, rvDp, rvMx, rvBp);
+        p.setTremolo   (trRt, trDp, trSh, trBp);
         p.setIRTools   (irHp, irHpB, irLp, irLpB, irTr, irPhi);
     };
     apply (*pipelineL_);

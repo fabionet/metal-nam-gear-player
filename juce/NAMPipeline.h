@@ -61,6 +61,8 @@ public:
     { flanger_.setRateHz(rateHz); flanger_.setDepth(depth); flanger_.setFeedback(feedback); flanger_.setMix(mix); flanger_.setBypass(byp); }
     void setReverb(float room, float damping, float mix, bool byp)
     { reverb_.setRoomSize(room); reverb_.setDamping(damping); reverb_.setMix(mix); reverb_.setBypass(byp); }
+    void setTremolo(float rateHz, float depth, float shape, bool byp)
+    { tremolo_.setRateHz(rateHz); tremolo_.setDepth(depth); tremolo_.setShape(shape); tremolo_.setBypass(byp); }
     void setIRTools(float hpFreqHz, bool hpBypass,
                     float lpFreqHz, bool lpBypass,
                     float trimDb,   bool phaseInv);
@@ -99,6 +101,7 @@ private:
     preamp_fx::ChorusFX      chorus_;
     preamp_fx::FlangerFX     flanger_;
     preamp_fx::ReverbFX      reverb_;
+    preamp_fx::TremoloFX     tremolo_;
 
     // IR post-processing tools (Fase 2a).
     preamp_fx::BiquadHPF     irHp_;

@@ -34,6 +34,7 @@ namespace {
         kChRate, kChDepth, kChMix,
         kFlRate, kFlDepth, kFlFb, kFlMix,
         kRvRoom, kRvDamp, kRvMix,
+        kTrRate, kTrDepth, kTrShape,
         kIrHp, kIrLp, kIrTrim,
         kCount
     };
@@ -55,6 +56,7 @@ namespace {
         {"chorus_rate_hz", "RATE"},   {"chorus_depth","DEPTH"},  {"chorus_mix","MIX"},
         {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"},
         {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"},
+        {"tremolo_rate_hz","RATE"},   {"tremolo_depth","DEPTH"}, {"tremolo_shape",    "SHAPE"},
         {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"}
     }};
 }
@@ -177,7 +179,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
     for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
-                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass,
+                     &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass, &trBypass,
                      &irHpBypass, &irLpBypass, &irPhaseInv }) {
         addAndMakeVisible (*b);
         b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
@@ -195,6 +197,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     chBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "chorus_bypass",chBypass);
     flBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "flanger_bypass",flBypass);
     rvBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "reverb_bypass", rvBypass);
+    trBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "tremolo_bypass",trBypass);
     irHpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_hp_bypass",  irHpBypass);
     irLpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_lp_bypass",  irLpBypass);
     irPhaseInvAtt = std::make_unique<BAtt> (processorRef.apvts, "ir_phase_inv", irPhaseInv);
@@ -508,12 +511,13 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (irHpBypass);
             placeBtn (irLpBypass);
             placeBtn (irPhaseInv);
-            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass);
+            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass); hideBtn (trBypass);
         } else {
             placeBtn (delBypass);
             placeBtn (chBypass);
             placeBtn (flBypass);
             placeBtn (rvBypass);
+            placeBtn (trBypass);
             hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
             hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
             hideBtn (hpBypass); hideBtn (lnEnabled);
@@ -548,6 +552,7 @@ void NAMAudioProcessorEditor::resized()
             { "CHORUS",  { kChRate, kChDepth, kChMix } },
             { "FLANGER", { kFlRate, kFlDepth, kFlFb, kFlMix } },
             { "REVERB",  { kRvRoom, kRvDamp, kRvMix } },
+            { "TREMOLO", { kTrRate, kTrDepth, kTrShape } },
         };
     }
 

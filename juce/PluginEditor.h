@@ -143,11 +143,12 @@ private:
     juce::ToggleButton chBypass   { "CHOR" };
     juce::ToggleButton flBypass   { "FLAN" };
     juce::ToggleButton rvBypass   { "REV" };
+    juce::ToggleButton trBypass   { "TREM" };
     juce::ToggleButton irHpBypass { "iHP" };
     juce::ToggleButton irLpBypass { "iLP" };
     juce::ToggleButton irPhaseInv { juce::CharPointer_UTF8 ("\xcf\x86") };
     IBypass ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
-    IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt, rvBypassAtt;
+    IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt, rvBypassAtt, trBypassAtt;
     IBypass irHpBypassAtt, irLpBypassAtt;
     std::unique_ptr<BAtt> lnEnabledAtt;
     std::unique_ptr<BAtt> irPhaseInvAtt; // non-inverted: bool param is truthy=active // LN uses `ln_enabled` (already active-semantics), keep direct.
