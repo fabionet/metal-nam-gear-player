@@ -3,13 +3,22 @@
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/deps/JUCE JUCE)
 
+# JUCE does not officially support MinGW for VST3, and its LV2 manifest helper
+# does not build against mingw-w64 headers. When cross-compiling for Windows
+# via MinGW, ship only the Standalone .exe.
+if(MINGW)
+    set(NAMCUSTOM_FORMATS Standalone)
+else()
+    set(NAMCUSTOM_FORMATS VST3 LV2 Standalone)
+endif()
+
 juce_add_plugin(NAMCustom
     PRODUCT_NAME          "NAM Custom"
     COMPANY_NAME          "fabionet"
     BUNDLE_ID             "com.fabionet.namcustom"
     PLUGIN_MANUFACTURER_CODE Fbnt
     PLUGIN_CODE              Nmcu
-    FORMATS                  VST3 LV2 Standalone
+    FORMATS                  ${NAMCUSTOM_FORMATS}
     LV2URI                   "https://github.com/mikeoliphant/neural-amp-modeler-lv2#namcustom-juce"
     IS_SYNTH                 FALSE
     NEEDS_MIDI_INPUT         FALSE
@@ -55,6 +64,8 @@ juce_add_binary_data(NAMPresets
         Presets/Factory/ThrashRhythm.nampreset
         Presets/Factory/DoomSludge.nampreset
         Presets/Factory/BlackMetal.nampreset
+        Presets/Factory/DemoClean.nampreset
+        Presets/Assets/nam/demo_wavenet_a1.nam
 )
 
 target_compile_definitions(NAMCustom PUBLIC

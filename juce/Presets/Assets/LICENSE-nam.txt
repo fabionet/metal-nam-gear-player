@@ -1,0 +1,7 @@
+demo_wavenet_a1.nam
+Source : https://github.com/sdatkinson/NeuralAmpModelerCore/tree/main/example_models
+License: MIT (see NeuralAmpModelerCore/LICENSE)
+Author : Steve Atkinson (sdatkinson)
+Note   : Fixture / test model bundled from the NeuralAmpModelerCore example_models
+         folder. Redistributable under MIT. This is a smoke-test capture, not a
+         production tone-quality model.

@@ -11,6 +11,7 @@ namespace
     constexpr const char* kAttrName   = "name";
     constexpr const char* kAttrVer    = "version";
     constexpr const char* kAttrLock   = "lockModel";
+    constexpr const char* kAttrCategory = "category";
     constexpr const char* kChildModel = "ModelPath";
     constexpr const char* kChildIR    = "IRPath";
     constexpr const char* kChildParams= "Parameters";
@@ -64,6 +65,12 @@ void PresetManager::refresh()
         ref.name         = juce::File (orig).getFileNameWithoutExtension();
         ref.isFactory    = true;
         ref.factoryIndex = i;
+        {
+            int sz = 0;
+            if (auto* bytes = NAMPresetData::getNamedResource (NAMPresetData::namedResourceList[i], sz))
+                if (auto x = juce::XmlDocument::parse (juce::String::fromUTF8 (bytes, sz)))
+                    ref.category = x->getStringAttribute (kAttrCategory, ref.category);
+        }
         presets_.push_back (ref);
     }
 
@@ -77,6 +84,8 @@ void PresetManager::refresh()
         ref.name      = stem (f);
         ref.isFactory = false;
         ref.userFile  = f;
+        if (auto x = juce::XmlDocument::parse (f))
+            ref.category = x->getStringAttribute (kAttrCategory, ref.category);
         presets_.push_back (ref);
     }
 
@@ -109,6 +118,7 @@ juce::String PresetManager::serialize (const juce::String& name) const
     root.setAttribute (kAttrName, name);
     root.setAttribute (kAttrVer, 1);
     root.setAttribute (kAttrLock, lockModel_ ? 1 : 0);
+    root.setAttribute (kAttrCategory, currentCategory_);
 
     auto* mp = root.createNewChildElement (kChildModel);
     mp->addTextElement (processor_.getCurrentModelPath());
@@ -133,6 +143,8 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
     const bool fileLockModel = root.getIntAttribute (kAttrLock, 0) != 0;
     const bool effectiveLock = lockModel_ || fileLockModel;
 
+    currentCategory_ = root.getStringAttribute (kAttrCategory, "Uncategorized");
+
     loading_ = true;
 
     if (auto* params = root.getChildByName (kChildParams))
@@ -152,8 +164,33 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
         const juce::String mpath = mp ? mp->getAllSubText().trim() : juce::String();
         const juce::String ipath = ip ? ip->getAllSubText().trim() : juce::String();
 
+        auto resolveBundled = [] (const juce::String& name) -> juce::File
+        {
+            if (name.isEmpty() || name.containsChar ('/')) return {};
+            int sz = 0;
+            const char* bytes = nullptr;
+            for (int i = 0; i < NAMPresetData::namedResourceListSize; ++i)
+            {
+                if (name.equalsIgnoreCase (NAMPresetData::originalFilenames[i]))
+                {
+                    bytes = NAMPresetData::getNamedResource (NAMPresetData::namedResourceList[i], sz);
+                    break;
+                }
+            }
+            if (bytes == nullptr || sz <= 0) return {};
+            auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                          .getChildFile ("NAMCustom").getChildFile ("bundled");
+            if (! dir.exists()) dir.createDirectory();
+            auto out = dir.getChildFile (name);
+            if (! out.existsAsFile() || out.getSize() != (juce::int64) sz)
+                out.replaceWithData (bytes, (size_t) sz);
+            return out;
+        };
+
         if (mpath.isNotEmpty() && juce::File (mpath).existsAsFile())
             processor_.loadModelAsync (juce::File (mpath));
+        else if (auto bundled = resolveBundled (mpath); bundled.existsAsFile())
+            processor_.loadModelAsync (bundled);
         else
             processor_.clearModel();
 
