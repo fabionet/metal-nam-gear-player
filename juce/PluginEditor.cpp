@@ -214,6 +214,19 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
     fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
 
+    // Slim slider (below MODEL loader). Mirrors QUAL knob via shared APVTS param.
+    addAndMakeVisible (slimLabel_);
+    slimLabel_.setJustificationType (juce::Justification::centredRight);
+    slimLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    slimLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    slimSlider_.setSliderStyle (juce::Slider::LinearHorizontal);
+    slimSlider_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 16);
+    slimSlider_.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    addAndMakeVisible (slimSlider_);
+    slimAtt_ = std::make_unique<SAtt> (processorRef.apvts, "quality_scale", slimSlider_);
+    updateSlimEnabled();
+    startTimerHz (8);
+
     applyUiScale (GlobalSettings::get().getUiScalePercent());
 }
 
@@ -279,8 +292,27 @@ void NAMAudioProcessorEditor::showOptionsMenu()
 
 NAMAudioProcessorEditor::~NAMAudioProcessorEditor()
 {
+    stopTimer();
     setLookAndFeel (nullptr);
     for (auto& k : knobs_) k->slider.setLookAndFeel (nullptr);
+}
+
+void NAMAudioProcessorEditor::updateSlimEnabled()
+{
+    const bool slim = processorRef.isCurrentModelSlimmable();
+    if (slim == lastSlimmable_) return;
+    lastSlimmable_ = slim;
+    slimSlider_.setEnabled (slim);
+    slimLabel_ .setAlpha   (slim ? 1.0f : 0.4f);
+    if (kQuality < (int) knobs_.size() && knobs_[kQuality]) {
+        knobs_[kQuality]->slider.setEnabled (slim);
+        knobs_[kQuality]->label .setAlpha  (slim ? 1.0f : 0.4f);
+    }
+}
+
+void NAMAudioProcessorEditor::timerCallback()
+{
+    updateSlimEnabled();
 }
 
 // ---------------- Painting --------------------------------------------------
@@ -455,13 +487,21 @@ void NAMAudioProcessorEditor::resized()
     r.removeFromTop (6);
 
     // Loader strip (very bottom): MODEL  ◀ [combo ▾] ▶ [Browse]   |   IR  ◀ [combo ▾] ▶ [Browse]
-    loaderArea_ = r.removeFromBottom (60);
+    loaderArea_ = r.removeFromBottom (92);
     {
         auto strip = loaderArea_.reduced (4, 8);
         auto half = strip.getWidth() / 2;
-        auto modelStrip = strip.removeFromLeft (half).reduced (4, 0);
+        auto modelBlock = strip.removeFromLeft (half).reduced (4, 0);
         strip.removeFromLeft (8);
         auto irStrip    = strip.reduced (4, 0);
+
+        // Split model side vertically: top = existing loader row, bottom = SLIM slider.
+        auto modelStrip = modelBlock.removeFromTop (28);
+        modelBlock.removeFromTop (4);
+        auto slimRow = modelBlock.removeFromTop (24);
+
+        // IR side keeps a single row centered vertically for symmetry.
+        auto irRow = irStrip.removeFromTop (28);
 
         auto layoutOne = [] (juce::Rectangle<int> area,
                              juce::Label& title,
@@ -478,7 +518,12 @@ void NAMAudioProcessorEditor::resized()
             combo.setBounds  (area);
         };
         layoutOne (modelStrip, modelTitleLabel, modelPrevBtn, modelCombo, modelNextBtn, modelBrowseBtn);
-        layoutOne (irStrip,    irTitleLabel,    irPrevBtn,    irCombo,    irNextBtn,    irBrowseBtn);
+        layoutOne (irRow,      irTitleLabel,    irPrevBtn,    irCombo,    irNextBtn,    irBrowseBtn);
+
+        // Slim label + slider aligned with combo column (skip the MODEL title width).
+        slimLabel_ .setBounds (slimRow.removeFromLeft (60));
+        slimRow.removeFromLeft (4);
+        slimSlider_.setBounds (slimRow);
     }
     r.removeFromBottom (4);
 

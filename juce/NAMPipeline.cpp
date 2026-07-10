@@ -180,9 +180,17 @@ bool NAMPipeline::loadModel(const std::string& path)
     loader_.SetDefaultMaxAudioBufferSize(blockSize_);
     loader_.SetDefaultQualityScaleFactor(qualityScale_.load());
     NeuralAudio::NeuralModel* m = loader_.CreateFromFile(path);
-    if (!m) return false;
+    if (!m) { isSlimmable_.store(false); return false; }
     model_.reset(m);
+    isSlimmable_.store(model_->HasQualityScaling());
     return true;
+}
+
+void NAMPipeline::setQualityScaleRuntime(float s)
+{
+    qualityScale_.store(s);
+    if (model_ && isSlimmable_.load())
+        model_->SetQualityScaleFactor(s);
 }
 
 bool NAMPipeline::loadIR(const std::string& path)
@@ -195,7 +203,7 @@ bool NAMPipeline::loadIR(const std::string& path)
     return true;
 }
 
-void NAMPipeline::clearModel() { model_.reset(); }
+void NAMPipeline::clearModel() { model_.reset(); isSlimmable_.store(false); }
 void NAMPipeline::clearIR()    { ir_.reset(); }
 
 float NAMPipeline::modelInputDBAdjustment()  const { return model_ ? model_->GetRecommendedInputDBAdjustment()  : 0.f; }

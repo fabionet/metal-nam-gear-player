@@ -11,7 +11,8 @@
 #include "PresetPanelComponent.h"
 #include "MeterStripComponent.h"
 
-class NAMAudioProcessorEditor : public juce::AudioProcessorEditor
+class NAMAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                private juce::Timer
 {
 public:
     explicit NAMAudioProcessorEditor (NAMAudioProcessor&);
@@ -19,6 +20,10 @@ public:
 
     void paint  (juce::Graphics&) override;
     void resized() override;
+
+    // Polls processorRef.isCurrentModelSlimmable() at ~8 Hz and enables/disables
+    // the Slim slider + the QUAL knob accordingly. Cheap and race-free.
+    void timerCallback() override;
 
     // Small readout that shows the DSP CPU load (%). Polled at 10 Hz.
     class CpuMeterComponent : public juce::Component, private juce::Timer
@@ -92,6 +97,15 @@ private:
     juce::TextButton modelBrowseBtn { "Browse" };
     juce::ComboBox   modelCombo;
     juce::Label      modelTitleLabel { {}, "MODEL" };
+
+    // Slim slider under the MODEL loader row. Bound to APVTS `quality_scale`
+    // (same param as the QUAL knob → the two stay in sync automatically).
+    // Enabled only when the active pipeline holds an A2 slimmable model.
+    juce::Slider slimSlider_;
+    juce::Label  slimLabel_ { {}, "SLIM" };
+    std::unique_ptr<SAtt> slimAtt_;
+    bool lastSlimmable_ = false;
+    void updateSlimEnabled();
 
     juce::TextButton irPrevBtn      { "<" };
     juce::TextButton irNextBtn      { ">" };

@@ -39,6 +39,14 @@ public:
     void setModelBypass(bool b)         { modelBypass_   = b; }
     void setQualityScale(float s)       { qualityScale_  = s; }
 
+    // Runtime slim/quality push: stores value and, if a slimmable model is loaded,
+    // applies it live via SetQualityScaleFactor (RT-safe per NeuralAudio API).
+    void setQualityScaleRuntime(float s);
+
+    // True iff the currently loaded model exposes A2 quality scaling
+    // (HasQualityScaling() returned true after the last successful load).
+    bool isSlimmable() const noexcept   { return isSlimmable_.load(); }
+
     // Pre-FX
     void setGate(float threshDB, float releaseMs, bool byp)
     { gate_.setThresholdDB(threshDB); gate_.setReleaseMs(releaseMs); gate_.setBypass(byp); }
@@ -127,6 +135,7 @@ private:
     std::atomic<float> qualityScale_  { 1.f };
     std::atomic<bool>  irBypass_      { false };
     std::atomic<bool>  modelBypass_   { false };
+    std::atomic<bool>  isSlimmable_   { false };
 
     // Smoothed gain state.
     float inputGainLin_  = 1.f;

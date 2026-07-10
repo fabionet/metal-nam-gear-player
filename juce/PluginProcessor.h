@@ -47,6 +47,14 @@ public:
     juce::String getCurrentModelPath() const { return currentModelPath_; }
     juce::String getCurrentIRPath()    const { return currentIRPath_;    }
 
+    // True iff the currently active pipeline holds a NAM model that exposes
+    // A2 quality scaling (aka "slimmable"). Editor polls this to enable/disable
+    // the Quality knob and the new Slim slider under the loader.
+    bool isCurrentModelSlimmable() const noexcept
+    {
+        return pipelineL_ && pipelineL_->isSlimmable();
+    }
+
     juce::AudioProcessorValueTreeState apvts;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

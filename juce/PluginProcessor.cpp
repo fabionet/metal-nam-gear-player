@@ -301,7 +301,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setEqAir (air);
         p.setDepth (dep);
         p.setResonance (res, resF);
-        p.setQualityScale (qual);
+        p.setQualityScaleRuntime (qual);
         p.setIrMix (mix);
         p.setIrBypass (irBp);
         p.setModelBypass (mdBp);
