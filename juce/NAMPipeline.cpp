@@ -90,8 +90,51 @@ void NAMPipeline::process(const float* in, float* out, int n)
     if (n <= 0) return;
     updateCachedDsp();
 
-    const float modelInDB  = (model_ && !modelBypass_.load()) ? model_->GetRecommendedInputDBAdjustment()  : 0.f;
-    const float modelOutDB = (model_ && !modelBypass_.load()) ? model_->GetRecommendedOutputDBAdjustment() : 0.f;
+    // Steve-style gain-staging (NeuralAmpModeler.cpp:690-730 reference):
+    // Input side  = Calibrate Input ? (inputCalDBu - modelInputLevelDBu) : 0
+    // Output side = Raw        -> 0
+    //               Normalized -> -18 - modelLoudnessDB           (if known)
+    //               Calibrated -> modelOutputLevelDBu - inputCalDBu (if known)
+    // If the metadata flag for the term is not known, the term is a no-op — this
+    // matches Steve's behavior for V1-legacy models with no dbu/loudness info,
+    // and avoids fabricated compensations that caused Bug B (output saturation
+    // with A2 slim + IR).
+    const bool  modelActive = (model_ && !modelBypass_.load());
+    float modelInDB  = 0.f;
+    float modelOutDB = 0.f;
+    if (modelActive) {
+        // Explicit Steve-style input calibration when user opts in AND model exposes it.
+        if (calibrateInput_.load() && hasInputLevelCached_.load()) {
+            modelInDB = inputCalDBu_.load() - modelInputLevelCached_.load();
+        }
+
+        switch (outputMode_.load()) {
+            case OutputMode::Normalized:
+                if (hasLoudnessCached_.load()) {
+                    const float totalCorr = -18.f - modelLoudnessCached_.load();
+                    // Half-metadata A2 fallback: when loudness is known but the model
+                    // exposes no input_level_dbu, splitting the Normalized correction
+                    // 50/50 across input and output keeps hot models (e.g. Orange Dual
+                    // Terror slim, loudness ~-12) out of the saturated / high-self-noise
+                    // region. When input_level_dbu is known Steve's rule wins and the
+                    // whole correction lands on the output side.
+                    if (!hasInputLevelCached_.load() && modelInDB == 0.f) {
+                        modelInDB  = 0.5f * totalCorr;
+                        modelOutDB = 0.5f * totalCorr;
+                    } else {
+                        modelOutDB = totalCorr;
+                    }
+                }
+                break;
+            case OutputMode::Calibrated:
+                if (hasOutputLevelCached_.load())
+                    modelOutDB = modelOutputLevelCached_.load() - inputCalDBu_.load();
+                break;
+            case OutputMode::Raw:
+            default:
+                break;
+        }
+    }
 
     // --- Input gain (smoothed) ---
     const float desiredIn = db2lin(inputGainDB_.load() + modelInDB);
@@ -120,6 +163,17 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // --- NAM model ---
     if (model_ && !modelBypass_.load()) {
         model_->Process(out, out, n);
+    }
+
+    // --- Model output gain-stage (Steve-style): apply BEFORE IR/post chain ---
+    // Placing modelOutDB here (not at final output) matches NeuralAmpModelerPlugin:
+    // Normalized/Calibrated correction lands on the raw model output so the IR
+    // convolver and post-cab FX see a level-normalized signal. Applying it at
+    // the end (after IR) would let hot A2 models saturate the convolution stage
+    // before the attenuation ever reaches them.
+    if (std::fabs(modelOutDB) > 1e-6f) {
+        const float modelOutLin = db2lin(modelOutDB);
+        for (int i = 0; i < n; ++i) out[i] *= modelOutLin;
     }
 
     // --- Depth + Resonance ---
@@ -158,8 +212,8 @@ void NAMPipeline::process(const float* in, float* out, int n)
         out[i] = s;
     }
 
-    // --- Output gain (smoothed) ---
-    const float desiredOut = db2lin(outputGainDB_.load() + modelOutDB);
+    // --- Output gain (smoothed) --- (modelOutDB already applied post-model)
+    const float desiredOut = db2lin(outputGainDB_.load());
     if (std::fabs(desiredOut - outputGainLin_) > kSmoothEpsilon) {
         float g = outputGainLin_;
         for (int i = 0; i < n; ++i) {
@@ -180,9 +234,22 @@ bool NAMPipeline::loadModel(const std::string& path)
     loader_.SetDefaultMaxAudioBufferSize(blockSize_);
     loader_.SetDefaultQualityScaleFactor(qualityScale_.load());
     NeuralAudio::NeuralModel* m = loader_.CreateFromFile(path);
-    if (!m) { isSlimmable_.store(false); return false; }
+    if (!m) {
+        isSlimmable_.store(false);
+        hasLoudnessCached_.store(false);
+        hasInputLevelCached_.store(false);
+        hasOutputLevelCached_.store(false);
+        return false;
+    }
     model_.reset(m);
     isSlimmable_.store(model_->HasQualityScaling());
+    // Snapshot metadata for the audio thread (avoid virtual calls in process()).
+    hasLoudnessCached_.store(model_->HasLoudness());
+    hasInputLevelCached_.store(model_->HasInputLevel());
+    hasOutputLevelCached_.store(model_->HasOutputLevel());
+    modelLoudnessCached_.store(model_->GetLoudnessDB());
+    modelInputLevelCached_.store(model_->GetInputLevelDBu());
+    modelOutputLevelCached_.store(model_->GetOutputLevelDBu());
     return true;
 }
 
@@ -203,7 +270,13 @@ bool NAMPipeline::loadIR(const std::string& path)
     return true;
 }
 
-void NAMPipeline::clearModel() { model_.reset(); isSlimmable_.store(false); }
+void NAMPipeline::clearModel() {
+    model_.reset();
+    isSlimmable_.store(false);
+    hasLoudnessCached_.store(false);
+    hasInputLevelCached_.store(false);
+    hasOutputLevelCached_.store(false);
+}
 void NAMPipeline::clearIR()    { ir_.reset(); }
 
 float NAMPipeline::modelInputDBAdjustment()  const { return model_ ? model_->GetRecommendedInputDBAdjustment()  : 0.f; }

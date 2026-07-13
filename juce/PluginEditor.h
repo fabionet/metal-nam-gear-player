@@ -104,7 +104,11 @@ private:
     juce::Slider slimSlider_;
     juce::Label  slimLabel_ { {}, "SLIM" };
     std::unique_ptr<SAtt> slimAtt_;
-    bool lastSlimmable_ = false;
+    // Init to `true` so the first updateSlimEnabled() call always applies the
+    // real state (disabled when no slimmable model is loaded). Otherwise the
+    // early-return `slim == lastSlimmable_` skips the first update and the
+    // JUCE Slider stays enabled by default → visually looks active on V1.
+    bool lastSlimmable_ = true;
     void updateSlimEnabled();
 
     juce::TextButton irPrevBtn      { "<" };
@@ -120,9 +124,15 @@ private:
 
     // Preset panel + toggle.
     juce::TextButton    presetsToggleBtn { "PRESETS" };
+    juce::TextButton    calBtn { "CAL" };
     PresetPanelComponent presetPanel;
     bool                 panelOpen_ = false;
     void togglePresetPanel();
+    void showCalibrationPopup();
+
+    // NORMAL toggle: shortcut for Output Mode Raw <-> Normalized.
+    juce::TextButton normalToggle_ { "NORMAL" };
+    std::unique_ptr<juce::ParameterAttachment> normalAtt_;
 
     // Options button + meters (Stage 8).
     juce::TextButton optionsBtn { "Meeter OPT" };

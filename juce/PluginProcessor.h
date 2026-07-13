@@ -55,6 +55,11 @@ public:
         return pipelineL_ && pipelineL_->isSlimmable();
     }
 
+    // Read-only accessor for the L pipeline (used by the Calibration popup
+    // to show cached model metadata). L is always populated when a model
+    // is loaded.
+    const NAMPipeline& pipelineL() const noexcept { return *pipelineL_; }
+
     juce::AudioProcessorValueTreeState apvts;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

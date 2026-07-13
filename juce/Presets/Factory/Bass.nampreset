@@ -18,7 +18,7 @@
       <PARAM id="resonance" value="2"/>
       <PARAM id="resonance_freq" value="80"/>
       <PARAM id="channel_mode" value="0"/>
-      <PARAM id="quality_scale" value="1"/>
+      <PARAM id="quality_scale" value="0"/>
       <PARAM id="ir_mix" value="1"/>
       <PARAM id="ir_bypass" value="0"/>
       <PARAM id="model_bypass" value="0"/>
@@ -35,7 +35,7 @@
       <PARAM id="dist_bypass" value="1"/>
       <PARAM id="hp_freq" value="25"/>
       <PARAM id="hp_bypass" value="0"/>
-      <PARAM id="ln_enabled" value="1"/>
+      <PARAM id="ln_enabled" value="0"/>
       <PARAM id="ln_target_db" value="-14"/>
       <PARAM id="ng_threshold" value="-55"/>
       <PARAM id="ng_release" value="80"/>
@@ -53,6 +53,19 @@
       <PARAM id="flanger_feedback" value="0.4"/>
       <PARAM id="flanger_mix" value="0.25"/>
       <PARAM id="flanger_bypass" value="1"/>
+      <PARAM id="tremolo_rate_hz" value="4"/>
+      <PARAM id="tremolo_depth" value="0.5"/>
+      <PARAM id="tremolo_shape" value="0"/>
+      <PARAM id="tremolo_bypass" value="1"/>
+      <PARAM id="ir_hp_freq" value="80"/>
+      <PARAM id="ir_hp_bypass" value="1"/>
+      <PARAM id="ir_lp_freq" value="12000"/>
+      <PARAM id="ir_lp_bypass" value="1"/>
+      <PARAM id="ir_trim_db" value="0"/>
+      <PARAM id="ir_phase_inv" value="0"/>
+      <PARAM id="output_mode" value="1"/>
+      <PARAM id="calibrate_input" value="0"/>
+      <PARAM id="input_cal_level" value="12"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

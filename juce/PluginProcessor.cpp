@@ -71,6 +71,10 @@ namespace ids {
     constexpr auto irLpBypass    = "ir_lp_bypass";
     constexpr auto irTrimDb      = "ir_trim_db";
     constexpr auto irPhaseInv    = "ir_phase_inv";
+    // Steve-style calibration
+    constexpr auto outputMode    = "output_mode";
+    constexpr auto calibrateInput= "calibrate_input";
+    constexpr auto inputCalLevel = "input_cal_level";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -96,7 +100,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::resonance,1},     "Resonance",juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonanceFreq,1}, "Res Freq", juce::NormalisableRange<float>(60.f, 250.f, 1.f, 0.5f), 100.f));
     add (std::make_unique<C>(juce::ParameterID{ids::channelMode,1},   "Mode",     juce::StringArray{"Mono","Dual-Mono","Stereo"}, 0));
-    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
@@ -163,6 +167,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<B>(juce::ParameterID{ids::irLpBypass,1}, "IR LP Bypass", true));
     add (std::make_unique<P>(juce::ParameterID{ids::irTrimDb,1},   "IR Trim dB",   juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irPhaseInv,1}, "IR Phase Inv", false));
+
+    // Steve-style calibration (Output Mode + Calibrate Input).
+    add (std::make_unique<C>(juce::ParameterID{ids::outputMode,1},    "Output Mode",     juce::StringArray{"Raw","Normalized","Calibrated"}, 1));
+    add (std::make_unique<B>(juce::ParameterID{ids::calibrateInput,1},"Calibrate Input", false));
+    add (std::make_unique<P>(juce::ParameterID{ids::inputCalLevel,1}, "Input Cal Level", juce::NormalisableRange<float>(-60.f, 60.f, 0.1f), 12.f));
 
     return layout;
 }
@@ -290,6 +299,9 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const bool  irLpB = apvts.getRawParameterValue (ids::irLpBypass)->load() > 0.5f;
     const float irTr  = apvts.getRawParameterValue (ids::irTrimDb)->load();
     const bool  irPhi = apvts.getRawParameterValue (ids::irPhaseInv)->load() > 0.5f;
+    const int   outMd = (int) apvts.getRawParameterValue (ids::outputMode)->load();
+    const bool  calIn = apvts.getRawParameterValue (ids::calibrateInput)->load() > 0.5f;
+    const float calDBu= apvts.getRawParameterValue (ids::inputCalLevel)->load();
 
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
@@ -317,6 +329,9 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setReverb    (rvRm, rvDp, rvMx, rvBp);
         p.setTremolo   (trRt, trDp, trSh, trBp);
         p.setIRTools   (irHp, irHpB, irLp, irLpB, irTr, irPhi);
+        p.setOutputMode (static_cast<NAMPipeline::OutputMode>(outMd));
+        p.setCalibrateInput (calIn);
+        p.setInputCalibrationLevelDBu (calDBu);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);

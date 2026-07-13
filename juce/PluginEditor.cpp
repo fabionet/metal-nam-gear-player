@@ -91,6 +91,30 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (presetsToggleBtn);
     presetsToggleBtn.onClick = [this] { togglePresetPanel(); };
 
+    addAndMakeVisible (calBtn);
+    calBtn.setTooltip ("Calibration / Output Mode");
+    calBtn.onClick = [this] { showCalibrationPopup(); };
+
+    // NORMAL toggle — Raw (0) <-> Normalized (1) shortcut. Choice range 0..2,
+    // so param value in [0,1] must be mapped as normalised = index/2.
+    addAndMakeVisible (normalToggle_);
+    normalToggle_.setClickingTogglesState (true);
+    normalToggle_.setTooltip ("Toggle Output Mode: Normalized <-> Raw");
+    if (auto* pOut = processorRef.apvts.getParameter ("output_mode")) {
+        normalAtt_ = std::make_unique<juce::ParameterAttachment> (
+            *pOut,
+            [this] (float v) {
+                // v is the raw (unnormalised) parameter value = choice index (0..2).
+                normalToggle_.setToggleState (v >= 0.5f, juce::dontSendNotification);
+            });
+        normalToggle_.onClick = [this] {
+            const bool on = normalToggle_.getToggleState();
+            // Choice param: raw value = index. 1 = Normalized, 0 = Raw.
+            normalAtt_->setValueAsCompleteGesture (on ? 1.0f : 0.0f);
+        };
+        normalAtt_->sendInitialUpdate();
+    }
+
     addAndMakeVisible (optionsBtn);
     optionsBtn.onClick = [this] { showOptionsMenu(); };
 
@@ -467,6 +491,8 @@ void NAMAudioProcessorEditor::resized()
         infoBtn.setBounds (infoCell);
         auto presetCell  = h.removeFromRight (90).reduced (4, 2);
         presetsToggleBtn.setBounds (presetCell);
+        auto calCell     = h.removeFromRight (56).reduced (4, 2);
+        calBtn.setBounds (calCell);
 
         auto tabs = h.removeFromLeft (130).reduced (2, 4);
         mainTabBtn.setBounds (tabs.removeFromLeft (60));
@@ -661,6 +687,26 @@ void NAMAudioProcessorEditor::resized()
         if (gi + 1 < groups.size())
             cursorRect.removeFromLeft (gap);
     }
+
+    // NORMAL toggle: place a small toggle strip on top of the OUTPUT knob cell,
+    // stealing ~14 px from the bottom of the knob slider. Only visible in Main tab.
+    if (activeTab_ == Tab::Main
+        && kOutput < (int) knobs_.size()
+        && knobs_[kOutput]
+        && knobs_[kOutput]->slider.isVisible()) {
+        auto sb = knobs_[kOutput]->slider.getBounds();
+        const int th = 16;
+        if (sb.getHeight() > th + 8) {
+            auto togRect = sb.removeFromBottom (th);
+            knobs_[kOutput]->slider.setBounds (sb);
+            normalToggle_.setVisible (true);
+            normalToggle_.setBounds (togRect.reduced (2, 1));
+        } else {
+            normalToggle_.setVisible (false);
+        }
+    } else {
+        normalToggle_.setVisible (false);
+    }
 }
 
 // ---------------- File pickers ----------------------------------------------
@@ -781,6 +827,106 @@ void NAMAudioProcessorEditor::togglePresetPanel()
         &presetPanel,
         juce::Rectangle<int> (targetX, 0, pw, getHeight()),
         1.0f, 200, false, 1.0, 1.0);
+}
+
+void NAMAudioProcessorEditor::showCalibrationPopup()
+{
+    struct CalContent : public juce::Component {
+        juce::Label title;
+        juce::Label modeLbl, calInLbl, calLevelLbl, infoLbl;
+        juce::ComboBox modeBox;
+        juce::ToggleButton calInBtn { "Calibrate Input" };
+        juce::Slider calLevel;
+        std::unique_ptr<CAtt> modeAtt;
+        std::unique_ptr<BAtt> calInAtt;
+        std::unique_ptr<SAtt> calLevelAtt;
+
+        CalContent (NAMAudioProcessor& proc) {
+            title.setText ("Calibration / Output Mode", juce::dontSendNotification);
+            title.setJustificationType (juce::Justification::centred);
+            title.setFont (juce::Font (juce::FontOptions().withHeight (18.f).withStyle ("Bold")));
+            addAndMakeVisible (title);
+
+            modeLbl.setText ("Output Mode", juce::dontSendNotification);
+            addAndMakeVisible (modeLbl);
+            modeBox.addItem ("Raw",        1);
+            modeBox.addItem ("Normalized", 2);
+            modeBox.addItem ("Calibrated", 3);
+            addAndMakeVisible (modeBox);
+            modeAtt = std::make_unique<CAtt> (proc.apvts, "output_mode", modeBox);
+
+            calInLbl.setText ("Calibrate Input", juce::dontSendNotification);
+            addAndMakeVisible (calInLbl);
+            addAndMakeVisible (calInBtn);
+            calInAtt = std::make_unique<BAtt> (proc.apvts, "calibrate_input", calInBtn);
+
+            calLevelLbl.setText ("Input Cal Level (dBu)", juce::dontSendNotification);
+            addAndMakeVisible (calLevelLbl);
+            calLevel.setSliderStyle (juce::Slider::LinearHorizontal);
+            calLevel.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 18);
+            calLevel.setRange (-60.0, 60.0, 0.1);
+            addAndMakeVisible (calLevel);
+            calLevelAtt = std::make_unique<SAtt> (proc.apvts, "input_cal_level", calLevel);
+
+            // Model info: read cached metadata from pipeline L.
+            const auto& pl = proc.pipelineL();
+            juce::String info;
+            info << "Model loudness: "
+                 << (pl.modelHasLoudness()
+                     ? juce::String (pl.modelLoudnessDB(), 2) + " dB (known)"
+                     : juce::String ("unknown"))
+                 << "\nModel input level: "
+                 << (pl.modelHasInputLevel()
+                     ? juce::String (pl.modelInputLevelDBu(), 2) + " dBu (known)"
+                     : juce::String ("unknown"))
+                 << "\nModel output level: "
+                 << (pl.modelHasOutputLevel()
+                     ? juce::String (pl.modelOutputLevelDBu(), 2) + " dBu (known)"
+                     : juce::String ("unknown"));
+            infoLbl.setText (info, juce::dontSendNotification);
+            infoLbl.setJustificationType (juce::Justification::topLeft);
+            infoLbl.setFont (juce::Font (juce::FontOptions (11.f)));
+            addAndMakeVisible (infoLbl);
+
+            // Grey-out disabled semantics (like Steve): if a mode's needed
+            // metadata is absent, the choice still switches but is a no-op.
+            // We reflect this by disabling controls whose metadata is missing.
+            if (! pl.modelHasInputLevel()) {
+                calInBtn.setEnabled (false);
+                calLevel.setEnabled (false);
+                calInLbl.setAlpha (0.5f);
+                calLevelLbl.setAlpha (0.5f);
+            }
+
+            setSize (420, 320);
+        }
+        void resized() override {
+            auto r = getLocalBounds().reduced (12);
+            title.setBounds (r.removeFromTop (28));
+            r.removeFromTop (8);
+            auto row = r.removeFromTop (28);
+            modeLbl.setBounds (row.removeFromLeft (160));
+            modeBox.setBounds (row);
+            r.removeFromTop (8);
+            row = r.removeFromTop (28);
+            calInLbl.setBounds (row.removeFromLeft (160));
+            calInBtn.setBounds (row);
+            r.removeFromTop (8);
+            row = r.removeFromTop (28);
+            calLevelLbl.setBounds (row.removeFromLeft (160));
+            calLevel.setBounds (row);
+            r.removeFromTop (12);
+            infoLbl.setBounds (r);
+        }
+    };
+    juce::DialogWindow::LaunchOptions opts;
+    opts.dialogTitle = "Calibration";
+    opts.dialogBackgroundColour = juce::Colour (0xff1a1a1a);
+    opts.escapeKeyTriggersCloseButton = true;
+    opts.useNativeTitleBar = true;
+    opts.resizable = false;
+    opts.content.setOwned (new CalContent (processorRef));
+    opts.launchAsync();
 }
 
 void NAMAudioProcessorEditor::showInfoPopup()

@@ -15,6 +15,8 @@
 
 class NAMPipeline {
 public:
+    enum class OutputMode { Raw = 0, Normalized = 1, Calibrated = 2 };
+
     NAMPipeline();
     ~NAMPipeline();
 
@@ -38,6 +40,19 @@ public:
     void setIrBypass(bool b)            { irBypass_      = b; }
     void setModelBypass(bool b)         { modelBypass_   = b; }
     void setQualityScale(float s)       { qualityScale_  = s; }
+
+    // Steve-style gain-staging: Output Mode + Calibrate Input.
+    void setOutputMode(OutputMode m)            { outputMode_.store(m); }
+    void setCalibrateInput(bool on)             { calibrateInput_.store(on); }
+    void setInputCalibrationLevelDBu(float dBu) { inputCalDBu_.store(dBu); }
+
+    // UI queries about currently loaded model metadata (populated at loadModel()).
+    bool  modelHasLoudness()    const noexcept { return hasLoudnessCached_.load(); }
+    bool  modelHasInputLevel()  const noexcept { return hasInputLevelCached_.load(); }
+    bool  modelHasOutputLevel() const noexcept { return hasOutputLevelCached_.load(); }
+    float modelLoudnessDB()     const noexcept { return modelLoudnessCached_.load(); }
+    float modelInputLevelDBu()  const noexcept { return modelInputLevelCached_.load(); }
+    float modelOutputLevelDBu() const noexcept { return modelOutputLevelCached_.load(); }
 
     // Runtime slim/quality push: stores value and, if a slimmable model is loaded,
     // applies it live via SetQualityScaleFactor (RT-safe per NeuralAudio API).
@@ -136,6 +151,19 @@ private:
     std::atomic<bool>  irBypass_      { false };
     std::atomic<bool>  modelBypass_   { false };
     std::atomic<bool>  isSlimmable_   { false };
+
+    // Steve-style calibration state (UI-thread writes; audio-thread reads).
+    std::atomic<OutputMode> outputMode_      { OutputMode::Normalized };
+    std::atomic<bool>       calibrateInput_  { false };
+    std::atomic<float>      inputCalDBu_     { 12.f };
+
+    // Cached model metadata (populated once per loadModel(), read from audio thread).
+    std::atomic<bool>  hasLoudnessCached_    { false };
+    std::atomic<bool>  hasInputLevelCached_  { false };
+    std::atomic<bool>  hasOutputLevelCached_ { false };
+    std::atomic<float> modelLoudnessCached_    { -18.f };
+    std::atomic<float> modelInputLevelCached_  { 12.f };
+    std::atomic<float> modelOutputLevelCached_ { 12.f };
 
     // Smoothed gain state.
     float inputGainLin_  = 1.f;
