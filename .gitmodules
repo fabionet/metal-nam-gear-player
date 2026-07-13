@@ -3,7 +3,7 @@
 	url = https://github.com/lv2/lv2
 [submodule "deps/NeuralAudio"]
 	path = deps/NeuralAudio
-	url = https://github.com/mikeoliphant/NeuralAudio
+	url = https://github.com/fabionet/NeuralAudio
 [submodule "deps/FFTConvolver"]
 	path = deps/FFTConvolver
 	url = https://github.com/HiFi-LoFi/FFTConvolver
