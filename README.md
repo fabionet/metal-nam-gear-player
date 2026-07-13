@@ -1,72 +1,54 @@
-# neural-amp-modeler-lv2
+# METAL NAM GEAR PLAYER
 
-LV2 plugin for neural network machine learning amp model playback using the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine.
+A full-featured guitar amp-sim plugin (VST3 / LV2 / Standalone) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
 
-**There is no custom plugin user interface**. Setting the model to use requires that your LV2 host supports atom:Path parameters. Reaper does as of v6.82. Carla and Ardour do. If your favorite LV2 host does not support atom:Path, let them know you want it.
-If you are looking for a GUI version, @brummer10 [has one here](https://github.com/brummer10/neural-amp-modeler-ui) that works for Linux and Windows. You may also be interested in the the version shipped with the [MOD Desktop App](https://github.com/moddevices/mod-desktop-app), or my digital pedalboard app [Stompbox](https://github.com/mikeoliphant/Stompbox).
+The plugin is exposed to hosts as **"NAM Custom"**.
 
-To get the intended behavior, **you must run your audio host at the same sample rate the model was trained at** (usually 48kHz) - no resampling is done by the plugin. An exception to this is oversampling (running at an even multiple of the model sample rate). See the "[Oversampling](https://github.com/mikeoliphant/neural-amp-modeler-lv2/blob/main/README.md#oversampling)" section below.
+> The original headless LV2 plugin lives on the [`custom-dual-stereo`](../../tree/custom-dual-stereo) branch. Active development happens on [`juce-rewrite`](../../tree/juce-rewrite) (default branch).
 
-For amp-only models (the most typical), **you will need to run an impulse reponse after this plugin** to model the cabinet.
+## Features
 
-## Usage
+- **NAM model playback** — supports both V1 (WaveNet/LSTM) and A2 (SlimmableContainer) models, with a **Slim** slider for real-time quality scaling on A2 models
+- **IR loader** with quality tools: high-pass / low-pass filters, trim, phase invert
+- **Full FX chain**:
+  - Pre-model: Smart Gate, Overdrive, Distortion
+  - Post-model: 5-band EQ + Depth + Resonance, Noise Gate, High-Pass, Loudness Normalization
+  - Post-cab: Delay, Chorus, Flanger, Reverb, Tremolo
+- **Gain-staging / calibration** (ported from the reference [NeuralAmpModelerPlugin](https://github.com/sdatkinson/NeuralAmpModelerPlugin)): Output Mode (Raw / Normalized / Calibrated) and Calibrate Input with dBu level — with automatic fallback when a model lacks calibration metadata
+- **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal), user presets, direct link to [Tone3000](https://www.tone3000.com/) for more models
+- **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
+- CPU meter, level meters, Info popup with credits
 
-Your DAW should expose the following input controls:
+## Requirements
 
-**Input:** - Input (pre-model) gain in dB.
+- Run your host at the sample rate the model was trained at (usually **48 kHz**)
+- Linux is the primary target (a Windows MinGW cross-build port is maintained separately)
 
-**Output:** - Output (post-model) volume in dB.
+## Building (Linux)
 
-**Quality:** - Model quality (if applicable). For NAM A2 models, a value below 0.5 will give you a "lite" model and a value above 0.5 will give you a "full" model.
-
-**Model:** - The model file (ie: xxx.nam) to use.
-
-## Models Supported and Performance
-
-The plugin supports both [Neural Amp Modeler (NAM)](https://github.com/sdatkinson/neural-amp-modeler) models (both A1 and A2) and [RTNeural keras json models](https://github.com/jatinchowdhury18/RTNeural) (like those used by [Aida-X](https://github.com/AidaDSP/AIDA-X)).
-
-The best source of models is [Tone3000](https://www.tone3000.com/).
-
-For more information on model type support and performance, see the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) repository, which is where the model handling code lives.
-
-## Input Calibration
-
-The expected input level to the plugin is 12dBu. For models that include input level information, they will be calibrated against this level. If you know the input level of your audio interface, you should adjust the input level relative to the expected 12dBu to provide the appropriate signal level to the model.
-
-## Oversampling
-
-If you run at a sample rate that is an even multiple of the model sample rate, the model will be correctly oversampled to behave as expected. So, if the model sample rate is 48kHz (which they typically are), and you are running at 96kHz, the model will be 2x oversampled. This also means that if your DAW supports oversampling, you can safely use it. Running oversampled comes with a signficant performance cost, but can be useful for reducing aliasing.
-
-## Building
-
-First clone the repository:
 ```bash
-git clone --recurse-submodules -j4 https://github.com/mikeoliphant/neural-amp-modeler-lv2
-cd neural-amp-modeler-lv2/build
+git clone --recurse-submodules https://github.com/fabionet/metal-nam-gear-player.git
+cd metal-nam-gear-player
+cmake -B build-juce -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build-juce -j 2
 ```
 
-Then compile the plugin using:
+> **Note:** `-DCMAKE_BUILD_TYPE=Release` is required — an empty build type produces an unoptimized binary that stutters under load.
 
-**Linux/MacOS**
+The VST3 bundle is produced at `build-juce/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3`. There is no install target; copy it to your user VST3 folder:
+
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE="Release"
-make -j4
+rsync -a --delete "build-juce/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3/" "$HOME/.vst3/NAM Custom.vst3/"
 ```
 
-**Windows**
-```bash
-cmake.exe -G "Visual Studio 17 2022" -A x64 ..
-cmake --build . --config=release -j4
-```
+### Submodule note
 
-Note - you'll have to change the Visual Studio version if you are using a different one.
+`deps/NeuralAudio` points to [fabionet/NeuralAudio](https://github.com/fabionet/NeuralAudio) (branch `nam-custom-patches`), a lightly patched fork that exposes model-metadata flags (`HasLoudness` / `HasInputLevel` / `HasOutputLevel`) used by the calibration logic.
 
-After building, the plugin will be in **build/neural_amp_modeler.lv2**.
+## Models
 
-## CMake Options
+Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 architectures are supported. For amp-only models, load an impulse response in the built-in IR loader to model the cabinet.
 
-```-DUSE_NATIVE_ARCH=ON```: If you have a relatively modern x64 processor, you can pass ```-DUSE_NATIVE_ARCH=ON``` on your cmake command line to enable certain processor-specific optimizations.
+## License
 
-```-DSMART_BYPASS_ENABLED=ON```: If enabled, this will bypass model processing if input has been silent (below -100 dB by default) for a sufficient number of samples (determined by the model's receptive field size).
-
-Also see the [NeuralAudio CMake options](https://github.com/mikeoliphant/NeuralAudio#cmake-options) - adding these to your neural-amp-modeler-lv2 cmake will pass them to the NeuralAudio build.
+GPL-3.0, same as the upstream project. Bundled demo preset assets are MIT-licensed. See the Info popup in the plugin for full credits.
