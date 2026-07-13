@@ -34,18 +34,44 @@ bool IRConvolver::loadFromFile(const std::string& path, double targetSR) {
     ready_ = false;
     targetSR_ = targetSR;
 
-    unsigned int channels = 0;
-    unsigned int srcRate  = 0;
-    drwav_uint64 totalFrames = 0;
-    float* raw = drwav_open_file_and_read_pcm_frames_f32(
-        path.c_str(), &channels, &srcRate, &totalFrames, nullptr);
-    if (!raw) return false;
+    // Stream-read a bounded number of frames instead of slurping the whole
+    // file: the final IR is capped to ~1.5 s anyway, and an untrusted WAV
+    // header can otherwise request a multi-GB allocation (OOM/DoS).
+    drwav wav;
+    if (!drwav_init_file(&wav, path.c_str(), nullptr)) return false;
+
+    const unsigned int channels = wav.channels;
+    const unsigned int srcRate  = wav.sampleRate;
+    // Bound srcRate too: a forged header (e.g. sampleRate=0xFFFFFFFF) would
+    // otherwise inflate the 4 s frame cap into a multi-GB allocation.
+    if (channels == 0 || channels > 64 || srcRate == 0 || srcRate > 768000) {
+        drwav_uninit(&wav);
+        return false;
+    }
+
+    // 4 s of source material is plenty of headroom before the resample cap.
+    const drwav_uint64 maxFrames = static_cast<drwav_uint64>(srcRate) * 4;
+    const drwav_uint64 want =
+        std::min<drwav_uint64>(wav.totalPCMFrameCount, maxFrames);
+
+    // Keep drwav_uninit reachable on every path: the allocation below can
+    // throw bad_alloc, which would otherwise leak the underlying FILE handle.
+    std::vector<float> interleaved;
+    drwav_uint64 got = 0;
+    try {
+        interleaved.resize(static_cast<size_t>(want) * channels);
+        got = drwav_read_pcm_frames_f32(&wav, want, interleaved.data());
+    } catch (...) {
+        drwav_uninit(&wav);
+        return false;
+    }
+    drwav_uninit(&wav);
+    if (got == 0) return false;
 
     // Down-mix to mono (first channel).
-    std::vector<float> mono(static_cast<size_t>(totalFrames));
-    for (drwav_uint64 i = 0; i < totalFrames; ++i)
-        mono[i] = raw[i * channels];
-    drwav_free(raw, nullptr);
+    std::vector<float> mono(static_cast<size_t>(got));
+    for (drwav_uint64 i = 0; i < got; ++i)
+        mono[i] = interleaved[i * channels];
 
     linearResample(mono, static_cast<double>(srcRate), ir_, targetSR_);
 

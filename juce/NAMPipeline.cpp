@@ -233,7 +233,14 @@ bool NAMPipeline::loadModel(const std::string& path)
     loader_.SetExternalSampleRate(static_cast<int>(sampleRate_));
     loader_.SetDefaultMaxAudioBufferSize(blockSize_);
     loader_.SetDefaultQualityScaleFactor(qualityScale_.load());
-    NeuralAudio::NeuralModel* m = loader_.CreateFromFile(path);
+    // NeuralAudio parses untrusted JSON with nlohmann (throws on malformed
+    // input / missing keys). A corrupt .nam must not take down the host.
+    NeuralAudio::NeuralModel* m = nullptr;
+    try {
+        m = loader_.CreateFromFile(path);
+    } catch (...) {
+        m = nullptr;
+    }
     if (!m) {
         isSlimmable_.store(false);
         hasLoudnessCached_.store(false);
@@ -264,7 +271,11 @@ bool NAMPipeline::loadIR(const std::string& path)
 {
     if (path.empty()) { clearIR(); return false; }
     auto next = std::make_unique<nam_dsp::IRConvolver>();
-    if (!next->loadFromFile(path, sampleRate_)) return false;
+    try {
+        if (!next->loadFromFile(path, sampleRate_)) return false;
+    } catch (...) {
+        return false; // corrupt/oversized WAV must not crash the host
+    }
     next->prepare(128, 1024);
     ir_ = std::move(next);
     return true;

@@ -221,7 +221,12 @@ void NAMAudioProcessor::setOversamplingEnabled (bool on)
 {
     if (oversamplingOn_.load() == on) return;
     oversamplingOn_.store (on);
+    if (baseSampleRate_ <= 0.0 || baseBlockSize_ <= 0) return; // not prepared yet
+    // Re-preparing swaps the oversampler and pipelines out from under the
+    // audio thread — block processBlock() while we do it.
+    suspendProcessing (true);
     prepareToPlay (baseSampleRate_, baseBlockSize_);
+    suspendProcessing (false);
 }
 
 bool NAMAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -483,15 +488,21 @@ void NAMAudioProcessor::loadIRAsync (const juce::File& f)
 void NAMAudioProcessor::clearModel()
 {
     currentModelPath_ = {};
+    // model_.reset() would free the model while the audio thread may be
+    // inside model_->Process() — pause processing around the mutation.
+    suspendProcessing (true);
     pipelineL_->clearModel();
     pipelineR_->clearModel();
+    suspendProcessing (false);
 }
 
 void NAMAudioProcessor::clearIR()
 {
     currentIRPath_ = {};
+    suspendProcessing (true);
     pipelineL_->clearIR();
     pipelineR_->clearIR();
+    suspendProcessing (false);
 }
 
 // --- State ------------------------------------------------------------------
