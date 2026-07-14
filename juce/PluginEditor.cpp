@@ -955,10 +955,17 @@ void NAMAudioProcessorEditor::showInfoPopup()
                 "- dr_wav (David Reid) - MIT / public domain\n"
                 "- FFTConvolver (HiFi-LoFi) - MIT\n"
                 "- LV2 (LV2 authors) - ISC\n\n"
+                "UI fonts (embedded, SIL Open Font License 1.1):\n"
+                "- Metal Mania - Copyright (c) 2012 Open Window\n"
+                "- Nosifer     - Copyright (c) 2011 Typomondo\n"
+                "- Pirata One  - Copyright (c) 2012 Rodrigo Fuenzalida, Nicolas Massi\n\n"
+                "Bundled fixture model (demo_wavenet_a1.nam, MIT):\n"
+                "- Steven Atkinson - from NeuralAmpModelerCore/example_models\n\n"
                 "Trademarks:\n"
                 "\"Neural Amp Modeler\" is a trademark of Steven Atkinson.\n"
                 "\"VST\" is a trademark of Steinberg Media Technologies GmbH.\n"
-                "This project is not affiliated with or endorsed by them.\n");
+                "\"JUCE\" is a trademark of Raw Material Software Limited.\n"
+                "This project is independent and not affiliated with any of them.\n");
             quickBtn .setButtonText ("Guida Rapida (PDF)");
             techBtn  .setButtonText ("Guida Tecnica (PDF)");
             donateBtn.setButtonText ("Donation");
