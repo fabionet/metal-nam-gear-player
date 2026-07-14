@@ -73,6 +73,7 @@ Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 arc
 - **Neural Amp Modeler / NeuralAmpModelerCore** — Steven Atkinson (MIT). NAM model format, reference implementation, and source of the bundled test model `demo_wavenet_a1.nam` (MIT).
 - **FFTConvolver** — HiFi-LoFi (MIT). Two-stage FFT convolution used by the IR loader.
 - **dr_wav** — David Reid (MIT / public domain choice). WAV file loading for the IR loader.
+- **denormal** — [Dougal-s/Aether](https://github.com/Dougal-s/Aether) (GPL-3.0). Single-header FPU denormal-handling helper at `deps/denormal/architecture.hpp`.
 
 ### Embedded UI fonts (SIL Open Font License 1.1)
 
