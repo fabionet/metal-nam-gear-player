@@ -233,7 +233,14 @@ bool NAMPipeline::loadModel(const std::string& path)
     loader_.SetExternalSampleRate(static_cast<int>(sampleRate_));
     loader_.SetDefaultMaxAudioBufferSize(blockSize_);
     loader_.SetDefaultQualityScaleFactor(qualityScale_.load());
-    NeuralAudio::NeuralModel* m = loader_.CreateFromFile(path);
+    // NeuralAudio parses untrusted JSON with nlohmann (throws on malformed
+    // input / missing keys). A corrupt .nam must not take down the host.
+    NeuralAudio::NeuralModel* m = nullptr;
+    try {
+        m = loader_.CreateFromFile(path);
+    } catch (...) {
+        m = nullptr;
+    }
     if (!m) {
         isSlimmable_.store(false);
         hasLoudnessCached_.store(false);
