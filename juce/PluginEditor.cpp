@@ -945,13 +945,20 @@ void NAMAudioProcessorEditor::showInfoPopup()
             credits.setReadOnly (true);
             credits.setScrollbarsShown (true);
             credits.setText (
-                "Fork chain:\n"
+                "This work: AGPL-3.0-or-later (JUCE 8 combination requirement).\n\n"
+                "Third-party components:\n"
                 "- Neural Amp Modeler (Steven Atkinson) - MIT\n"
                 "- neural-amp-modeler-lv2 (Mike Oliphant) - GPL-3.0\n"
                 "- NeuralAudio (Mike Oliphant) - MIT\n"
-                "- JUCE (Raw Material Software) - GPL-3.0\n"
+                "- JUCE (Raw Material Software) - AGPL-3.0\n"
                 "- VST3 SDK (Steinberg) - GPL-3.0\n"
-                "- This fork by fabionet - GPL-3.0\n");
+                "- dr_wav (David Reid) - MIT / public domain\n"
+                "- FFTConvolver (HiFi-LoFi) - MIT\n"
+                "- LV2 (LV2 authors) - ISC\n\n"
+                "Trademarks:\n"
+                "\"Neural Amp Modeler\" is a trademark of Steven Atkinson.\n"
+                "\"VST\" is a trademark of Steinberg Media Technologies GmbH.\n"
+                "This project is not affiliated with or endorsed by them.\n");
             quickBtn .setButtonText ("Guida Rapida (PDF)");
             techBtn  .setButtonText ("Guida Tecnica (PDF)");
             donateBtn.setButtonText ("Donation");

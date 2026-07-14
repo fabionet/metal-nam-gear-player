@@ -51,4 +51,11 @@ Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 arc
 
 ## License
 
-GPL-3.0, same as the upstream project. Bundled demo preset assets are MIT-licensed. See the Info popup in the plugin for full credits.
+**AGPL-3.0-or-later.** This project combines the GPL-3.0 upstream (`mikeoliphant/neural-amp-modeler-lv2`) with the JUCE 8 framework, which is licensed under AGPLv3 (or a commercial JUCE licence). Per GPL-3 §13, the combined derivative work is distributed under AGPLv3. Bundled demo preset assets are MIT-licensed. See the Info popup in the plugin and the `LICENSE` file for full text.
+
+## Trademarks
+
+- **Neural Amp Modeler**® is a trademark of Steven Atkinson.
+- **VST**® is a trademark of Steinberg Media Technologies GmbH.
+
+This project is an independent fork and is **not affiliated with, endorsed by, or sponsored by** Steven Atkinson, Mike Oliphant, Raw Material Software, or Steinberg.
