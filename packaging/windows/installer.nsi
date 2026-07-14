@@ -94,6 +94,9 @@ Section "Standalone application" SEC_STANDALONE
   SetOutPath "$INSTDIR\docs"
   File /r "${STAGING}\docs\*.*"
 
+  SetOutPath "$INSTDIR\extras\reaper"
+  File /r "${STAGING}\extras\reaper\*.*"
+
   ; Start Menu shortcut for the standalone
   CreateDirectory "$SMPROGRAMS\METAL NAM GEAR PLAYER"
   CreateShortCut  "$SMPROGRAMS\METAL NAM GEAR PLAYER\NAM Custom (Standalone).lnk" \
@@ -146,6 +149,7 @@ Section "Uninstall"
   Delete "$INSTDIR\README.txt"
   Delete "$INSTDIR\uninstall.exe"
   RMDir /r "$INSTDIR\docs"
+  RMDir /r "$INSTDIR\extras"
   RMDir "$INSTDIR"
 
   ; VST3 bundle

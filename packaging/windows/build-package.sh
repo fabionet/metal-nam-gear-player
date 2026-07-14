@@ -45,6 +45,7 @@ cp "$ROOT/LICENSE"          "$STAGE/"
 cp "$ROOT/juce/fonts/LICENSE-fonts.txt" "$STAGE/"
 cp "$DOCS_SRC/guida-rapida.pdf"  "$STAGE/docs/"
 cp "$DOCS_SRC/guida-tecnica.pdf" "$STAGE/docs/"
+cp -r "$ROOT/extras"        "$STAGE/"
 
 cat > "$STAGE/README.txt" <<EOF
 METAL NAM GEAR PLAYER v${VERSION} - Windows x64 portable
@@ -56,6 +57,8 @@ NAM Custom.vst3/      VST3 plugin bundle
 docs/                 Italian user guides (Guida Rapida + Guida Tecnica)
 LICENSE               AGPL-3.0-or-later
 LICENSE-fonts.txt     SIL OFL 1.1 for the three embedded UI fonts
+extras/reaper/        ReaScript helper: inserts a "NAM Custom" track and
+                      loads the VST3 in one click (Actions -> Load ReaScript)
 
 Installation
 ------------
