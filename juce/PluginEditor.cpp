@@ -956,13 +956,13 @@ void NAMAudioProcessorEditor::showInfoPopup()
             techBtn  .setButtonText ("Guida Tecnica (PDF)");
             donateBtn.setButtonText ("Donation");
             quickBtn.onClick = [] {
-                juce::URL ("file:///home/fabionet/Documenti/nam-guide-quick.pdf").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player/blob/juce-rewrite/docs/guida-rapida.pdf").launchInDefaultBrowser();
             };
             techBtn.onClick = [] {
-                juce::URL ("file:///home/fabionet/Documenti/nam-guide-technical.pdf").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player/blob/juce-rewrite/docs/guida-tecnica.pdf").launchInDefaultBrowser();
             };
             donateBtn.onClick = [] {
-                juce::URL ("https://example.com/donate").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player").launchInDefaultBrowser();
             };
             addAndMakeVisible (title);
             addAndMakeVisible (version);
