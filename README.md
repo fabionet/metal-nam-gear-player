@@ -6,6 +6,16 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 > The original headless LV2 plugin lives on the [`custom-dual-stereo`](../../tree/custom-dual-stereo) branch. Active development happens on [`juce-rewrite`](../../tree/juce-rewrite) (default branch).
 
+## Screenshots
+
+**MAIN tab** — Noise Gate, Overdrive/Distortion, Amp (NAM model), 5-band EQ, Power (Depth/Resonance), Cab (IR mix), IR Tools (HP/LP/Trim), Master (Loudness Normalization):
+
+![MAIN tab](docs/screenshots/main-tab.png)
+
+**FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
+
+![FX tab](docs/screenshots/fx-tab.png)
+
 ## Features
 
 - **NAM model playback** — supports both V1 (WaveNet/LSTM) and A2 (SlimmableContainer) models, with a **Slim** slider for real-time quality scaling on A2 models
