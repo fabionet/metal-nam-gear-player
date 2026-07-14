@@ -42,6 +42,7 @@ mkdir -p "$STAGE/docs"
 cp "$STANDALONE"            "$STAGE/"
 cp -r "$VST3_BUNDLE"        "$STAGE/"
 cp "$ROOT/LICENSE"          "$STAGE/"
+cp "$ROOT/juce/fonts/LICENSE-fonts.txt" "$STAGE/"
 cp "$DOCS_SRC/guida-rapida.pdf"  "$STAGE/docs/"
 cp "$DOCS_SRC/guida-tecnica.pdf" "$STAGE/docs/"
 
@@ -54,6 +55,7 @@ NAM Custom.exe        Standalone application (ASIO / MME / DirectSound)
 NAM Custom.vst3/      VST3 plugin bundle
 docs/                 Italian user guides (Guida Rapida + Guida Tecnica)
 LICENSE               AGPL-3.0-or-later
+LICENSE-fonts.txt     SIL OFL 1.1 for the three embedded UI fonts
 
 Installation
 ------------

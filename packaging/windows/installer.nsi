@@ -88,6 +88,7 @@ Section "Standalone application" SEC_STANDALONE
   SetOutPath "$INSTDIR"
   File "${STAGING}\NAM Custom.exe"
   File "${STAGING}\LICENSE"
+  File "${STAGING}\LICENSE-fonts.txt"
   File "${STAGING}\README.txt"
 
   SetOutPath "$INSTDIR\docs"
@@ -141,6 +142,7 @@ Section "Uninstall"
   ; Standalone tree
   Delete "$INSTDIR\NAM Custom.exe"
   Delete "$INSTDIR\LICENSE"
+  Delete "$INSTDIR\LICENSE-fonts.txt"
   Delete "$INSTDIR\README.txt"
   Delete "$INSTDIR\uninstall.exe"
   RMDir /r "$INSTDIR\docs"

@@ -64,6 +64,7 @@ Wine 9 misses the WinRT `Windows.UI.ViewManagement.UIViewSettings` API that JUCE
 - **VST3 SDK 3.7.9** — dual GPLv3 / Steinberg proprietary (used under the GPLv3 branch)
 - **NeuralAudio** — MIT (fabionet fork `nam-custom-patches`)
 - The upstream `mikeoliphant/neural-amp-modeler-lv2` sources are GPL-3.0
+- **Embedded UI fonts** — SIL Open Font License 1.1: Metal Mania (© 2012 Open Window / Dathan Boardman), Nosifer (© 2011 Typomondo), Pirata One (© 2012 Rodrigo Fuenzalida, Nicolas Massi). Full text bundled as `LICENSE-fonts.txt`.
 
 The combined work is distributed under **AGPL-3.0-or-later** (per GPL-3 §13, since the Linux sibling branch links JUCE 8/AGPLv3 and the license needs to be consistent across the same product family). See `LICENSE`.
 
