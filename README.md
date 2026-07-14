@@ -32,7 +32,7 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 ## Requirements
 
 - Run your host at the sample rate the model was trained at (usually **48 kHz**)
-- Linux is the primary target (a Windows MinGW cross-build port is maintained separately)
+- Linux is the primary target. A **Windows MinGW cross-build** lives on the [`windows-mingw`](../../tree/windows-mingw) branch — pinned to JUCE 7.0.12 (JUCE 8 does not build under MinGW) with a small `JuceFontCompat.h` shim so the sources stay in sync with the Linux tree; toolchain in `cmake/mingw-w64-x86_64.cmake` and a required post-clone patch in `patches/juce-vst3-helper-wine.patch`.
 
 ## Building (Linux)
 
