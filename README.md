@@ -125,10 +125,11 @@ The script inserts a track named "NAM Custom" and loads the plugin, opening the 
 
 - **JUCE 7.0.12** — GPL-3.0-or-later or Raw Material Software commercial licence
 - **VST3 SDK 3.7.9** — dual GPLv3 / Steinberg proprietary (used under the GPLv3 branch)
-- **NeuralAudio** — MIT ([fabionet fork](https://github.com/fabionet/NeuralAudio) `nam-custom-patches`)
+- **NeuralAudio** (Mike Oliphant) — MIT; built from the [fabionet fork](https://github.com/fabionet/NeuralAudio) branch `nam-custom-patches` (metadata-flag additions only, upstream MIT preserved)
 - **Neural Amp Modeler / NeuralAmpModelerCore** (Steven Atkinson) — MIT; also covers the bundled demo model `juce/Presets/Assets/nam/demo_wavenet_a1.nam`
-- **FFTConvolver** (Christian Borß) — MIT; used by the IR loader
-- **dr_wav** (David Reid) — MIT-0 / public domain; WAV parser for IR loading
+- **FFTConvolver** (HiFi-LoFi) — MIT; used by the IR loader
+- **dr_wav** (David Reid) — MIT-0 / public domain; single-file WAV parser vendored at `src/dsp/dr_wav.h`
+- **denormal** (`deps/denormal/architecture.hpp`, from [Dougal-s/Aether](https://github.com/Dougal-s/Aether)) — GPL-3.0; FPU denormal-handling helper
 - Upstream [`mikeoliphant/neural-amp-modeler-lv2`](https://github.com/mikeoliphant/neural-amp-modeler-lv2) sources (Mike Oliphant and contributors) — GPL-3.0
 - **Embedded UI fonts** — SIL Open Font License 1.1: Metal Mania (© 2012 Open Window / Dathan Boardman), Nosifer (© 2011 Typomondo), Pirata One (© 2012 Rodrigo Fuenzalida, Nicolas Massi). Full text in `juce/fonts/LICENSE-fonts.txt`.
 
