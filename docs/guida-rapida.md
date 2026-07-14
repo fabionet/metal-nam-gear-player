@@ -18,7 +18,7 @@ Guida di partenza per suonare in pochi minuti.
 
 ## 3. Modalità Output (Steve-style)
 
-Sotto il pomello OUT trovi il toggle **NORMAL** e il bottone **CAL** (accanto al banner preset):
+Nella colonna **AMP**, sotto il knob `OUTPUT`, trovi il toggle **NORMAL / RAW / CALIBRATED**. Il bottone **CAL** (per aprire il popup di calibrazione) è nell'header in alto a destra, insieme a PRESETS, i, OS 2x, CPU e Zoom.
 
 - **Raw** — nessuna correzione, esci al livello del modello.
 - **Normalized** *(default)* — se il modello ha metadata `loudness`, il plugin compensa per allineare il volume ai modelli di riferimento (~14 dBu di headroom).
@@ -28,7 +28,7 @@ Se un modello **non ha metadata reali** la normalizzazione è **no-op** (evita s
 
 ## 4. Slim (solo modelli A2)
 
-Sotto il loader NAM c'è lo slider **SLIM** e il pomello **QUAL**: attivi solo con modelli **A2 SlimmableContainer**. Riduce il numero di canali della rete in tempo reale → meno CPU al costo di un po' di fedeltà. Sui modelli V1 lo slider è grigio.
+Lo slider **SLIM** sotto il loader NAM e il pomello **QUAL** nella colonna **CAB** (sotto `IR MIX`) sono bindati allo stesso parametro e sono attivi **solo con modelli A2 SlimmableContainer**. Riducono il numero di canali della rete in tempo reale → meno CPU al costo di un po' di fedeltà. Sui modelli V1 entrambi i controlli sono grigi.
 
 ## 5. Catena effetti
 
@@ -53,9 +53,14 @@ I toggle di bypass sono nel footer (checked = **attivo**, unchecked = bypass).
 
 ## 7. Controlli extra nell'header
 
-- **CPU N%** — meter di carico (lime <40%, giallo <75%, arancione oltre)
-- **OS 2x** — oversampling 2x (aumenta qualità e CPU; latenza dichiarata al DAW)
+Dall'alto a destra della UI:
+
+- **CAL** — apre il popup di calibrazione (vedi §3)
+- **PRESETS** — menu preset (vedi §6)
 - **i** — popup informazioni, crediti e licenze
+- **OS 2x** — oversampling 2x (aumenta qualità e CPU; latenza dichiarata al DAW)
+- **CPU N%** — meter di carico (lime <40%, giallo <75%, arancione oltre)
+- **Zoom** — scala la finestra del plugin (utile su schermi HiDPI)
 
 ## 8. Troubleshooting
 

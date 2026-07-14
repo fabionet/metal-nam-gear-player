@@ -112,11 +112,13 @@ Note:
 
 ## Licenze
 
-- Codice: GPL-3.0 (eredità del progetto upstream `mikeoliphant/neural-amp-modeler-lv2`).
-- Motore NeuralAudio: MIT.
-- Framework JUCE: GPL-3.0.
-- VST3 SDK: GPL-3.0.
+- **Opera combinata: AGPL-3.0-or-later.** L'upstream `mikeoliphant/neural-amp-modeler-lv2` è GPL-3.0, ma JUCE 8 è **AGPLv3 / commerciale**: per GPL-3 §13 il derivato combinato viene distribuito AGPL-3.0-or-later (upgrade permesso, downgrade no).
+- Motore **NeuralAudio**: MIT (compatibile).
+- Framework **JUCE 8**: AGPLv3 / commerciale (Raw Material Software Ltd.).
+- **VST3 SDK**: dual GPLv3 / proprietary Steinberg; usato sotto il ramo GPLv3 (compatibile con l'AGPLv3 risultante).
 - Asset preset demo bundled: MIT.
+
+Trademark: "JUCE" è marchio di Raw Material Software Ltd., "VST" di Steinberg Media Technologies GmbH, "Neural Amp Modeler" di Steven Atkinson. Il progetto non è affiliato con nessuno dei suddetti.
 
 ## Contribuire
 
