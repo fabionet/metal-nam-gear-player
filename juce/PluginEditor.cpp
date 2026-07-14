@@ -945,24 +945,31 @@ void NAMAudioProcessorEditor::showInfoPopup()
             credits.setReadOnly (true);
             credits.setScrollbarsShown (true);
             credits.setText (
-                "Fork chain:\n"
+                "This work: AGPL-3.0-or-later (product-family consistency; per GPL-3 \xc2\xa713).\n\n"
+                "Third-party components:\n"
                 "- Neural Amp Modeler (Steven Atkinson) - MIT\n"
                 "- neural-amp-modeler-lv2 (Mike Oliphant) - GPL-3.0\n"
                 "- NeuralAudio (Mike Oliphant) - MIT\n"
-                "- JUCE (Raw Material Software) - GPL-3.0\n"
-                "- VST3 SDK (Steinberg) - GPL-3.0\n"
-                "- This fork by fabionet - GPL-3.0\n");
+                "- JUCE 7.0.12 (Raw Material Software) - GPL-3.0 or commercial\n"
+                "- VST3 SDK (Steinberg) - GPL-3.0 / Steinberg proprietary\n"
+                "- dr_wav (David Reid) - MIT / public domain\n"
+                "- FFTConvolver (HiFi-LoFi) - MIT\n\n"
+                "Trademarks:\n"
+                "\"Neural Amp Modeler\" is a trademark of Steven Atkinson.\n"
+                "\"VST\" is a trademark of Steinberg Media Technologies GmbH.\n"
+                "\"JUCE\" is a trademark of Raw Material Software Limited.\n"
+                "This project is independent and not affiliated with any of them.\n");
             quickBtn .setButtonText ("Guida Rapida (PDF)");
             techBtn  .setButtonText ("Guida Tecnica (PDF)");
-            donateBtn.setButtonText ("Donation");
+            donateBtn.setButtonText ("Project page");
             quickBtn.onClick = [] {
-                juce::URL ("file:///home/fabionet/Documenti/nam-guide-quick.pdf").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player/blob/juce-rewrite/docs/guida-rapida.pdf").launchInDefaultBrowser();
             };
             techBtn.onClick = [] {
-                juce::URL ("file:///home/fabionet/Documenti/nam-guide-technical.pdf").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player/blob/juce-rewrite/docs/guida-tecnica.pdf").launchInDefaultBrowser();
             };
             donateBtn.onClick = [] {
-                juce::URL ("https://example.com/donate").launchInDefaultBrowser();
+                juce::URL ("https://github.com/fabionet/metal-nam-gear-player").launchInDefaultBrowser();
             };
             addAndMakeVisible (title);
             addAndMakeVisible (version);
