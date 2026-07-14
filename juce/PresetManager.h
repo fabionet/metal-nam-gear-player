@@ -14,6 +14,7 @@ public:
     struct PresetRef
     {
         juce::String name;
+        juce::String category { "Uncategorized" };
         bool         isFactory = false;
         juce::File   userFile;          // valid only when !isFactory
         int          factoryIndex = -1; // index into BinaryData when isFactory
@@ -60,6 +61,7 @@ private:
 
     std::vector<PresetRef> presets_;
     juce::String currentName_;
+    juce::String currentCategory_ { "Uncategorized" };
     int   currentIndex_ = -1;
     bool  dirty_        = false;
     bool  lockModel_    = false;

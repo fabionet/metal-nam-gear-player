@@ -1,10 +1,11 @@
 // Stage 7 — PresetPanelComponent implementation.
 #include "PresetPanelComponent.h"
+#include "JuceFontCompat.h"
 
 PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
     : mgr_ (mgr)
 {
-    title_.setFont (juce::Font (18.0f, juce::Font::bold));
+    title_.setFont (juce::Font (juce::FontOptions (18.0f, juce::Font::bold)));
     title_.setColour (juce::Label::textColourId, juce::Colours::white);
     title_.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (title_);
@@ -25,14 +26,27 @@ PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
     list_.setOutlineThickness (1);
     addAndMakeVisible (list_);
 
-    for (auto* b : { &saveBtn_, &saveAsBtn_, &deleteBtn_, &prevBtn_, &nextBtn_ })
+    for (auto* b : { &saveBtn_, &saveAsBtn_, &deleteBtn_, &prevBtn_, &nextBtn_, &getMoreBtn_ })
         addAndMakeVisible (b);
+
+    categoryFilter_.addItem ("All",           1);
+    categoryFilter_.addItem ("Clean",         2);
+    categoryFilter_.addItem ("Rock",          3);
+    categoryFilter_.addItem ("Metal",         4);
+    categoryFilter_.addItem ("Extreme Metal", 5);
+    categoryFilter_.addItem ("Bass",          6);
+    categoryFilter_.setSelectedId (1, juce::dontSendNotification);
+    categoryFilter_.onChange = [this] { refreshFromManager(); };
+    addAndMakeVisible (categoryFilter_);
 
     saveBtn_  .onClick = [this] { mgr_.save();   };
     saveAsBtn_.onClick = [this] { doSaveAs();    };
     deleteBtn_.onClick = [this] { mgr_.deleteCurrent(); };
     prevBtn_  .onClick = [this] { mgr_.prev();   };
     nextBtn_  .onClick = [this] { mgr_.next();   };
+    getMoreBtn_.onClick = [] {
+        juce::URL ("https://www.tone3000.com/tones?architecture=V1").launchInDefaultBrowser();
+    };
 
     mgr_.onChanged = [this] { refreshFromManager(); };
     refreshFromManager();
@@ -64,11 +78,17 @@ void PresetPanelComponent::resized()
     lockBox_.setBounds (r.removeFromTop (22));
     r.removeFromTop (6);
 
+    categoryFilter_.setBounds (r.removeFromTop (24));
+    r.removeFromTop (6);
+
     auto navRow = r.removeFromTop (28);
     prevBtn_.setBounds (navRow.removeFromLeft (40));
     navRow.removeFromLeft (4);
     nextBtn_.setBounds (navRow.removeFromLeft (40));
     r.removeFromTop (6);
+
+    getMoreBtn_.setBounds (r.removeFromBottom (26));
+    r.removeFromBottom (6);
 
     auto btnRow = r.removeFromBottom (30);
     auto third = btnRow.getWidth() / 3;
@@ -82,21 +102,28 @@ void PresetPanelComponent::resized()
 
 int PresetPanelComponent::getNumRows()
 {
-    return (int) mgr_.presets().size();
+    return (int) visibleIndices_.size();
+}
+
+int PresetPanelComponent::presetIndexForRow (int row) const
+{
+    if (row < 0 || row >= (int) visibleIndices_.size()) return -1;
+    return visibleIndices_[(size_t) row];
 }
 
 void PresetPanelComponent::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool selected)
 {
-    if (row < 0 || row >= (int) mgr_.presets().size()) return;
-    const auto& ref = mgr_.presets()[(size_t) row];
+    const int idx = presetIndexForRow (row);
+    if (idx < 0 || idx >= (int) mgr_.presets().size()) return;
+    const auto& ref = mgr_.presets()[(size_t) idx];
 
     if (selected)
         g.fillAll (juce::Colour (0xff8a5a00));
-    else if (row == mgr_.getCurrentIndex())
+    else if (idx == mgr_.getCurrentIndex())
         g.fillAll (juce::Colour (0xff3a2a00));
 
     g.setColour (juce::Colours::white);
-    g.setFont (juce::Font (13.0f));
+    g.setFont (juce::Font (juce::FontOptions (13.0f)));
 
     juce::String prefix = ref.isFactory ? "[F] " : "    ";
     g.drawText (prefix + ref.name, 6, 0, w - 8, h, juce::Justification::centredLeft, true);
@@ -104,8 +131,22 @@ void PresetPanelComponent::paintListBoxItem (int row, juce::Graphics& g, int w, 
 
 void PresetPanelComponent::listBoxItemClicked (int row, const juce::MouseEvent&)
 {
-    if (row >= 0 && row < (int) mgr_.presets().size())
-        mgr_.load (row);
+    const int idx = presetIndexForRow (row);
+    if (idx >= 0)
+        mgr_.load (idx);
+}
+
+void PresetPanelComponent::rebuildVisibleIndices()
+{
+    visibleIndices_.clear();
+    const auto& list = mgr_.presets();
+    const juce::String sel = categoryFilter_.getText();
+    const bool showAll = sel.isEmpty() || sel == "All";
+    for (size_t i = 0; i < list.size(); ++i)
+    {
+        if (showAll || list[i].category.equalsIgnoreCase (sel))
+            visibleIndices_.push_back ((int) i);
+    }
 }
 
 void PresetPanelComponent::listBoxItemDoubleClicked (int row, const juce::MouseEvent& e)
@@ -141,10 +182,15 @@ void PresetPanelComponent::refreshFromManager()
     currentLbl_.setText (juce::String ("Current: ") + name + (mgr_.isDirty() ? " *" : ""),
                          juce::dontSendNotification);
     lockBox_.setToggleState (mgr_.getLockModel(), juce::dontSendNotification);
+    rebuildVisibleIndices();
     updateEnableState();
     list_.updateContent();
-    if (mgr_.getCurrentIndex() >= 0)
-        list_.selectRow (mgr_.getCurrentIndex(), false, true);
+    const int cur = mgr_.getCurrentIndex();
+    if (cur >= 0)
+    {
+        for (size_t r = 0; r < visibleIndices_.size(); ++r)
+            if (visibleIndices_[r] == cur) { list_.selectRow ((int) r, false, true); break; }
+    }
     repaint();
 }
 

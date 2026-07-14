@@ -408,4 +408,172 @@ private:
     bool  bypass_ = true;
 };
 
+// --- Reverb (Freeverb-style mono, 8 comb + 4 allpass) ------------------------
+class ReverbFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        const double scale = sr_ / 44100.0;
+        static const int combLenRef[kNComb] = { 1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617 };
+        static const int allpLenRef[kNAllp] = { 225, 341, 441, 556 };
+        for (int i = 0; i < kNComb; ++i) {
+            comb_[i].len = std::max (1, (int) std::round (combLenRef[i] * scale));
+            comb_[i].buf.assign ((size_t) comb_[i].len, 0.f);
+            comb_[i].idx = 0;
+            comb_[i].lpz = 0.f;
+        }
+        for (int i = 0; i < kNAllp; ++i) {
+            allp_[i].len = std::max (1, (int) std::round (allpLenRef[i] * scale));
+            allp_[i].buf.assign ((size_t) allp_[i].len, 0.f);
+            allp_[i].idx = 0;
+        }
+    }
+    void reset()
+    {
+        for (auto& c : comb_) { std::fill (c.buf.begin(), c.buf.end(), 0.f); c.idx = 0; c.lpz = 0.f; }
+        for (auto& a : allp_) { std::fill (a.buf.begin(), a.buf.end(), 0.f); a.idx = 0; }
+    }
+
+    void setRoomSize (float r) { roomSize_ = std::clamp (r, 0.f, 1.f); }
+    void setDamping  (float d) { damping_  = std::clamp (d, 0.f, 1.f); }
+    void setMix      (float m) { mix_      = std::clamp (m, 0.f, 1.f); }
+    void setBypass   (bool  b) { bypass_ = b; }
+
+    float process (float x)
+    {
+        if (bypass_) return x;
+        const float fb   = 0.7f + roomSize_ * 0.28f; // 0.70 .. 0.98
+        const float damp = damping_ * 0.4f;          // 0 .. 0.4
+        const float input = x * 0.015f;              // Freeverb fixed input gain
+        float sum = 0.f;
+        for (int i = 0; i < kNComb; ++i) {
+            auto& c = comb_[i];
+            const float y = c.buf[(size_t) c.idx];
+            c.lpz = y * (1.f - damp) + c.lpz * damp;
+            c.buf[(size_t) c.idx] = input + c.lpz * fb;
+            c.idx = (c.idx + 1) % c.len;
+            sum += y;
+        }
+        float y = sum;
+        for (int i = 0; i < kNAllp; ++i) {
+            auto& a = allp_[i];
+            const float bufout = a.buf[(size_t) a.idx];
+            const float in = y;
+            a.buf[(size_t) a.idx] = in + bufout * 0.5f;
+            a.idx = (a.idx + 1) % a.len;
+            y = bufout - in;
+        }
+        return x * (1.f - mix_) + y * mix_;
+    }
+private:
+    static constexpr int kNComb = 8;
+    static constexpr int kNAllp = 4;
+    struct Comb { std::vector<float> buf; int len = 0, idx = 0; float lpz = 0.f; };
+    struct Allp { std::vector<float> buf; int len = 0, idx = 0; };
+    Comb comb_[kNComb];
+    Allp allp_[kNAllp];
+    double sr_ = 48000.0;
+    float roomSize_ = 0.5f;
+    float damping_  = 0.5f;
+    float mix_      = 0.25f;
+    bool  bypass_   = true;
+};
+
+// -------- Butterworth 2nd-order biquad (TDF-II) --------------------------
+class Biquad2 {
+public:
+    void setBypass (bool b) { bypass_ = b; }
+    void reset ()           { z1_ = z2_ = 0.f; }
+    float process (float x)
+    {
+        if (bypass_) return x;
+        const float y = b0_ * x + z1_;
+        z1_ = b1_ * x - a1_ * y + z2_;
+        z2_ = b2_ * x - a2_ * y;
+        return y;
+    }
+protected:
+    float b0_ = 1.f, b1_ = 0.f, b2_ = 0.f, a1_ = 0.f, a2_ = 0.f;
+    float z1_ = 0.f, z2_ = 0.f;
+    bool  bypass_ = true;
+
+    void setLowPass (float fcHz, double sr)
+    {
+        const double w0 = 2.0 * M_PI * (double) fcHz / sr;
+        const double cosw = std::cos (w0);
+        const double sinw = std::sin (w0);
+        const double alpha = sinw / (2.0 * 0.70710678); // Q = 1/sqrt(2)
+        const double b0 = (1.0 - cosw) * 0.5;
+        const double b1 =  1.0 - cosw;
+        const double b2 = (1.0 - cosw) * 0.5;
+        const double a0 =  1.0 + alpha;
+        const double a1 = -2.0 * cosw;
+        const double a2 =  1.0 - alpha;
+        b0_ = (float) (b0 / a0); b1_ = (float) (b1 / a0); b2_ = (float) (b2 / a0);
+        a1_ = (float) (a1 / a0); a2_ = (float) (a2 / a0);
+    }
+    void setHighPass (float fcHz, double sr)
+    {
+        const double w0 = 2.0 * M_PI * (double) fcHz / sr;
+        const double cosw = std::cos (w0);
+        const double sinw = std::sin (w0);
+        const double alpha = sinw / (2.0 * 0.70710678);
+        const double b0 =  (1.0 + cosw) * 0.5;
+        const double b1 = -(1.0 + cosw);
+        const double b2 =  (1.0 + cosw) * 0.5;
+        const double a0 =  1.0 + alpha;
+        const double a1 = -2.0 * cosw;
+        const double a2 =  1.0 - alpha;
+        b0_ = (float) (b0 / a0); b1_ = (float) (b1 / a0); b2_ = (float) (b2 / a0);
+        a1_ = (float) (a1 / a0); a2_ = (float) (a2 / a0);
+    }
+};
+
+class BiquadHPF : public Biquad2 {
+public:
+    void setCutoff (float fcHz, double sr) { setHighPass (fcHz, sr); }
+};
+
+class BiquadLPF : public Biquad2 {
+public:
+    void setCutoff (float fcHz, double sr) { setLowPass (fcHz, sr); }
+};
+
+// --- Tremolo (LFO amplitude modulation) --------------------------------------
+class TremoloFX {
+public:
+    void setBypass (bool b)    { bypass_ = b; }
+    void setRateHz (float r)   { rateHz_  = std::clamp (r, 0.05f, 20.f); updatePhaseInc(); }
+    void setDepth  (float d)   { depth_   = std::clamp (d, 0.f, 1.f); }
+    void setShape  (float s)   { shape_   = std::clamp (s, 0.f, 1.f); } // 0=sine, 1=square-ish
+    void prepare (double sr)   { sr_ = sr; phase_ = 0.f; updatePhaseInc(); }
+    void reset ()              { phase_ = 0.f; }
+    float process (float x)
+    {
+        if (bypass_) return x;
+        // LFO: sine → square blend via tanh compression on sine.
+        const float s = std::sin (phase_);
+        const float sq = std::tanh (s * 6.f);
+        const float lfo = s * (1.f - shape_) + sq * shape_;
+        // Map LFO from [-1..+1] to [1-depth .. 1] (unipolar downward modulation).
+        const float gain = 1.f - depth_ * 0.5f * (1.f - lfo);
+        phase_ += phaseInc_;
+        if (phase_ >= 6.2831853f) phase_ -= 6.2831853f;
+        return x * gain;
+    }
+private:
+    void updatePhaseInc()
+    {
+        phaseInc_ = (float) (2.0 * 3.141592653589793 * (double) rateHz_ / std::max (1.0, sr_));
+    }
+    bool  bypass_ = true;
+    float rateHz_ = 4.f;
+    float depth_  = 0.5f;
+    float shape_  = 0.f;
+    double sr_ = 48000.0;
+    float phase_ = 0.f;
+    float phaseInc_ = 0.f;
+};
+
 } // namespace preamp_fx

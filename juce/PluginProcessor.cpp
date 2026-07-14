@@ -55,6 +55,26 @@ namespace ids {
     constexpr auto flFb          = "flanger_feedback";
     constexpr auto flMix         = "flanger_mix";
     constexpr auto flBypass      = "flanger_bypass";
+    constexpr auto rvRoom        = "reverb_room";
+    constexpr auto rvDamping     = "reverb_damping";
+    constexpr auto rvMix         = "reverb_mix";
+    constexpr auto rvBypass      = "reverb_bypass";
+    // Tremolo
+    constexpr auto trRate        = "tremolo_rate_hz";
+    constexpr auto trDepth       = "tremolo_depth";
+    constexpr auto trShape       = "tremolo_shape";
+    constexpr auto trBypass      = "tremolo_bypass";
+    // IR tools (Fase 2a)
+    constexpr auto irHpFreq      = "ir_hp_freq";
+    constexpr auto irHpBypass    = "ir_hp_bypass";
+    constexpr auto irLpFreq      = "ir_lp_freq";
+    constexpr auto irLpBypass    = "ir_lp_bypass";
+    constexpr auto irTrimDb      = "ir_trim_db";
+    constexpr auto irPhaseInv    = "ir_phase_inv";
+    // Steve-style calibration
+    constexpr auto outputMode    = "output_mode";
+    constexpr auto calibrateInput= "calibrate_input";
+    constexpr auto inputCalLevel = "input_cal_level";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -80,7 +100,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::resonance,1},     "Resonance",juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonanceFreq,1}, "Res Freq", juce::NormalisableRange<float>(60.f, 250.f, 1.f, 0.5f), 100.f));
     add (std::make_unique<C>(juce::ParameterID{ids::channelMode,1},   "Mode",     juce::StringArray{"Mono","Dual-Mono","Stereo"}, 0));
-    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
@@ -127,6 +147,32 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::flFb,1},     "Flanger Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.4f));
     add (std::make_unique<P>(juce::ParameterID{ids::flMix,1},    "Flanger Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::flBypass,1}, "Flanger Bypass",   true));
+
+    // Reverb
+    add (std::make_unique<P>(juce::ParameterID{ids::rvRoom,1},    "Reverb Room",    juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::rvDamping,1}, "Reverb Damping", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::rvMix,1},     "Reverb Mix",     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
+    add (std::make_unique<B>(juce::ParameterID{ids::rvBypass,1},  "Reverb Bypass",  true));
+
+    // Tremolo
+    add (std::make_unique<P>(juce::ParameterID{ids::trRate,1},   "Tremolo Rate",  juce::NormalisableRange<float>(0.05f, 20.f, 0.01f, 0.3f), 4.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::trDepth,1},  "Tremolo Depth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::trShape,1},  "Tremolo Shape", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::trBypass,1}, "Tremolo Bypass", true));
+
+    // IR tools
+    add (std::make_unique<P>(juce::ParameterID{ids::irHpFreq,1},   "IR HP",        juce::NormalisableRange<float>(20.f, 500.f, 0.5f, 0.3f), 80.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::irHpBypass,1}, "IR HP Bypass", true));
+    add (std::make_unique<P>(juce::ParameterID{ids::irLpFreq,1},   "IR LP",        juce::NormalisableRange<float>(2000.f, 20000.f, 1.f, 0.3f), 12000.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::irLpBypass,1}, "IR LP Bypass", true));
+    add (std::make_unique<P>(juce::ParameterID{ids::irTrimDb,1},   "IR Trim dB",   juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::irPhaseInv,1}, "IR Phase Inv", false));
+
+    // Steve-style calibration (Output Mode + Calibrate Input).
+    add (std::make_unique<C>(juce::ParameterID{ids::outputMode,1},    "Output Mode",     juce::StringArray{"Raw","Normalized","Calibrated"}, 1));
+    add (std::make_unique<B>(juce::ParameterID{ids::calibrateInput,1},"Calibrate Input", false));
+    add (std::make_unique<P>(juce::ParameterID{ids::inputCalLevel,1}, "Input Cal Level", juce::NormalisableRange<float>(-60.f, 60.f, 0.1f), 12.f));
+
     return layout;
 }
 
@@ -150,12 +196,32 @@ NAMAudioProcessor::~NAMAudioProcessor()
 
 void NAMAudioProcessor::prepareToPlay (double sr, int samplesPerBlock)
 {
-    sampleRate_ = sr;
-    blockSize_  = samplesPerBlock;
-    pipelineL_->prepare (sr, samplesPerBlock);
-    pipelineR_->prepare (sr, samplesPerBlock);
+    baseSampleRate_ = sr;
+    baseBlockSize_  = samplesPerBlock;
+    const bool os = oversamplingOn_.load();
+    const double effSr = os ? sr * 2.0 : sr;
+    const int    effBs = os ? samplesPerBlock * 2 : samplesPerBlock;
+    sampleRate_ = effSr;
+    blockSize_  = effBs;
+
+    oversampler_.reset (new juce::dsp::Oversampling<float> (
+        2, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true));
+    oversampler_->initProcessing ((size_t) samplesPerBlock);
+    oversamplingPrepared_ = true;
+
+    pipelineL_->prepare (effSr, effBs);
+    pipelineR_->prepare (effSr, effBs);
     pipelineL_->reset();
     pipelineR_->reset();
+
+    setLatencySamples (os ? (int) oversampler_->getLatencyInSamples() : 0);
+}
+
+void NAMAudioProcessor::setOversamplingEnabled (bool on)
+{
+    if (oversamplingOn_.load() == on) return;
+    oversamplingOn_.store (on);
+    prepareToPlay (baseSampleRate_, baseBlockSize_);
 }
 
 bool NAMAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -219,6 +285,23 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float fFb = apvts.getRawParameterValue (ids::flFb)->load();
     const float fMx = apvts.getRawParameterValue (ids::flMix)->load();
     const bool  fBp = apvts.getRawParameterValue (ids::flBypass)->load() > 0.5f;
+    const float rvRm = apvts.getRawParameterValue (ids::rvRoom)->load();
+    const float rvDp = apvts.getRawParameterValue (ids::rvDamping)->load();
+    const float rvMx = apvts.getRawParameterValue (ids::rvMix)->load();
+    const bool  rvBp = apvts.getRawParameterValue (ids::rvBypass)->load() > 0.5f;
+    const float trRt = apvts.getRawParameterValue (ids::trRate)->load();
+    const float trDp = apvts.getRawParameterValue (ids::trDepth)->load();
+    const float trSh = apvts.getRawParameterValue (ids::trShape)->load();
+    const bool  trBp = apvts.getRawParameterValue (ids::trBypass)->load() > 0.5f;
+    const float irHp  = apvts.getRawParameterValue (ids::irHpFreq)->load();
+    const bool  irHpB = apvts.getRawParameterValue (ids::irHpBypass)->load() > 0.5f;
+    const float irLp  = apvts.getRawParameterValue (ids::irLpFreq)->load();
+    const bool  irLpB = apvts.getRawParameterValue (ids::irLpBypass)->load() > 0.5f;
+    const float irTr  = apvts.getRawParameterValue (ids::irTrimDb)->load();
+    const bool  irPhi = apvts.getRawParameterValue (ids::irPhaseInv)->load() > 0.5f;
+    const int   outMd = (int) apvts.getRawParameterValue (ids::outputMode)->load();
+    const bool  calIn = apvts.getRawParameterValue (ids::calibrateInput)->load() > 0.5f;
+    const float calDBu= apvts.getRawParameterValue (ids::inputCalLevel)->load();
 
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
@@ -230,7 +313,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setEqAir (air);
         p.setDepth (dep);
         p.setResonance (res, resF);
-        p.setQualityScale (qual);
+        p.setQualityScaleRuntime (qual);
         p.setIrMix (mix);
         p.setIrBypass (irBp);
         p.setModelBypass (mdBp);
@@ -243,6 +326,12 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setDelay     (dT, dFb, dMx, dBp);
         p.setChorus    (cR, cD, cMx, cBp);
         p.setFlanger   (fR, fD, fFb, fMx, fBp);
+        p.setReverb    (rvRm, rvDp, rvMx, rvBp);
+        p.setTremolo   (trRt, trDp, trSh, trBp);
+        p.setIRTools   (irHp, irHpB, irLp, irLpB, irTr, irPhi);
+        p.setOutputMode (static_cast<NAMPipeline::OutputMode>(outMd));
+        p.setCalibrateInput (calIn);
+        p.setInputCalibrationLevelDBu (calDBu);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);
@@ -263,6 +352,7 @@ void NAMAudioProcessor::consumePendingSwaps()
 void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+    const auto t0 = juce::Time::getHighResolutionTicks();
     consumePendingSwaps();
     pushParametersToPipelines();
 
@@ -286,7 +376,29 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     sampleAbsPeak (meterInL_, L, n);
     if (R) sampleAbsPeak (meterInR_, R, n);
 
-    if (numCh == 1 || mode == 0) {
+    if (oversamplingOn_.load() && oversamplingPrepared_) {
+        // Prepare channel mirror if needed (dual-mono) before upsampling.
+        if (mode == 1 && R)
+            std::memcpy (R, L, sizeof(float) * n);
+
+        juce::dsp::AudioBlock<float> block (buffer);
+        auto upBlock = oversampler_->processSamplesUp (block);
+        const int upN = (int) upBlock.getNumSamples();
+        float* uL = upBlock.getChannelPointer (0);
+        float* uR = (upBlock.getNumChannels() > 1) ? upBlock.getChannelPointer (1) : nullptr;
+
+        if (numCh == 1 || mode == 0) {
+            pipelineL_->process (uL, uL, upN);
+            if (uR) std::memcpy (uR, uL, sizeof(float) * upN);
+        } else if (mode == 1) {
+            pipelineL_->process (uL, uL, upN);
+            if (uR) pipelineR_->process (uR, uR, upN);
+        } else {
+            pipelineL_->process (uL, uL, upN);
+            if (uR) pipelineR_->process (uR, uR, upN);
+        }
+        oversampler_->processSamplesDown (block);
+    } else if (numCh == 1 || mode == 0) {
         // Mono: process L, mirror to R.
         pipelineL_->process (L, L, n);
         if (R) std::memcpy (R, L, sizeof(float) * n);
@@ -304,6 +416,17 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     // Output meter taps (post-DSP).
     sampleAbsPeak (meterOutL_, L, n);
     if (R) sampleAbsPeak (meterOutR_, R, n);
+
+    // CPU load % (EMA smoothing).
+    const double dt = juce::Time::highResolutionTicksToSeconds (
+                          juce::Time::getHighResolutionTicks() - t0);
+    if (sampleRate_ > 0.0)
+    {
+        const double blockDur = (double) n / sampleRate_;
+        const float  cur      = (float) juce::jlimit (0.0, 200.0, dt / blockDur * 100.0);
+        const float  prev     = cpuLoad_.load (std::memory_order_relaxed);
+        cpuLoad_.store (prev * 0.9f + cur * 0.1f, std::memory_order_relaxed);
+    }
 }
 
 juce::AudioProcessorEditor* NAMAudioProcessor::createEditor()

@@ -2,6 +2,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include <atomic>
 #include <memory>
 
@@ -46,6 +47,19 @@ public:
     juce::String getCurrentModelPath() const { return currentModelPath_; }
     juce::String getCurrentIRPath()    const { return currentIRPath_;    }
 
+    // True iff the currently active pipeline holds a NAM model that exposes
+    // A2 quality scaling (aka "slimmable"). Editor polls this to enable/disable
+    // the Quality knob and the new Slim slider under the loader.
+    bool isCurrentModelSlimmable() const noexcept
+    {
+        return pipelineL_ && pipelineL_->isSlimmable();
+    }
+
+    // Read-only accessor for the L pipeline (used by the Calibration popup
+    // to show cached model metadata). L is always populated when a model
+    // is loaded.
+    const NAMPipeline& pipelineL() const noexcept { return *pipelineL_; }
+
     juce::AudioProcessorValueTreeState apvts;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -58,11 +72,19 @@ public:
     std::atomic<float>& getMeterOutL() noexcept { return meterOutL_; }
     std::atomic<float>& getMeterOutR() noexcept { return meterOutR_; }
 
+    // CPU load %, updated at every processBlock (EMA).
+    float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
+
+    // Oversampling (session-local; not APVTS).
+    void setOversamplingEnabled (bool on);
+    bool isOversamplingEnabled() const noexcept { return oversamplingOn_.load(); }
+
 private:
     std::atomic<float> meterInL_  { 0.f };
     std::atomic<float> meterInR_  { 0.f };
     std::atomic<float> meterOutL_ { 0.f };
     std::atomic<float> meterOutR_ { 0.f };
+    std::atomic<float> cpuLoad_   { 0.f };
 
     // Two pipelines for 3 channel modes (mono mirror / dual-mono / stereo split).
     std::unique_ptr<NAMPipeline> pipelineL_;
@@ -79,6 +101,13 @@ private:
 
     double sampleRate_  = 48000.0;
     int    blockSize_   = 512;
+
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversampler_;
+    std::atomic<bool> oversamplingOn_ { false };
+    std::atomic<bool> oversamplingRequested_ { false };
+    double baseSampleRate_ = 48000.0;
+    int    baseBlockSize_  = 512;
+    bool   oversamplingPrepared_ = false;
 
     void pushParametersToPipelines();
     void consumePendingSwaps();

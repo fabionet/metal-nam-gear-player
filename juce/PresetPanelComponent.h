@@ -3,6 +3,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PresetManager.h"
+#include <vector>
 
 class PresetPanelComponent : public juce::Component,
                              private juce::ListBoxModel
@@ -25,18 +26,24 @@ private:
 
     void doSaveAs();
     void updateEnableState();
+    void rebuildVisibleIndices();
+    int  presetIndexForRow (int row) const;
 
     PresetManager& mgr_;
 
     juce::Label        title_      { {}, "PRESETS" };
     juce::Label        currentLbl_;
     juce::ToggleButton lockBox_    { "Lock model on load" };
+    juce::ComboBox     categoryFilter_;
     juce::ListBox      list_;
     juce::TextButton   saveBtn_    { "SAVE" };
     juce::TextButton   saveAsBtn_  { "SAVE AS\u2026" };
     juce::TextButton   deleteBtn_  { "DELETE" };
     juce::TextButton   prevBtn_    { "\u25c0" };
     juce::TextButton   nextBtn_    { "\u25b6" };
+    juce::TextButton   getMoreBtn_ { "Get more presets" };
+
+    std::vector<int>   visibleIndices_;
 
     std::unique_ptr<juce::AlertWindow> nameDialog_;
 
