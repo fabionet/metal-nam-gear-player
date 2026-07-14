@@ -126,10 +126,15 @@ The script inserts a track named "NAM Custom" and loads the plugin, opening the 
 - **JUCE 7.0.12** — GPL-3.0-or-later or Raw Material Software commercial licence
 - **VST3 SDK 3.7.9** — dual GPLv3 / Steinberg proprietary (used under the GPLv3 branch)
 - **NeuralAudio** — MIT ([fabionet fork](https://github.com/fabionet/NeuralAudio) `nam-custom-patches`)
-- Upstream `mikeoliphant/neural-amp-modeler-lv2` sources — GPL-3.0
+- **Neural Amp Modeler / NeuralAmpModelerCore** (Steven Atkinson) — MIT; also covers the bundled demo model `juce/Presets/Assets/nam/demo_wavenet_a1.nam`
+- **FFTConvolver** (Christian Borß) — MIT; used by the IR loader
+- **dr_wav** (David Reid) — MIT-0 / public domain; WAV parser for IR loading
+- Upstream [`mikeoliphant/neural-amp-modeler-lv2`](https://github.com/mikeoliphant/neural-amp-modeler-lv2) sources (Mike Oliphant and contributors) — GPL-3.0
 - **Embedded UI fonts** — SIL Open Font License 1.1: Metal Mania (© 2012 Open Window / Dathan Boardman), Nosifer (© 2011 Typomondo), Pirata One (© 2012 Rodrigo Fuenzalida, Nicolas Massi). Full text in `juce/fonts/LICENSE-fonts.txt`.
 
 The combined work is distributed under **AGPL-3.0-or-later** (per GPL-3 §13, since the Linux sibling branch links JUCE 8/AGPLv3 and the license must remain consistent across the same product family). See `LICENSE`.
+
+> Note: this branch does **not** build the LV2 target (Windows ships VST3 + Standalone only), so the LV2 SDK is not linked here.
 
 ## Trademarks
 
