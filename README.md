@@ -1,4 +1,4 @@
-# neural-amp-modeler-lv2
+# neural-amp-modeler-lv2 - this version is test NO WARRANTY
 
 LV2 plugin for neural network machine learning amp model playback using the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine.
 
