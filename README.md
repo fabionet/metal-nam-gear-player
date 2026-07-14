@@ -61,11 +61,31 @@ Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 arc
 
 ## License
 
-**AGPL-3.0-or-later.** This project combines the GPL-3.0 upstream (`mikeoliphant/neural-amp-modeler-lv2`) with the JUCE 8 framework, which is licensed under AGPLv3 (or a commercial JUCE licence). Per GPL-3 §13, the combined derivative work is distributed under AGPLv3. Bundled demo preset assets are MIT-licensed. See the Info popup in the plugin and the `LICENSE` file for full text.
+**AGPL-3.0-or-later.** This project combines the GPL-3.0 upstream (`mikeoliphant/neural-amp-modeler-lv2`) with the JUCE 8 framework (AGPLv3 or commercial JUCE licence). Per GPL-3 §13, the combined derivative work is distributed under AGPLv3. See `LICENSE` for the full text and `CREDITS.md` for the complete attribution list.
+
+### Third-party components
+
+- **JUCE 8** — Raw Material Software Limited (AGPLv3 or commercial JUCE licence). GUI, DSP, plugin format wrappers.
+- **VST3 SDK 3.7.x** — Steinberg Media Technologies GmbH (dual GPLv3 / Steinberg VST3 proprietary licence, used here under the GPLv3 branch via JUCE).
+- **LV2 SDK** — LV2 authors (ISC). Plugin format for the LV2 build.
+- **NeuralAudio** — Mike Oliphant (MIT). NAM model runtime engine. This build uses the [fabionet/NeuralAudio](https://github.com/fabionet/NeuralAudio) fork on branch `nam-custom-patches`.
+- **neural-amp-modeler-lv2** (upstream) — Mike Oliphant and [contributors](https://github.com/mikeoliphant/neural-amp-modeler-lv2/graphs/contributors) (GPL-3.0-or-later). The base plugin this project forks from.
+- **Neural Amp Modeler / NeuralAmpModelerCore** — Steven Atkinson (MIT). NAM model format, reference implementation, and source of the bundled test model `demo_wavenet_a1.nam` (MIT).
+- **FFTConvolver** — HiFi-LoFi (MIT). Two-stage FFT convolution used by the IR loader.
+- **dr_wav** — David Reid (MIT / public domain choice). WAV file loading for the IR loader.
+
+### Embedded UI fonts (SIL Open Font License 1.1)
+
+Three OpenType fonts are embedded in the plugin binary and used solely for the UI. Full license text bundled at `juce/fonts/LICENSE-fonts.txt`.
+
+- **Metal Mania** — © 2012 Open Window (Dathan Boardman)
+- **Nosifer** — © 2011 Typomondo
+- **Pirata One** — © 2012 Rodrigo Fuenzalida, Nicolas Massi
 
 ## Trademarks
 
 - **Neural Amp Modeler**® is a trademark of Steven Atkinson.
 - **VST**® is a trademark of Steinberg Media Technologies GmbH.
+- **JUCE**™ is a trademark of Raw Material Software Limited.
 
 This project is an independent fork and is **not affiliated with, endorsed by, or sponsored by** Steven Atkinson, Mike Oliphant, Raw Material Software, or Steinberg.
