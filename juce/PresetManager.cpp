@@ -17,6 +17,33 @@ namespace
     constexpr const char* kChildParams= "Parameters";
 
     static juce::String stem (const juce::File& f) { return f.getFileNameWithoutExtension(); }
+
+    // H3 fix (2026-07-15 audit): allowlist for preset-referenced file paths.
+    // A user-crafted .nampreset used to carry arbitrary <ModelPath>/<IRPath>
+    // strings that PresetManager would blindly pass to juce::File(...) +
+    // loadModelAsync. That enabled info-disclosure (probing existence of
+    // /etc/passwd, C:\Windows\System32\config\SAM, ...) and DoS via
+    // over-sized file opens. We now require the resolved path to sit under
+    // one of the standard user/system data roots where NAM assets legitimately
+    // live. isAChildOf works on canonicalised paths, so ../.. tricks that
+    // land outside the allowed roots are rejected automatically.
+    static bool isPresetPathAllowed (const juce::File& f)
+    {
+        if (f == juce::File{}) return false;
+        if (f.getFullPathName().isEmpty()) return false;
+        static const juce::File roots[] = {
+            juce::File::getSpecialLocation (juce::File::userHomeDirectory),
+            juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+            juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory),
+            juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory),
+            juce::File::getSpecialLocation (juce::File::commonDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::tempDirectory),
+        };
+        for (const auto& r : roots)
+            if (r != juce::File{} && (f == r || f.isAChildOf (r))) return true;
+        return false;
+    }
 }
 
 PresetManager::PresetManager (NAMAudioProcessor& proc,
@@ -166,7 +193,15 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
 
         auto resolveBundled = [] (const juce::String& name) -> juce::File
         {
-            if (name.isEmpty() || name.containsChar ('/')) return {};
+            // H3 fix: bundled name must be a bare filename. Reject any path
+            // separator (both '/' and '\\' — the original code only blocked
+            // '/', letting ..\..\evil.nam through on Windows) and any ".."
+            // component so a hostile preset can't reach outside the bundled
+            // temp dir.
+            if (name.isEmpty()
+                || name.containsChar ('/')
+                || name.containsChar ('\\')
+                || name.contains ("..")) return {};
             int sz = 0;
             const char* bytes = nullptr;
             for (int i = 0; i < NAMPresetData::namedResourceListSize; ++i)
@@ -187,15 +222,21 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
             return out;
         };
 
-        if (mpath.isNotEmpty() && juce::File (mpath).existsAsFile())
-            processor_.loadModelAsync (juce::File (mpath));
+        // H3 fix: gate absolute paths from the preset behind the allowlist.
+        // A path that resolves outside the standard user/system data roots is
+        // treated as if the file did not exist; we still try the bundled
+        // fallback so factory presets keep working, then clear on miss.
+        const juce::File mfile (mpath);
+        if (mpath.isNotEmpty() && isPresetPathAllowed (mfile) && mfile.existsAsFile())
+            processor_.loadModelAsync (mfile);
         else if (auto bundled = resolveBundled (mpath); bundled.existsAsFile())
             processor_.loadModelAsync (bundled);
         else
             processor_.clearModel();
 
-        if (ipath.isNotEmpty() && juce::File (ipath).existsAsFile())
-            processor_.loadIRAsync (juce::File (ipath));
+        const juce::File ifile (ipath);
+        if (ipath.isNotEmpty() && isPresetPathAllowed (ifile) && ifile.existsAsFile())
+            processor_.loadIRAsync (ifile);
         else
             processor_.clearIR();
     }
