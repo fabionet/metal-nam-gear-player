@@ -94,6 +94,12 @@ private:
     std::atomic<NAMPipeline*> pendingL_ { nullptr };
     std::atomic<NAMPipeline*> pendingR_ { nullptr };
 
+    // Shutdown latch: loader jobs check this before touching pendingL_/R_
+    // so a job that outlives ~NAMAudioProcessor cannot write into a
+    // destroyed atomic. Set to true at the top of the destructor before
+    // draining the pool. See PluginProcessor.cpp ~ctor / loader lambdas.
+    std::atomic<bool> shuttingDown_ { false };
+
     juce::ThreadPool loaderPool_ { 1 };
 
     juce::String currentModelPath_;
