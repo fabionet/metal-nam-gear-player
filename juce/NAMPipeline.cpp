@@ -263,8 +263,20 @@ bool NAMPipeline::loadModel(const std::string& path)
 void NAMPipeline::setQualityScaleRuntime(float s)
 {
     qualityScale_.store(s);
-    if (model_ && isSlimmable_.load())
+    if (model_ && isSlimmable_.load()) {
         model_->SetQualityScaleFactor(s);
+        // Re-snapshot loudness/level metadata: on slimmable A2 containers the
+        // active sub-model changes with quality scale, and its LUFS / input /
+        // output levels can differ. Without this refresh the Normalized/
+        // Calibrated gain-staging uses stale loudness (cached at load time)
+        // and can push the model into saturation → IR overvolume.
+        hasLoudnessCached_.store(model_->HasLoudness());
+        hasInputLevelCached_.store(model_->HasInputLevel());
+        hasOutputLevelCached_.store(model_->HasOutputLevel());
+        modelLoudnessCached_.store(model_->GetLoudnessDB());
+        modelInputLevelCached_.store(model_->GetInputLevelDBu());
+        modelOutputLevelCached_.store(model_->GetOutputLevelDBu());
+    }
 }
 
 bool NAMPipeline::loadIR(const std::string& path)

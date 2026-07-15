@@ -79,6 +79,22 @@ bool IRConvolver::loadFromFile(const std::string& path, double targetSR) {
     const size_t maxLen = static_cast<size_t>(targetSR_ * 1.5);
     if (ir_.size() > maxLen) ir_.resize(maxLen);
 
+    // Peak-normalize the IR to 0 dBFS. Matches the convention used by every
+    // mainstream cabinet loader (LiquidSonics, NadIR, NAM reference plugin):
+    // guarantees the convolution stage never receives a raw / over-driven
+    // WAV (peak > 1.0) that would combine with a hot A2 model output and
+    // push the master bus past 0 dBFS → Reaper track protection.
+    // Users who want a specific level use the "IR Trim dB" post-cab slider.
+    float irPeak = 0.f;
+    for (float s : ir_) {
+        const float a = std::fabs(s);
+        if (a > irPeak) irPeak = a;
+    }
+    if (irPeak > 1e-9f) {
+        const float inv = 1.0f / irPeak;
+        for (float& s : ir_) s *= inv;
+    }
+
     return !ir_.empty();
 }
 
