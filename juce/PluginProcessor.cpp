@@ -189,7 +189,16 @@ NAMAudioProcessor::NAMAudioProcessor()
 
 NAMAudioProcessor::~NAMAudioProcessor()
 {
-    loaderPool_.removeAllJobs (true, 2000);
+    // H2 fix (2026-07-15 audit): raise the shutdown latch BEFORE draining
+    // the pool. Loader jobs sample shuttingDown_ before publishing into
+    // pendingL_/R_, so a job that outlives our previous finite 2000 ms
+    // timeout can no longer write into these atomics after we are gone.
+    // We still cap the wait so a genuinely wedged worker doesn't block
+    // host teardown forever — but 30 s covers cold-disk A2 loads that
+    // legitimately blow past 2 s. Any pipeline the worker built after
+    // the latch was raised is deleted by the worker itself.
+    shuttingDown_.store (true, std::memory_order_release);
+    loaderPool_.removeAllJobs (true, 30000);
     if (auto* p = pendingL_.exchange (nullptr)) delete p;
     if (auto* p = pendingR_.exchange (nullptr)) delete p;
 }
@@ -458,8 +467,17 @@ void NAMAudioProcessor::loadModelAsync (const juce::File& f)
             if (! irPath.empty()) pl->loadIR (irPath);
             return pl.release();
         };
-        if (auto* a = buildOne()) if (auto* old = pendingL_.exchange (a)) delete old;
-        if (auto* b = buildOne()) if (auto* old = pendingR_.exchange (b)) delete old;
+        // H2 fix: never publish to pendingL_/R_ after the processor has
+        // begun teardown — the atomics may already be gone. Free what we
+        // built and bail. Sample the latch after each expensive build.
+        if (auto* a = buildOne()) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete a; return; }
+            if (auto* old = pendingL_.exchange (a)) delete old;
+        }
+        if (auto* b = buildOne()) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete b; return; }
+            if (auto* old = pendingR_.exchange (b)) delete old;
+        }
     });
 }
 
@@ -480,8 +498,14 @@ void NAMAudioProcessor::loadIRAsync (const juce::File& f)
             if (! pl->loadIR (path)) return nullptr;
             return pl.release();
         };
-        if (auto* a = buildOne()) if (auto* old = pendingL_.exchange (a)) delete old;
-        if (auto* b = buildOne()) if (auto* old = pendingR_.exchange (b)) delete old;
+        if (auto* a = buildOne()) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete a; return; }
+            if (auto* old = pendingL_.exchange (a)) delete old;
+        }
+        if (auto* b = buildOne()) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete b; return; }
+            if (auto* old = pendingR_.exchange (b)) delete old;
+        }
     });
 }
 
