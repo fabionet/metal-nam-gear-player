@@ -28,7 +28,7 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 - **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal), user presets, direct link to [Tone3000](https://www.tone3000.com/) for more models
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
 - CPU meter, level meters, Info popup with credits
-- **Reaper first-test helper** — bundled `extras/reaper/nam_insert.lua` script that inserts a "NAM Custom" track and loads the VST3 in one click
+- **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click VST3 insertion (`nam_insert.lua`) and `.nam` + IR autoload with clipboard fallback (`nam_autoload_vst3.lua`)
 
 ## Requirements
 
@@ -109,15 +109,21 @@ To keep the source files identical with the Linux tree (which uses JUCE 8 idioms
 
 Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 architectures are supported. For amp-only models, load an impulse response in the built-in IR loader to model the cabinet.
 
-## Reaper quick-start helper
+## Reaper quick-start helpers
 
-Bundled at `extras/reaper/nam_insert.lua`. Once the VST3 is installed and Reaper has scanned it:
+Two ReaScripts ship in `extras/reaper/` for Windows Reaper users:
 
-- Reaper GUI: **Actions → Load ReaScript → nam_insert.lua → Run**
-- CLI (Windows): `"C:\Program Files\REAPER (x64)\reaper.exe" -nonewinst extras\reaper\nam_insert.lua`
-- CLI (Linux): `reaper -nonewinst extras/reaper/nam_insert.lua`
+| Script                  | Behaviour                                                                                              |
+|-------------------------|--------------------------------------------------------------------------------------------------------|
+| `nam_insert.lua`        | Inserts a "NAM Custom" track, loads the VST3, opens the FX chain — for quick sanity checks             |
+| `nam_autoload_vst3.lua` | Same as above, then prompts for a `.nam` model and (optionally) an IR `.wav` and loads them            |
 
-The script inserts a track named "NAM Custom" and loads the plugin, opening the FX chain for immediate testing.
+Once the VST3 has been installed under `C:\Program Files\Common Files\VST3\` (or `%APPDATA%\VST3\`) and Reaper has scanned it, run either script via:
+
+- Reaper GUI: **Actions → Load ReaScript → *nam_...lua* → Run**
+- CLI (Windows): `"C:\Program Files\REAPER (x64)\reaper.exe" -nonewinst extras\reaper\nam_autoload_vst3.lua`
+
+If Reaper doesn't accept the model path programmatically (varies by build), `nam_autoload_vst3.lua` copies the chosen `.nam` / IR paths to the system clipboard as a fallback so they can be pasted into the plugin's file dialog.
 
 ## License
 
