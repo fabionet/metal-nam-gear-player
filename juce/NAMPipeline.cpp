@@ -63,6 +63,7 @@ void NAMPipeline::reset()
     if (ir_) ir_->reset();
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
+    irTrimGainSmoothed_ = irTrimGain_;  // snap follower to current target
 }
 
 void NAMPipeline::updateCachedDsp()
@@ -196,12 +197,17 @@ void NAMPipeline::process(const float* in, float* out, int n)
     }
 
     // --- Post-cab: IR tools (phase/HP/LP/trim) → High-pass → Loudness Normalization → Delay → Chorus → Flanger → Reverb ---
+    // Smooth irTrimGain_ with a one-pole follower to avoid audible clicks when
+    // the user drags the "IR Trim dB" knob; matches the input/output smoothing
+    // pattern above (~10 ms tau at 44.1/48 kHz, coefficient 0.99/0.01).
+    const float irTrimTarget = irTrimGain_;
     for (int i = 0; i < n; ++i) {
+        irTrimGainSmoothed_ = 0.99f * irTrimGainSmoothed_ + 0.01f * irTrimTarget;
         float s = out[i];
         if (irPhaseInv_) s = -s;
         s = irHp_.process (s);
         s = irLp_.process (s);
-        s *= irTrimGain_;
+        s *= irTrimGainSmoothed_;
         s = hp_.process   (s);
         s = loud_.process (s);
         s = delay_.process   (s);

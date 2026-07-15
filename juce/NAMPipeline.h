@@ -129,7 +129,8 @@ private:
     // IR post-processing tools (Fase 2a).
     preamp_fx::BiquadHPF     irHp_;
     preamp_fx::BiquadLPF     irLp_;
-    float irTrimGain_ = 1.f;
+    float irTrimGain_ = 1.f;          // target gain (linear), set by setIRTools()
+    float irTrimGainSmoothed_ = 1.f;  // one-pole follower, avoids clicks on knob moves
     bool  irPhaseInv_ = false;
 
     // Cached EQ/depth values to avoid recomputing biquad coeffs every block.
