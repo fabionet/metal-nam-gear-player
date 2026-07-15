@@ -43,14 +43,15 @@ local function copy_to_clipboard(str)
     reaper.CF_SetClipboard(str)
     return true
   end
-  -- Fallback: pipe through Windows 'clip' via cmd.
-  local tmp = os.tmpname()
-  if not tmp:match(":") then tmp = os.getenv("TEMP") .. "\\" .. tmp:gsub("[/\\]", "_") end
-  local f = io.open(tmp, "w"); if not f then return false end
-  f:write(str); f:close()
-  local ok = os.execute('cmd /c "type "' .. tmp .. '" | clip"')
-  os.remove(tmp)
-  return ok == true or ok == 0
+  -- Fallback: stream the payload directly to Windows' clip.exe via stdin.
+  -- The command string is a fixed literal ("clip"); user-controlled data
+  -- (paths, %TEMP%, ...) never touches the cmd.exe parser, so the old
+  --   os.execute('cmd /c "type "'..tmp..'" | clip"')
+  -- injection surface (malformed quote nesting + unquoted %TEMP%) is gone.
+  local h = io.popen("clip", "w")
+  if not h then return false end
+  h:write(str)
+  return h:close() == true
 end
 
 local function file_exists(p)

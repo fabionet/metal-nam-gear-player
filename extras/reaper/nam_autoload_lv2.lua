@@ -41,15 +41,22 @@ local function copy_to_clipboard(str)
     reaper.CF_SetClipboard(str)
     return true
   end
-  -- Fallback: shell out to xclip / xsel / wl-copy
-  local tmp = os.tmpname()
-  local f = io.open(tmp, "w"); if not f then return false end
-  f:write(str); f:close()
-  local ok = os.execute("(command -v wl-copy >/dev/null && wl-copy < " .. tmp ..
-    ") || (command -v xclip >/dev/null && xclip -selection clipboard < " .. tmp ..
-    ") || (command -v xsel >/dev/null && xsel -bi < " .. tmp .. ")")
-  os.remove(tmp)
-  return ok == true or ok == 0
+  -- Fallback: stream the payload to the child's stdin so we never build a
+  -- shell string from user data (avoids injection via paths containing
+  -- $, ;, backticks, spaces, ...). Each command is a fixed literal; the
+  -- untrusted `str` only reaches the child through handle:write().
+  local function have(bin)
+    return os.execute("command -v " .. bin .. " >/dev/null 2>&1") == 0
+  end
+  local function popen_write(cmd)
+    local h = io.popen(cmd, "w"); if not h then return false end
+    h:write(str)
+    return h:close() == true
+  end
+  if have("wl-copy") then return popen_write("wl-copy")                    end
+  if have("xclip")   then return popen_write("xclip -selection clipboard") end
+  if have("xsel")    then return popen_write("xsel -bi")                   end
+  return false
 end
 
 local function file_exists(p)
