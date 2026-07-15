@@ -28,6 +28,7 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 - **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal), user presets, direct link to [Tone3000](https://www.tone3000.com/) for more models
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
 - CPU meter, level meters, Info popup with credits
+- **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click LV2/VST3 track insertion and `.nam` / IR autoload (see [Reaper quick-start helpers](#reaper-quick-start-helpers) below)
 
 ## Requirements
 
@@ -58,6 +59,18 @@ rsync -a --delete "build-juce/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.v
 ## Models
 
 Get `.nam` models from [Tone3000](https://www.tone3000.com/). Both V1 and A2 architectures are supported. For amp-only models, load an impulse response in the built-in IR loader to model the cabinet.
+
+## Reaper quick-start helpers
+
+Three ReaScripts in `extras/reaper/` cover different Reaper builds and formats:
+
+| Script                     | Format | Target                       | Behaviour                                              |
+|----------------------------|--------|------------------------------|--------------------------------------------------------|
+| `nam_insert.lua`           | LV2    | Reaper Linux                 | Insert an "NAM Custom" track, load the LV2 plugin      |
+| `nam_autoload_lv2.lua`     | LV2    | Reaper Linux                 | Same as above, plus prompts for a `.nam` model and IR  |
+| `nam_autoload_vst3.lua`    | VST3   | Reaper Windows (or wine)     | Insert the VST3, prompt for `.nam` + optional IR       |
+
+Run any of them via **Actions → Load ReaScript** or from the CLI, e.g. `reaper -nonewinst extras/reaper/nam_autoload_lv2.lua`. When Reaper doesn't accept the model path programmatically, the autoload helpers fall back to copying the file path(s) to the system clipboard.
 
 ## License
 
