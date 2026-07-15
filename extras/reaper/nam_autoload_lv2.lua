@@ -1,31 +1,29 @@
--- METAL NAM GEAR PLAYER — Reaper autoload helper (Windows / VST3)
+-- METAL NAM GEAR PLAYER — Reaper autoload helper (Linux / LV2)
 --
--- Inserts a new track, adds the "NAM Custom" VST3 plugin, prompts the user
+-- Inserts a new track, adds the "NAM Custom" LV2 plugin, prompts the user
 -- for a .nam model (and optionally an IR .wav), then attempts to preload
 -- them into the plugin. If the plugin does not accept programmatic path
 -- injection, the chosen paths are copied to the system clipboard as a
 -- fallback and a dialog explains where to paste them.
 --
--- Usage (Reaper on Windows):
---   Reaper GUI: Actions → Load ReaScript → nam_autoload_vst3.lua → Run
---   CLI:        "C:\Program Files\REAPER (x64)\reaper.exe" -nonewinst nam_autoload_vst3.lua
+-- Usage:
+--   Reaper GUI: Actions → Load ReaScript → nam_autoload_lv2.lua → Run
+--   CLI:        reaper -nonewinst extras/reaper/nam_autoload_lv2.lua
 --
--- Requires: Reaper 6.x+, "NAM Custom.vst3" installed under one of
---   C:\Program Files\Common Files\VST3\
---   %USERPROFILE%\AppData\Roaming\VST3\
--- (or another VST3 path scanned by Reaper).
+-- Requires: Reaper 6.x+, "NAM Custom.lv2" installed under ~/.lv2/ or
+-- another standard LV2 path scanned by Reaper.
 
 local EXT_NS      = "nam_autoload"
 local FX_CANDS    = {
-  "VST3: NAM Custom (fabionet)",
-  "VST3: NAM Custom",
+  "LV2: NAM Custom (fabionet)",
+  "LV2: NAM Custom",
   "NAM Custom",
 }
-local USERPROFILE = os.getenv("USERPROFILE") or (os.getenv("HOMEDRIVE") or "C:") ..
-                    (os.getenv("HOMEPATH") or "\\Users\\Default")
-local NAM_DEFAULT = USERPROFILE .. "\\Documents\\NAM-Models"
+local NAM_DEFAULT = os.getenv("HOME") .. "/Documenti/NAM-Models"
 local IR_DEFAULT  = NAM_DEFAULT
 
+-- Try several documented / experimental named-config keys that different
+-- JUCE plugin backends have exposed over the years to receive a file path.
 local function try_set_path(track, fx, path)
   local keys = { "model_path", "nam_model_path", "ModelPath",
                  "state_model_path", "userStateModel" }
@@ -43,15 +41,22 @@ local function copy_to_clipboard(str)
     reaper.CF_SetClipboard(str)
     return true
   end
-  -- Fallback: stream the payload directly to Windows' clip.exe via stdin.
-  -- The command string is a fixed literal ("clip"); user-controlled data
-  -- (paths, %TEMP%, ...) never touches the cmd.exe parser, so the old
-  --   os.execute('cmd /c "type "'..tmp..'" | clip"')
-  -- injection surface (malformed quote nesting + unquoted %TEMP%) is gone.
-  local h = io.popen("clip", "w")
-  if not h then return false end
-  h:write(str)
-  return h:close() == true
+  -- Fallback: stream the payload to the child's stdin so we never build a
+  -- shell string from user data (avoids injection via paths containing
+  -- $, ;, backticks, spaces, ...). Each command is a fixed literal; the
+  -- untrusted `str` only reaches the child through handle:write().
+  local function have(bin)
+    return os.execute("command -v " .. bin .. " >/dev/null 2>&1") == 0
+  end
+  local function popen_write(cmd)
+    local h = io.popen(cmd, "w"); if not h then return false end
+    h:write(str)
+    return h:close() == true
+  end
+  if have("wl-copy") then return popen_write("wl-copy")                    end
+  if have("xclip")   then return popen_write("xclip -selection clipboard") end
+  if have("xsel")    then return popen_write("xsel -bi")                   end
+  return false
 end
 
 local function file_exists(p)
@@ -61,8 +66,8 @@ end
 
 local last_nam = reaper.GetExtState(EXT_NS, "last_nam")
 local last_ir  = reaper.GetExtState(EXT_NS, "last_ir")
-local nam_seed = last_nam ~= "" and last_nam or (NAM_DEFAULT .. "\\")
-local ir_seed  = last_ir  ~= "" and last_ir  or (IR_DEFAULT .. "\\")
+local nam_seed = last_nam ~= "" and last_nam or (NAM_DEFAULT .. "/")
+local ir_seed  = last_ir  ~= "" and last_ir  or (IR_DEFAULT .. "/")
 
 local ok, nam_path = reaper.GetUserFileNameForRead(nam_seed,
   "Pick a .nam model", ".nam")
@@ -86,7 +91,7 @@ reaper.PreventUIRefresh(1)
 reaper.Undo_BeginBlock()
 reaper.InsertTrackAtIndex(0, true)
 local track = reaper.GetTrack(0, 0)
-reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "NAM Custom (VST3)", true)
+reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "NAM Custom (LV2)", true)
 
 local fx = -1
 for _, n in ipairs(FX_CANDS) do
@@ -95,12 +100,11 @@ for _, n in ipairs(FX_CANDS) do
 end
 if fx < 0 then
   reaper.PreventUIRefresh(-1)
-  reaper.Undo_EndBlock("NAM autoload (failed: VST3 not found)", -1)
+  reaper.Undo_EndBlock("NAM autoload (failed: LV2 not found)", -1)
   reaper.ShowMessageBox(
-    "NAM Custom VST3 was not found in Reaper's plug-in cache.\n\n" ..
-    "Make sure NAM Custom.vst3 is installed under\n" ..
-    "  C:\\Program Files\\Common Files\\VST3\\\n" ..
-    "or %APPDATA%\\VST3\\, then Options → Preferences → Plug-ins → VST → Re-scan.",
+    "NAM Custom LV2 was not found in Reaper's plug-in cache.\n\n" ..
+    "Make sure NAM Custom.lv2 is installed under ~/.lv2/ (or another LV2\n" ..
+    "path Reaper scans), then Options → Preferences → Plug-ins → LV2 → Re-scan.",
     "NAM autoload", 0)
   return
 end
@@ -121,7 +125,7 @@ end
 
 reaper.TrackFX_Show(track, fx, 3)   -- open FX chain + show plugin UI
 reaper.PreventUIRefresh(-1)
-reaper.Undo_EndBlock("NAM autoload (VST3)", -1)
+reaper.Undo_EndBlock("NAM autoload (LV2)", -1)
 reaper.TrackList_AdjustWindows(false)
 reaper.UpdateArrange()
 
@@ -135,13 +139,13 @@ if nam_ok then
   reaper.ShowMessageBox(msg, "NAM autoload", 0)
 else
   local clip = nam_path
-  if ir_path ~= "" then clip = clip .. "\r\n" .. ir_path end
+  if ir_path ~= "" then clip = clip .. "\n" .. ir_path end
   copy_to_clipboard(clip)
   reaper.ShowMessageBox(
     "The plugin did not accept the model path via SetNamedConfigParm.\n\n" ..
     "Path(s) copied to clipboard — click the plugin's 'Load NAM' button,\n" ..
     "paste in the file dialog, then repeat for the IR if applicable.\n\n" ..
     "Selected model:\n" .. nam_path ..
-    (ir_path ~= "" and ("\r\n\r\nSelected IR:\r\n" .. ir_path) or ""),
+    (ir_path ~= "" and ("\n\nSelected IR:\n" .. ir_path) or ""),
     "NAM autoload — manual step required", 0)
 end
