@@ -12,6 +12,7 @@
 #include "DepthFilter.h"
 #include "IRConvolver.h"
 #include "PreampFX.h"
+#include "NativeAmp.h"
 
 class NAMPipeline {
 public:
@@ -90,6 +91,22 @@ public:
                     float lpFreqHz, bool lpBypass,
                     float trimDb,   bool phaseInv);
 
+    // Native tube amp (non-NAM). When enabled, the NAM model acts as a drive
+    // pedal in front of this amp (routing: pre-FX → NAM(pedal) → native amp → …).
+    void setNativeAmp(bool en, int ch, float thumpDB, float presenceDB,
+                      float b1, float m1, float t1, float g1, float ma1,
+                      float g2, float ma2,
+                      float b3, float m3, float t3, float g3, float ma3)
+    {
+        ampEnabled_.store(en);
+        amp_.setEnabled(en);
+        amp_.setChannel(ch);
+        amp_.setGlobal(thumpDB, presenceDB);
+        amp_.setChannel1(b1, m1, t1, g1, ma1);
+        amp_.setChannel2(g2, ma2);
+        amp_.setChannel3(b3, m3, t3, g3, ma3);
+    }
+
     // --- Model / IR loading (call from non-audio thread) ---
     // Returns true on success. Old model/IR is destroyed.
     bool loadModel(const std::string& path);
@@ -127,6 +144,8 @@ private:
     preamp_fx::TremoloFX     tremolo_;
 
     // IR post-processing tools (Fase 2a).
+    preamp_fx::NativeAmp     amp_;
+
     preamp_fx::BiquadHPF     irHp_;
     preamp_fx::BiquadLPF     irLp_;
     float irTrimGain_ = 1.f;          // target gain (linear), set by setIRTools()
@@ -152,6 +171,7 @@ private:
     std::atomic<bool>  irBypass_      { false };
     std::atomic<bool>  modelBypass_   { false };
     std::atomic<bool>  isSlimmable_   { false };
+    std::atomic<bool>  ampEnabled_    { false };
 
     // Steve-style calibration state (UI-thread writes; audio-thread reads).
     std::atomic<OutputMode> outputMode_      { OutputMode::Normalized };

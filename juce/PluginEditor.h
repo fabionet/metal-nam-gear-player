@@ -179,12 +179,23 @@ private:
     std::unique_ptr<BAtt> lnEnabledAtt;
     std::unique_ptr<BAtt> irPhaseInvAtt; // non-inverted: bool param is truthy=active // LN uses `ln_enabled` (already active-semantics), keep direct.
 
-    // Tab switcher (MAIN / FX).
+    // Tab switcher (MAIN / FX / AMP).
     juce::TextButton mainTabBtn { "MAIN" };
     juce::TextButton fxTabBtn   { "FX" };
-    enum class Tab { Main, Fx };
+    juce::TextButton ampTabBtn  { "AMP" };
+    enum class Tab { Main, Fx, Amp };
     Tab activeTab_ = Tab::Main;
     void setActiveTab (Tab t);
+
+    // Native tube amp ("GEAR SX"): enable toggle (next to Input/Output on MAIN),
+    // 3-way channel selector, and 14 knobs shown on the AMP tab.
+    juce::ToggleButton tubeToggle_ { "TUBE" };
+    std::unique_ptr<BAtt> tubeToggleAtt_;
+    juce::ComboBox ampChannelBox_;
+    juce::Label    ampChannelLabel_ { {}, "CHANNEL" };
+    std::unique_ptr<CAtt> ampChannelAtt_;
+    std::vector<KnobBox*> ampKnobs_;   // pointers into knobs_, in layout order
+    void paintAmpFaceplate (juce::Graphics&, juce::Rectangle<int>);
 
     // Mode.
     juce::ComboBox modeBox;
