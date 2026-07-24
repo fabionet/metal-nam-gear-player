@@ -28,6 +28,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     flanger_.prepare(sampleRate);
     reverb_.prepare(sampleRate);
     tremolo_.prepare(sampleRate);
+    amp_.prepare(sampleRate);
     irHp_.reset();
     irLp_.reset();
 
@@ -58,6 +59,7 @@ void NAMPipeline::reset()
     flanger_.reset();
     reverb_.reset();
     tremolo_.reset();
+    amp_.reset();
     irHp_.reset();
     irLp_.reset();
     if (ir_) ir_->reset();
@@ -175,6 +177,13 @@ void NAMPipeline::process(const float* in, float* out, int n)
     if (std::fabs(modelOutDB) > 1e-6f) {
         const float modelOutLin = db2lin(modelOutDB);
         for (int i = 0; i < n; ++i) out[i] *= modelOutLin;
+    }
+
+    // --- Native tube amp (optional; NAM acts as a drive pedal upstream) ---
+    // Placed after the model gain-stage and before Depth so the routing is
+    // pre-FX → NAM(pedal) → native amp → depth/EQ → IR cab → post-FX.
+    if (ampEnabled_.load()) {
+        for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
     }
 
     // --- Depth + Resonance ---

@@ -187,9 +187,23 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     };
 
     // Knobs.
-    knobs_.reserve (kCount);
+    knobs_.reserve (kCount + 16);
     for (auto& d : kDefs)
         addKnob (d.id, d.label);
+
+    // Native tube-amp knobs (AMP tab). Order matters — resized() indexes ampKnobs_.
+    {
+        static constexpr std::array<KnobDef, 14> ampDefs {{
+            {"amp_thump",   "THUMP"},  {"amp_presence", "PRES"},
+            {"amp_bass1",   "BASS"},   {"amp_mid1",  "MID"},   {"amp_treble1", "TREBLE"},
+            {"amp_gain1",   "GAIN"},   {"amp_master1","MASTER"},
+            {"amp_gain2",   "GAIN"},   {"amp_master2","MASTER"},
+            {"amp_bass3",   "BASS"},   {"amp_mid3",  "MID"},   {"amp_treble3", "TREBLE"},
+            {"amp_gain3",   "GAIN"},   {"amp_master3","MASTER"}
+        }};
+        for (auto& d : ampDefs)
+            ampKnobs_.push_back (&addKnob (d.id, d.label));
+    }
 
     // Mode + bypass toggles.
     modeBox.addItem ("Mono", 1);
@@ -230,13 +244,34 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // Tab buttons.
     addAndMakeVisible (mainTabBtn);
     addAndMakeVisible (fxTabBtn);
+    addAndMakeVisible (ampTabBtn);
     mainTabBtn.setClickingTogglesState (true);
     fxTabBtn  .setClickingTogglesState (true);
+    ampTabBtn .setClickingTogglesState (true);
     mainTabBtn.setRadioGroupId (0xCA11);
     fxTabBtn  .setRadioGroupId (0xCA11);
+    ampTabBtn .setRadioGroupId (0xCA11);
     mainTabBtn.setToggleState (true, juce::dontSendNotification);
     mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
     fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
+    ampTabBtn .onClick = [this] { setActiveTab (Tab::Amp);  };
+
+    // Native tube-amp enable toggle (shown on MAIN, next to Input/Output) +
+    // 3-way channel selector (shown on AMP tab).
+    addAndMakeVisible (tubeToggle_);
+    tubeToggle_.setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
+    tubeToggleAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", tubeToggle_);
+    tubeToggle_.onStateChange = [this] { refreshLabels(); };
+
+    addAndMakeVisible (ampChannelLabel_);
+    ampChannelLabel_.setJustificationType (juce::Justification::centredRight);
+    ampChannelLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    ampChannelLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    ampChannelBox_.addItem ("Clean",  1);
+    ampChannelBox_.addItem ("Crunch", 2);
+    ampChannelBox_.addItem ("Lead",   3);
+    addAndMakeVisible (ampChannelBox_);
+    ampChannelAtt_ = std::make_unique<CAtt> (processorRef.apvts, "amp_channel", ampChannelBox_);
 
     // Slim slider (below MODEL loader). Mirrors QUAL knob via shared APVTS param.
     addAndMakeVisible (slimLabel_);
@@ -442,6 +477,55 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
     g.drawText (title, titleStrip.toNearestInt(), juce::Justification::centred);
 }
 
+// Custom black/gold faceplate for the native "GEAR SX" tube amp page.
+// Fully code-drawn (no imported artwork). Draws behind the amp knob rows.
+void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectangle<int> area)
+{
+    if (area.isEmpty()) return;
+    auto a = area.toFloat().reduced (2.f);
+    const auto gold = juce::Colour (0xffd9a200);
+
+    // Tolex-black panel.
+    juce::ColourGradient bg (juce::Colour (0xff1c1c1c), a.getX(), a.getY(),
+                             juce::Colour (0xff0b0b0b), a.getX(), a.getBottom(), false);
+    g.setGradientFill (bg);
+    g.fillRoundedRectangle (a, 6.f);
+
+    // Gold bevel frame.
+    g.setColour (gold.withAlpha (0.85f));
+    g.drawRoundedRectangle (a.reduced (1.5f), 6.f, 1.5f);
+    g.setColour (juce::Colour (0xff000000).withAlpha (0.6f));
+    g.drawRoundedRectangle (a.reduced (4.f), 5.f, 1.0f);
+
+    // Top brand strip: "GEAR SX" logo + POWER LED.
+    auto strip = a.removeFromTop (34.f).reduced (14.f, 4.f);
+
+    // POWER LED (lit when the amp is enabled).
+    const bool on = tubeToggle_.getToggleState();
+    auto led = strip.removeFromRight (60.f);
+    auto dot = led.removeFromLeft (14.f).withSizeKeepingCentre (10.f, 10.f);
+    g.setColour (on ? juce::Colour (0xffff5030) : juce::Colour (0xff3a1a12));
+    g.fillEllipse (dot);
+    if (on) {
+        g.setColour (juce::Colour (0xffff5030).withAlpha (0.35f));
+        g.fillEllipse (dot.expanded (3.f));
+    }
+    g.setColour (gold.withAlpha (0.8f));
+    g.setFont (juce::Font (juce::FontOptions (11.0f).withStyle ("Bold")));
+    g.drawText ("POWER", led, juce::Justification::centredLeft);
+
+    // "GEAR SX" logo, left-aligned in the metal display font.
+    g.setFont (juce::Font (juce::FontOptions().withTypeface (metalManiaTypeface()).withHeight (26.0f)));
+    g.setColour (juce::Colour (0xff000000).withAlpha (0.7f));
+    g.drawText ("GEAR SX", strip.toNearestInt().translated (1, 1), juce::Justification::centredLeft);
+    g.setColour (gold);
+    g.drawText ("GEAR SX", strip.toNearestInt(), juce::Justification::centredLeft);
+
+    // Thin gold divider under the brand strip.
+    g.setColour (gold.withAlpha (0.4f));
+    g.drawHorizontalLine ((int) a.getY() + 34, a.getX() + 14.f, a.getRight() - 14.f);
+}
+
 void NAMAudioProcessorEditor::paint (juce::Graphics& g)
 {
     paintMetalBackground (g);
@@ -453,6 +537,9 @@ void NAMAudioProcessorEditor::paint (juce::Graphics& g)
     paintScrew (g, { (float) getWidth() - 14.f, 14.f }, sr);
     paintScrew (g, { 14.f, (float) getHeight() - 14.f }, sr);
     paintScrew (g, { (float) getWidth() - 14.f, (float) getHeight() - 14.f }, sr);
+
+    if (activeTab_ == Tab::Amp)
+        paintAmpFaceplate (g, panelArea_);
 
     for (auto& gp : groupPanels_)
         paintGroupPanel (g, gp.first, gp.second);
@@ -494,10 +581,12 @@ void NAMAudioProcessorEditor::resized()
         auto calCell     = h.removeFromRight (56).reduced (4, 2);
         calBtn.setBounds (calCell);
 
-        auto tabs = h.removeFromLeft (130).reduced (2, 4);
+        auto tabs = h.removeFromLeft (196).reduced (2, 4);
         mainTabBtn.setBounds (tabs.removeFromLeft (60));
         tabs.removeFromLeft (4);
         fxTabBtn  .setBounds (tabs.removeFromLeft (60));
+        tabs.removeFromLeft (4);
+        ampTabBtn .setBounds (tabs.removeFromLeft (60));
     }
 
     // Preset panel overlay (positioned offscreen-right when closed, slides in).
@@ -583,7 +672,7 @@ void NAMAudioProcessorEditor::resized()
             placeBtn (irLpBypass);
             placeBtn (irPhaseInv);
             hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass); hideBtn (trBypass);
-        } else {
+        } else if (activeTab_ == Tab::Fx) {
             placeBtn (delBypass);
             placeBtn (chBypass);
             placeBtn (flBypass);
@@ -593,6 +682,12 @@ void NAMAudioProcessorEditor::resized()
             hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
             hideBtn (hpBypass); hideBtn (lnEnabled);
             hideBtn (irHpBypass); hideBtn (irLpBypass); hideBtn (irPhaseInv);
+        } else { // Tab::Amp — no per-effect bypass row on the amp page.
+            hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
+            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
+            hideBtn (hpBypass); hideBtn (lnEnabled);
+            hideBtn (irHpBypass); hideBtn (irLpBypass); hideBtn (irPhaseInv);
+            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass); hideBtn (trBypass);
         }
     }
 
@@ -617,7 +712,7 @@ void NAMAudioProcessorEditor::resized()
             { "IR TOOLS",   { kIrHp, kIrLp, kIrTrim } },
             { "MASTER",     { kHpFreq, kLnTarget } },
         };
-    } else {
+    } else if (activeTab_ == Tab::Fx) {
         groups = {
             { "DELAY",   { kDelTime, kDelFb, kDelMix } },
             { "CHORUS",  { kChRate, kChDepth, kChMix } },
@@ -686,6 +781,50 @@ void NAMAudioProcessorEditor::resized()
 
         if (gi + 1 < groups.size())
             cursorRect.removeFromLeft (gap);
+    }
+
+    // --- Native tube-amp enable toggle (MAIN tab, beside Input/Output). --------
+    tubeToggle_.setVisible (activeTab_ == Tab::Main);
+    if (activeTab_ == Tab::Main) {
+        for (auto& gp : groupPanels_) {
+            if (gp.second == "AMP") {
+                auto strip = gp.first.reduced (6, 4).removeFromTop (26);
+                tubeToggle_.setBounds (strip.removeFromRight (70).reduced (2, 4));
+                break;
+            }
+        }
+    }
+
+    // --- Native amp page: CHANNEL selector + 14 knobs in 4 horizontal rows. ----
+    const bool ampPage = (activeTab_ == Tab::Amp);
+    ampChannelBox_  .setVisible (ampPage);
+    ampChannelLabel_.setVisible (ampPage);
+    for (auto* kb : ampKnobs_) { kb->slider.setVisible (ampPage); kb->label.setVisible (ampPage); }
+
+    if (ampPage) {
+        auto area = panelArea_.reduced (10, 8);
+        const int rowH  = area.getHeight() / 4;
+        const int cellW = area.getWidth()  / 5;
+
+        auto placeKnob = [&] (juce::Rectangle<int>& row, int idx) {
+            auto cell = row.removeFromLeft (cellW).reduced (5, 4);
+            auto lab  = cell.removeFromTop (13);
+            ampKnobs_[idx]->label .setBounds (lab);
+            ampKnobs_[idx]->slider.setBounds (cell);
+        };
+
+        { // Row 1: CHANNEL combo (2 cells) + THUMP + PRES
+            auto row = area.removeFromTop (rowH);
+            auto comboCell = row.removeFromLeft (cellW * 2).reduced (8, 8);
+            ampChannelLabel_.setBounds (comboCell.removeFromTop (14));
+            comboCell.removeFromTop (2);
+            ampChannelBox_.setBounds (comboCell.removeFromTop (26));
+            placeKnob (row, 0);
+            placeKnob (row, 1);
+        }
+        { auto row = area.removeFromTop (rowH); for (int i : { 2, 3, 4, 5, 6 })  placeKnob (row, i); }
+        { auto row = area.removeFromTop (rowH); for (int i : { 7, 8 })           placeKnob (row, i); }
+        { auto row = area;                      for (int i : { 9,10,11,12,13 })  placeKnob (row, i); }
     }
 
     // NORMAL toggle: place a small toggle strip on top of the OUTPUT knob cell,
@@ -813,6 +952,10 @@ void NAMAudioProcessorEditor::refreshLabels()
         juce::File f (ip);
         if (f.existsAsFile()) rescanIRDir (f);
     }
+    // When the native tube amp is engaged the NAM slot acts as a drive PEDAL
+    // in front of it, so relabel the loader accordingly.
+    modelTitleLabel.setText (tubeToggle_.getToggleState() ? "PEDAL" : "MODEL",
+                             juce::dontSendNotification);
 }
 
 void NAMAudioProcessorEditor::togglePresetPanel()

@@ -75,6 +75,23 @@ namespace ids {
     constexpr auto outputMode    = "output_mode";
     constexpr auto calibrateInput= "calibrate_input";
     constexpr auto inputCalLevel = "input_cal_level";
+    // Native tube amp (GEAR SX)
+    constexpr auto ampEnable     = "amp_enable";
+    constexpr auto ampChannel    = "amp_channel";
+    constexpr auto ampThump      = "amp_thump";
+    constexpr auto ampPresence   = "amp_presence";
+    constexpr auto ampBass1      = "amp_bass1";
+    constexpr auto ampMid1       = "amp_mid1";
+    constexpr auto ampTreble1    = "amp_treble1";
+    constexpr auto ampGain1      = "amp_gain1";
+    constexpr auto ampMaster1    = "amp_master1";
+    constexpr auto ampGain2      = "amp_gain2";
+    constexpr auto ampMaster2    = "amp_master2";
+    constexpr auto ampBass3      = "amp_bass3";
+    constexpr auto ampMid3       = "amp_mid3";
+    constexpr auto ampTreble3    = "amp_treble3";
+    constexpr auto ampGain3      = "amp_gain3";
+    constexpr auto ampMaster3    = "amp_master3";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -172,6 +189,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<C>(juce::ParameterID{ids::outputMode,1},    "Output Mode",     juce::StringArray{"Raw","Normalized","Calibrated"}, 1));
     add (std::make_unique<B>(juce::ParameterID{ids::calibrateInput,1},"Calibrate Input", false));
     add (std::make_unique<P>(juce::ParameterID{ids::inputCalLevel,1}, "Input Cal Level", juce::NormalisableRange<float>(-60.f, 60.f, 0.1f), 12.f));
+
+    // Native tube amp (GEAR SX): 3 channels Clean/Crunch/Lead + global Thump/Presence.
+    add (std::make_unique<B>(juce::ParameterID{ids::ampEnable,1},   "Amp Enable",   false));
+    add (std::make_unique<C>(juce::ParameterID{ids::ampChannel,1},  "Amp Channel",  juce::StringArray{"Clean","Crunch","Lead"}, 0));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampThump,1},    "Amp Thump",    juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampPresence,1}, "Amp Presence", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    // Ch1 Clean
+    add (std::make_unique<P>(juce::ParameterID{ids::ampBass1,1},    "Amp Bass 1",   juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampMid1,1},     "Amp Mid 1",    juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampTreble1,1},  "Amp Treble 1", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampGain1,1},    "Amp Gain 1",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampMaster1,1},  "Amp Master 1", juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
+    // Ch2 Crunch (gain/master only)
+    add (std::make_unique<P>(juce::ParameterID{ids::ampGain2,1},    "Amp Gain 2",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampMaster2,1},  "Amp Master 2", juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
+    // Ch3 Lead
+    add (std::make_unique<P>(juce::ParameterID{ids::ampBass3,1},    "Amp Bass 3",   juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampMid3,1},     "Amp Mid 3",    juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampTreble3,1},  "Amp Treble 3", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampGain3,1},    "Amp Gain 3",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.6f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ampMaster3,1},  "Amp Master 3", juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
 
     return layout;
 }
@@ -317,6 +355,23 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const bool  calIn = apvts.getRawParameterValue (ids::calibrateInput)->load() > 0.5f;
     const float calDBu= apvts.getRawParameterValue (ids::inputCalLevel)->load();
 
+    const bool  aEn  = apvts.getRawParameterValue (ids::ampEnable)->load() > 0.5f;
+    const int   aCh  = (int) apvts.getRawParameterValue (ids::ampChannel)->load();
+    const float aTh  = apvts.getRawParameterValue (ids::ampThump)->load();
+    const float aPr  = apvts.getRawParameterValue (ids::ampPresence)->load();
+    const float aB1  = apvts.getRawParameterValue (ids::ampBass1)->load();
+    const float aM1  = apvts.getRawParameterValue (ids::ampMid1)->load();
+    const float aT1  = apvts.getRawParameterValue (ids::ampTreble1)->load();
+    const float aG1  = apvts.getRawParameterValue (ids::ampGain1)->load();
+    const float aMa1 = apvts.getRawParameterValue (ids::ampMaster1)->load();
+    const float aG2  = apvts.getRawParameterValue (ids::ampGain2)->load();
+    const float aMa2 = apvts.getRawParameterValue (ids::ampMaster2)->load();
+    const float aB3  = apvts.getRawParameterValue (ids::ampBass3)->load();
+    const float aM3  = apvts.getRawParameterValue (ids::ampMid3)->load();
+    const float aT3  = apvts.getRawParameterValue (ids::ampTreble3)->load();
+    const float aG3  = apvts.getRawParameterValue (ids::ampGain3)->load();
+    const float aMa3 = apvts.getRawParameterValue (ids::ampMaster3)->load();
+
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
         p.setOutputGainDB (out_);
@@ -346,6 +401,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setOutputMode (static_cast<NAMPipeline::OutputMode>(outMd));
         p.setCalibrateInput (calIn);
         p.setInputCalibrationLevelDBu (calDBu);
+        p.setNativeAmp (aEn, aCh, aTh, aPr,
+                        aB1, aM1, aT1, aG1, aMa1,
+                        aG2, aMa2,
+                        aB3, aM3, aT3, aG3, aMa3);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);
