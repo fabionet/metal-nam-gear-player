@@ -56,7 +56,7 @@ public:
     };
 
     // Small gain-reduction readout for the COMP section. Polled at 15 Hz.
-    // Shows GR in dB as a horizontal bar filling right-to-left with depth.
+    // Shows GR in dB as a vertical bar filling bottom-to-top with depth.
     class GrMeterComponent : public juce::Component, private juce::Timer
     {
     public:
@@ -77,16 +77,23 @@ public:
             g.setColour (juce::Colours::black.withAlpha (0.55f));
             g.fillRoundedRectangle (r, 3.f);
             auto bar = r.reduced (2.f);
-            const float w = bar.getWidth() * frac;
+            const float h = bar.getHeight() * frac;
             juce::Colour col = juce::Colours::lime;
             if (frac > 0.4f) col = juce::Colours::yellow;
             if (frac > 0.7f) col = juce::Colours::orangered;
             g.setColour (col.withAlpha (0.85f));
-            g.fillRoundedRectangle (bar.withWidth (w), 2.f);
+            g.fillRoundedRectangle (bar.withTop (bar.getBottom() - h), 2.f);
+            // dB readout, rotated 90° so it reads along the vertical meter.
             g.setColour (juce::Colours::white.withAlpha (0.9f));
-            g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 10.f, juce::Font::bold));
-            g.drawText ("GR " + juce::String (grDb, 1) + " dB",
-                        getLocalBounds(), juce::Justification::centred);
+            g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 9.f, juce::Font::bold));
+            g.saveState();
+            g.addTransform (juce::AffineTransform::rotation (
+                -juce::MathConstants<float>::halfPi, r.getCentreX(), r.getCentreY()));
+            juce::Rectangle<float> tr (0.f, 0.f, r.getHeight(), r.getWidth());
+            tr.setCentre (r.getCentre());
+            g.drawText ("GR " + juce::String (grDb, 1),
+                        tr.toNearestInt(), juce::Justification::centred);
+            g.restoreState();
         }
     private:
         void timerCallback() override { repaint(); }
