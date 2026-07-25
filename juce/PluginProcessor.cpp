@@ -101,6 +101,13 @@ namespace ids {
     constexpr auto compPos       = "comp_pos";
     // POWER section (depth/resonance) bypass
     constexpr auto powerBypass   = "power_bypass";
+    // Splitter / Widener (cross-channel, lives in processBlock)
+    constexpr auto splitBypass   = "split_bypass";
+    constexpr auto splitLeft     = "split_left";
+    constexpr auto splitRight    = "split_right";
+    constexpr auto splitBalance  = "split_balance";
+    constexpr auto widthAmount   = "width_amount";
+    constexpr auto widthEnable   = "width_enable";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -231,6 +238,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
 
     // POWER section (depth/resonance) bypass.
     add (std::make_unique<B>(juce::ParameterID{ids::powerBypass,1}, "Power Bypass", false));
+
+    // Splitter / Widener. Bypassed by default => no regression vs current behaviour.
+    add (std::make_unique<B>(juce::ParameterID{ids::splitBypass,1},  "Splitter Bypass", true));
+    add (std::make_unique<P>(juce::ParameterID{ids::splitLeft,1},    "Split Left",  juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::splitRight,1},   "Split Right", juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::splitBalance,1}, "Balance",     juce::NormalisableRange<float>(-1.f, 1.f, 0.01f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::widthAmount,1},  "Width",       juce::NormalisableRange<float>(0.f, 2.f, 0.01f), 1.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::widthEnable,1},  "Widener Enable", false));
 
     return layout;
 }
@@ -481,9 +496,27 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     sampleAbsPeak (meterInL_, L, n);
     if (R) sampleAbsPeak (meterInR_, R, n);
 
+    // --- Splitter input stage (cross-channel L/R gain + equal-power balance) ---
+    const bool  splitBypass = apvts.getRawParameterValue (ids::splitBypass)->load() > 0.5f;
+    const bool  widthEnable = apvts.getRawParameterValue (ids::widthEnable)->load() > 0.5f;
+    const float widthAmount = apvts.getRawParameterValue (ids::widthAmount)->load();
+    if (! splitBypass && R && mode != 0) {
+        // Dual-Mono feeds both amps from L: mirror before applying independent gains.
+        if (mode == 1) std::memcpy (R, L, sizeof(float) * n);
+        auto db2lin = [] (float db) { return std::pow (10.f, db * 0.05f); };
+        float gL = db2lin (apvts.getRawParameterValue (ids::splitLeft)->load());
+        float gR = db2lin (apvts.getRawParameterValue (ids::splitRight)->load());
+        const float bal   = apvts.getRawParameterValue (ids::splitBalance)->load(); // -1..1
+        const float theta = (bal * 0.5f + 0.5f) * juce::MathConstants<float>::halfPi;
+        gL *= std::cos (theta);
+        gR *= std::sin (theta);
+        juce::FloatVectorOperations::multiply (L, gL, n);
+        juce::FloatVectorOperations::multiply (R, gR, n);
+    }
+
     if (oversamplingOn_.load() && oversamplingPrepared_) {
         // Prepare channel mirror if needed (dual-mono) before upsampling.
-        if (mode == 1 && R)
+        if (mode == 1 && R && splitBypass)
             std::memcpy (R, L, sizeof(float) * n);
 
         juce::dsp::AudioBlock<float> block (buffer);
@@ -509,13 +542,24 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         if (R) std::memcpy (R, L, sizeof(float) * n);
     } else if (mode == 1) {
         // Dual-Mono: duplicate L into both pipelines.
-        if (R) std::memcpy (R, L, sizeof(float) * n);
+        if (R && splitBypass) std::memcpy (R, L, sizeof(float) * n);
         pipelineL_->process (L, L, n);
         pipelineR_->process (R, R, n);
     } else {
         // Stereo split.
         pipelineL_->process (L, L, n);
         if (R) pipelineR_->process (R, R, n);
+    }
+
+    // --- Widener (mid/side) at end of chain, stereo only ---
+    if (widthEnable && ! splitBypass && mode == 2 && R) {
+        const float w = widthAmount;
+        for (int i = 0; i < n; ++i) {
+            const float m = (L[i] + R[i]) * 0.5f;
+            const float s = (L[i] - R[i]) * 0.5f * w;
+            L[i] = m + s;
+            R[i] = m - s;
+        }
     }
 
     // Output meter taps (post-DSP).

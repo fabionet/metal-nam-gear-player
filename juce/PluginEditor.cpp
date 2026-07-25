@@ -37,6 +37,7 @@ namespace {
         kTrRate, kTrDepth, kTrShape,
         kIrHp, kIrLp, kIrTrim,
         kCompSustain, kCompAttack, kCompTone, kCompLevel,
+        kSplitLeft, kSplitRight, kSplitBalance, kWidth,
         kCount
     };
 
@@ -59,7 +60,8 @@ namespace {
         {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"},
         {"tremolo_rate_hz","RATE"},   {"tremolo_depth","DEPTH"}, {"tremolo_shape",    "SHAPE"},
         {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"},
-        {"comp_sustain",   "SUSTAIN"},{"comp_attack",  "ATTACK"},{"comp_tone",   "TONE"}, {"comp_level","LEVEL"}
+        {"comp_sustain",   "SUSTAIN"},{"comp_attack",  "ATTACK"},{"comp_tone",   "TONE"}, {"comp_level","LEVEL"},
+        {"split_left",     "LEFT"},   {"split_right",  "RIGHT"}, {"split_balance","BAL"}, {"width_amount","WIDTH"}
     }};
 }
 
@@ -224,7 +226,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
 
     for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &compBypass, &powerBypass, &odBypass, &distBypass,
                      &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass, &trBypass,
-                     &irHpBypass, &irLpBypass, &irPhaseInv }) {
+                     &irHpBypass, &irLpBypass, &irPhaseInv, &splitBypass, &widthEnableBtn }) {
         addAndMakeVisible (*b);
         b->setClickingTogglesState (true);
         b->setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
@@ -251,22 +253,28 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     irHpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_hp_bypass",  irHpBypass);
     irLpBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_lp_bypass",  irLpBypass);
     irPhaseInvAtt = std::make_unique<BAtt> (processorRef.apvts, "ir_phase_inv", irPhaseInv);
+    splitBypassAtt  = std::make_unique<InvertBypassBinding> (processorRef.apvts, "split_bypass", splitBypass);
+    widthEnableAtt_ = std::make_unique<BAtt> (processorRef.apvts, "width_enable", widthEnableBtn);
     // Toggles in our layout = "enabled when off" — invert visually if desired.
 
     // Tab buttons.
     addAndMakeVisible (mainTabBtn);
     addAndMakeVisible (fxTabBtn);
     addAndMakeVisible (ampTabBtn);
+    addAndMakeVisible (chainTabBtn);
     mainTabBtn.setClickingTogglesState (true);
     fxTabBtn  .setClickingTogglesState (true);
     ampTabBtn .setClickingTogglesState (true);
+    chainTabBtn.setClickingTogglesState (true);
     mainTabBtn.setRadioGroupId (0xCA11);
     fxTabBtn  .setRadioGroupId (0xCA11);
     ampTabBtn .setRadioGroupId (0xCA11);
+    chainTabBtn.setRadioGroupId (0xCA11);
     mainTabBtn.setToggleState (true, juce::dontSendNotification);
     mainTabBtn.onClick = [this] { setActiveTab (Tab::Main); };
     fxTabBtn  .onClick = [this] { setActiveTab (Tab::Fx);   };
     ampTabBtn .onClick = [this] { setActiveTab (Tab::Amp);  };
+    chainTabBtn.onClick = [this] { setActiveTab (Tab::Chain); };
 
     // Native tube-amp enable toggle (shown on MAIN, next to Input/Output) +
     // 3-way channel selector (shown on AMP tab).
@@ -278,7 +286,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     tubeToggle_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020)); // red  = on
     tubeToggle_.setTooltip ("Enable native GEAR SX tube amp (NAM becomes a drive pedal)");
     tubeToggleAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", tubeToggle_);
-    tubeToggle_.onStateChange = [this] { refreshLabels(); };
+    tubeToggle_.onStateChange = [this] { refreshLabels(); repaint(); };
 
     // Second GEAR SX enable toggle for the AMP tab (acts as the section bypass,
     // same red/grey rule). Bound to the same `amp_enable` param as tubeToggle_.
@@ -290,6 +298,10 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtn2_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
     ampEnableBtn2_.setTooltip ("Enable native GEAR SX tube amp");
     ampEnableBtn2Att_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", ampEnableBtn2_);
+    // Keep the Main-tab TUBE button, the POWER LED and the "PEDAL/MODEL" label in
+    // sync when GEAR SX is toggled from the AMP tab (shared param syncs the toggle
+    // state; the faceplate/labels need an explicit repaint).
+    ampEnableBtn2_.onStateChange = [this] { refreshLabels(); repaint(); };
 
     // GR meter for COMP (MAIN tab).
     addAndMakeVisible (compGrMeter_);
@@ -310,6 +322,18 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampChannelBox_.addItem ("Lead",   3);
     addAndMakeVisible (ampChannelBox_);
     ampChannelAtt_ = std::make_unique<CAtt> (processorRef.apvts, "amp_channel", ampChannelBox_);
+
+    // SPLITTER mode selector (MAIN tab) — a second view onto `channel_mode`,
+    // synced with the footer modeBox via the shared APVTS param.
+    addAndMakeVisible (splitModeLabel_);
+    splitModeLabel_.setJustificationType (juce::Justification::centredRight);
+    splitModeLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    splitModeLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    splitModeBox_.addItem ("Mono",   1);
+    splitModeBox_.addItem ("Dual",   2);
+    splitModeBox_.addItem ("Stereo", 3);
+    addAndMakeVisible (splitModeBox_);
+    splitModeAtt_ = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", splitModeBox_);
 
     // Slim slider (below MODEL loader). Mirrors QUAL knob via shared APVTS param.
     addAndMakeVisible (slimLabel_);
@@ -564,6 +588,339 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
     g.drawHorizontalLine ((int) a.getY() + 34, a.getX() + 14.f, a.getRight() - 14.f);
 }
 
+// ---------------- CATENA (signal-path map) ----------------------------------
+
+namespace {
+    enum ChainGlyph {
+        GInput, GGate, GComp, GDrive, GNam, GSplit, GAmp, GEq, GPower,
+        GCab, GTools, GDelay, GMod, GReverb, GTrem, GWiden, GMaster, GOutput
+    };
+}
+
+bool NAMAudioProcessorEditor::nodeActive (const ChainNode& n) const
+{
+    if (n.paramId.isEmpty()) return true;            // INPUT / OUTPUT: always lit
+    auto* rp = processorRef.apvts.getRawParameterValue (n.paramId);
+    if (rp == nullptr) return true;
+    const float v = rp->load();
+    return n.inverted ? (v < 0.5f) : (v >= 0.5f);    // *_bypass: 0 = active
+}
+
+void NAMAudioProcessorEditor::layoutChainNodes (juce::Rectangle<int> area)
+{
+    chainNodes_.clear();
+    chainLinks_.clear();
+
+    struct Stage { const char* label; const char* param; bool inv; int glyph; };
+    static const Stage pre[] = {
+        { "INPUT", "",             false, GInput },
+        { "NGATE", "ng_bypass",    true,  GGate  },
+        { "GATE",  "gate_bypass",  true,  GGate  },
+        { "COMP",  "comp_bypass",  true,  GComp  },
+        { "DRIVE", "od_bypass",    true,  GDrive },
+        { "DIST",  "dist_bypass",  true,  GDrive },
+        { "NAM",   "model_bypass", true,  GNam   },
+        { "SPLIT", "split_bypass", true,  GSplit },
+    };
+    static const Stage mid[] = {
+        { "AMP SIM", "amp_enable",     false, GAmp    },
+        { "EQ",      "eq_bypass",      true,  GEq     },
+        { "POWER",   "power_bypass",   true,  GPower  },
+        { "CAB",     "ir_bypass",      true,  GCab    },
+        { "IR",      "ir_hp_bypass",   true,  GTools  },
+        { "DELAY",   "delay_bypass",   true,  GDelay  },
+        { "CHORUS",  "chorus_bypass",  true,  GMod    },
+        { "FLANGE",  "flanger_bypass", true,  GMod    },
+        { "REVERB",  "reverb_bypass",  true,  GReverb },
+        { "TREM",    "tremolo_bypass", true,  GTrem   },
+    };
+    static const Stage post[] = {
+        { "WIDEN",  "width_enable", false, GWiden  },
+        { "MASTER", "hp_bypass",    true,  GMaster },
+        { "OUTPUT", "",             false, GOutput },
+    };
+    const int nPre  = (int) (sizeof (pre)  / sizeof (Stage));
+    const int nMid  = (int) (sizeof (mid)  / sizeof (Stage));
+    const int nPost = (int) (sizeof (post) / sizeof (Stage));
+
+    auto* cm = processorRef.apvts.getRawParameterValue ("channel_mode");
+    const bool stereo = (cm != nullptr) && (cm->load() >= 1.5f);
+
+    auto a = area.reduced (16);
+    a.removeFromTop (30);                             // title band (painted separately)
+    const int bands  = stereo ? 4 : 3;
+    const int bandH  = a.getHeight() / bands;
+
+    // Place a straight row of stages inside a band; returns index range in chainNodes_.
+    auto placeRow = [&] (juce::Rectangle<int> band, const Stage* s, int n, int rail)
+                    -> std::pair<int,int>
+    {
+        const int gap = 8;
+        const int nw  = (band.getWidth() - gap * (n - 1)) / n;
+        const int nh  = juce::jmin (66, band.getHeight() - 8);
+        const int y   = band.getCentreY() - nh / 2;
+        int x = band.getX();
+        const int first = (int) chainNodes_.size();
+        for (int i = 0; i < n; ++i) {
+            ChainNode node;
+            node.rect     = { x, y, nw, nh };
+            node.label    = s[i].label;
+            node.paramId  = s[i].param;
+            node.inverted = s[i].inv;
+            node.glyph    = s[i].glyph;
+            node.rail     = rail;
+            chainNodes_.push_back (node);
+            x += nw + gap;
+        }
+        return { first, (int) chainNodes_.size() - 1 };
+    };
+
+    auto midC = [] (juce::Rectangle<int> r) { return juce::Point<int> (r.getCentreX(), r.getCentreY()); };
+    auto rightC = [] (juce::Rectangle<int> r) { return juce::Point<int> (r.getRight(), r.getCentreY()); };
+    auto leftC  = [] (juce::Rectangle<int> r) { return juce::Point<int> (r.getX(), r.getCentreY()); };
+    auto botC   = [] (juce::Rectangle<int> r) { return juce::Point<int> (r.getCentreX(), r.getBottom()); };
+    auto topC   = [] (juce::Rectangle<int> r) { return juce::Point<int> (r.getCentreX(), r.getY()); };
+
+    // Band 0: pre spine.
+    auto preRange = placeRow (a.removeFromTop (bandH), pre, nPre, 0);
+    for (int i = preRange.first; i < preRange.second; ++i)
+        chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+    const int splitIdx = preRange.second;             // SPLIT node
+
+    int widenIdx = -1;
+    if (stereo) {
+        auto lRange = placeRow (a.removeFromTop (bandH), mid, nMid, 1);
+        auto rRange = placeRow (a.removeFromTop (bandH), mid, nMid, 2);
+        for (int i = lRange.first; i < lRange.second; ++i)
+            chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+        for (int i = rRange.first; i < rRange.second; ++i)
+            chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+
+        auto postRange = placeRow (a.removeFromTop (bandH), post, nPost, 0);
+        for (int i = postRange.first; i < postRange.second; ++i)
+            chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+        widenIdx = postRange.first;                   // WIDEN node
+
+        // Fan out from SPLIT to both rails, merge both rails into WIDEN.
+        chainLinks_.push_back ({ botC (chainNodes_[splitIdx].rect), leftC (chainNodes_[lRange.first].rect) });
+        chainLinks_.push_back ({ botC (chainNodes_[splitIdx].rect), leftC (chainNodes_[rRange.first].rect) });
+        chainLinks_.push_back ({ rightC (chainNodes_[lRange.second].rect), topC (chainNodes_[widenIdx].rect) });
+        chainLinks_.push_back ({ rightC (chainNodes_[rRange.second].rect), topC (chainNodes_[widenIdx].rect) });
+    } else {
+        auto midRange = placeRow (a.removeFromTop (bandH), mid, nMid, 0);
+        for (int i = midRange.first; i < midRange.second; ++i)
+            chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+
+        auto postRange = placeRow (a.removeFromTop (bandH), post, nPost, 0);
+        for (int i = postRange.first; i < postRange.second; ++i)
+            chainLinks_.push_back ({ rightC (chainNodes_[i].rect), leftC (chainNodes_[i + 1].rect) });
+        widenIdx = postRange.first;
+
+        chainLinks_.push_back ({ botC (chainNodes_[splitIdx].rect), leftC (chainNodes_[midRange.first].rect) });
+        chainLinks_.push_back ({ rightC (chainNodes_[midRange.second].rect), topC (chainNodes_[widenIdx].rect) });
+    }
+    juce::ignoreUnused (midC);
+}
+
+void NAMAudioProcessorEditor::drawChainIcon (juce::Graphics& g, juce::Rectangle<float> r,
+                                             int glyph, bool active)
+{
+    const auto col = active ? juce::Colour (0xffd9a200) : juce::Colour (0xff6a6a6a);
+    g.setColour (col);
+    auto c = r.reduced (r.getWidth() * 0.16f, r.getHeight() * 0.16f);
+    const float cx = c.getCentreX(), cy = c.getCentreY();
+    const float w = c.getWidth(), h = c.getHeight();
+    const float t = 1.8f;
+
+    switch (glyph)
+    {
+        case GInput: case GOutput: {                 // jack plug
+            g.drawEllipse (cx - w * 0.16f, cy - h * 0.16f, w * 0.32f, h * 0.32f, t);
+            g.drawLine (cx, cy + h * 0.16f, cx, cy + h * 0.42f, t);
+            break;
+        }
+        case GGate: {                                // two bars w/ gap (gate)
+            g.fillRect (juce::Rectangle<float> (cx - w * 0.34f, cy - h * 0.3f, w * 0.16f, h * 0.6f));
+            g.fillRect (juce::Rectangle<float> (cx + w * 0.18f, cy - h * 0.3f, w * 0.16f, h * 0.6f));
+            break;
+        }
+        case GComp: {                                // arrows squeezing inward
+            juce::Path p;
+            p.addArrow ({ cx, cy - h * 0.42f, cx, cy - h * 0.06f }, t, 6.f, 5.f);
+            p.addArrow ({ cx, cy + h * 0.42f, cx, cy + h * 0.06f }, t, 6.f, 5.f);
+            g.fillPath (p);
+            break;
+        }
+        case GDrive: {                               // clipped (flat-top) wave
+            juce::Path p;
+            p.startNewSubPath (cx - w * 0.42f, cy + h * 0.28f);
+            p.lineTo (cx - w * 0.18f, cy - h * 0.28f);
+            p.lineTo (cx + w * 0.18f, cy - h * 0.28f);
+            p.lineTo (cx + w * 0.42f, cy + h * 0.28f);
+            g.strokePath (p, juce::PathStrokeType (t));
+            break;
+        }
+        case GNam: {                                 // chip w/ pins
+            auto body = juce::Rectangle<float> (cx - w * 0.26f, cy - h * 0.26f, w * 0.52f, h * 0.52f);
+            g.drawRoundedRectangle (body, 2.f, t);
+            for (float o : { -0.12f, 0.12f }) {
+                g.drawLine (body.getX() - w * 0.12f, cy + o * h, body.getX(), cy + o * h, t);
+                g.drawLine (body.getRight(), cy + o * h, body.getRight() + w * 0.12f, cy + o * h, t);
+            }
+            break;
+        }
+        case GSplit: {                               // one line branching into two (Y)
+            g.drawLine (cx - w * 0.42f, cy, cx, cy, t);
+            g.drawLine (cx, cy, cx + w * 0.42f, cy - h * 0.34f, t);
+            g.drawLine (cx, cy, cx + w * 0.42f, cy + h * 0.34f, t);
+            break;
+        }
+        case GAmp: {                                 // amp head w/ two knobs
+            g.drawRoundedRectangle (c.reduced (w * 0.08f, h * 0.2f), 2.f, t);
+            g.drawEllipse (cx - w * 0.2f, cy - h * 0.06f, w * 0.14f, h * 0.14f, t);
+            g.drawEllipse (cx + w * 0.06f, cy - h * 0.06f, w * 0.14f, h * 0.14f, t);
+            break;
+        }
+        case GEq: {                                  // three sliders
+            for (int i = 0; i < 3; ++i) {
+                float x = cx + (i - 1) * w * 0.28f;
+                g.drawLine (x, cy - h * 0.36f, x, cy + h * 0.36f, t);
+                float ky = cy + (i - 1) * h * 0.18f;
+                g.fillRect (juce::Rectangle<float> (x - w * 0.07f, ky - h * 0.05f, w * 0.14f, h * 0.1f));
+            }
+            break;
+        }
+        case GPower: {                               // vacuum tube
+            g.drawRoundedRectangle (juce::Rectangle<float> (cx - w * 0.16f, cy - h * 0.36f, w * 0.32f, h * 0.72f), w * 0.16f, t);
+            if (active) { g.setColour (col.withAlpha (0.5f)); g.fillEllipse (cx - w * 0.09f, cy - h * 0.1f, w * 0.18f, h * 0.2f); }
+            break;
+        }
+        case GCab: {                                 // speaker cone
+            g.drawEllipse (cx - w * 0.34f, cy - h * 0.34f, w * 0.68f, h * 0.68f, t);
+            g.drawEllipse (cx - w * 0.12f, cy - h * 0.12f, w * 0.24f, h * 0.24f, t);
+            break;
+        }
+        case GTools: {                               // filter slope
+            juce::Path p;
+            p.startNewSubPath (cx - w * 0.4f, cy + h * 0.3f);
+            p.lineTo (cx, cy + h * 0.3f);
+            p.quadraticTo (cx + w * 0.2f, cy + h * 0.3f, cx + w * 0.32f, cy - h * 0.34f);
+            g.strokePath (p, juce::PathStrokeType (t));
+            break;
+        }
+        case GDelay: {                               // decaying echoes
+            for (int i = 0; i < 3; ++i) {
+                float x = cx - w * 0.32f + i * w * 0.3f;
+                float rr = w * (0.13f - i * 0.03f);
+                g.fillEllipse (x - rr, cy - rr, rr * 2, rr * 2);
+            }
+            break;
+        }
+        case GMod: {                                 // sine wave
+            juce::Path p;
+            const int N = 24;
+            for (int i = 0; i <= N; ++i) {
+                float x = c.getX() + w * i / N;
+                float y = cy - std::sin (juce::MathConstants<float>::twoPi * i / N) * h * 0.3f;
+                if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+            }
+            g.strokePath (p, juce::PathStrokeType (t));
+            break;
+        }
+        case GReverb: {                              // concentric arcs
+            for (float s : { 0.24f, 0.42f, 0.6f })
+                g.drawEllipse (cx - w * s, cy - h * s, w * s * 2, h * s * 2, t * 0.8f);
+            break;
+        }
+        case GTrem: {                                // amplitude-modulated bars
+            for (int i = 0; i < 5; ++i) {
+                float x = cx - w * 0.36f + i * w * 0.18f;
+                float bh = h * (0.14f + 0.22f * std::abs (2 - i));
+                g.fillRect (juce::Rectangle<float> (x - w * 0.04f, cy - bh, w * 0.08f, bh * 2));
+            }
+            break;
+        }
+        case GWiden: {                               // outward arrows <->
+            juce::Path p;
+            p.addArrow ({ cx - w * 0.04f, cy, cx - w * 0.42f, cy }, t, 6.f, 5.f);
+            p.addArrow ({ cx + w * 0.04f, cy, cx + w * 0.42f, cy }, t, 6.f, 5.f);
+            g.fillPath (p);
+            break;
+        }
+        case GMaster: {                              // knob w/ indicator
+            g.drawEllipse (cx - w * 0.3f, cy - h * 0.3f, w * 0.6f, h * 0.6f, t);
+            g.drawLine (cx, cy, cx + w * 0.18f, cy - h * 0.22f, t);
+            break;
+        }
+        default: break;
+    }
+}
+
+void NAMAudioProcessorEditor::paintChainMap (juce::Graphics& g, juce::Rectangle<int> area)
+{
+    if (area.isEmpty()) return;
+    layoutChainNodes (area);
+
+    auto a = area.toFloat().reduced (2.f);
+    const auto gold = juce::Colour (0xffd9a200);
+
+    juce::ColourGradient bg (juce::Colour (0xff1c1c1c), a.getX(), a.getY(),
+                             juce::Colour (0xff0b0b0b), a.getX(), a.getBottom(), false);
+    g.setGradientFill (bg);
+    g.fillRoundedRectangle (a, 6.f);
+    g.setColour (gold.withAlpha (0.85f));
+    g.drawRoundedRectangle (a.reduced (1.5f), 6.f, 1.5f);
+
+    // Title.
+    g.setColour (gold);
+    g.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
+    g.drawText ("SIGNAL CHAIN  \xe2\x80\x94  click an icon to bypass",
+                area.reduced (18, 8).removeFromTop (22), juce::Justification::centredLeft);
+
+    // Connectors first (under the nodes).
+    for (auto& link : chainLinks_) {
+        g.setColour (gold.withAlpha (0.45f));
+        g.drawLine ((float) link.first.x, (float) link.first.y,
+                    (float) link.second.x, (float) link.second.y, 1.6f);
+    }
+
+    // Nodes.
+    for (auto& node : chainNodes_) {
+        const bool act = nodeActive (node);
+        auto r = node.rect.toFloat();
+        g.setColour (act ? gold.withAlpha (0.16f) : juce::Colour (0xff202020));
+        g.fillRoundedRectangle (r, 5.f);
+        g.setColour (act ? gold : juce::Colour (0xff555555));
+        g.drawRoundedRectangle (r.reduced (0.75f), 5.f, act ? 1.6f : 1.0f);
+
+        auto inner = r.reduced (6.f);
+        auto lab   = inner.removeFromBottom (12.f);
+        drawChainIcon (g, inner, node.glyph, act);
+        g.setColour (act ? juce::Colour (0xfff0e6c2) : juce::Colour (0xff888888));
+        g.setFont (juce::Font (juce::FontOptions (9.5f).withStyle ("Bold")));
+        g.drawText (node.label, lab.toNearestInt(), juce::Justification::centred);
+    }
+}
+
+void NAMAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
+{
+    if (activeTab_ != Tab::Chain) return;
+    const auto p = e.getPosition();
+    for (auto& node : chainNodes_) {
+        if (node.paramId.isEmpty()) continue;
+        if (! node.rect.contains (p)) continue;
+        if (auto* param = processorRef.apvts.getParameter (node.paramId)) {
+            const bool nowActive = nodeActive (node);        // toggling to !nowActive
+            const bool wantActive = ! nowActive;
+            const float v = node.inverted ? (wantActive ? 0.f : 1.f)
+                                          : (wantActive ? 1.f : 0.f);
+            param->setValueNotifyingHost (v);
+        }
+        repaint();
+        break;
+    }
+}
+
 void NAMAudioProcessorEditor::paint (juce::Graphics& g)
 {
     paintMetalBackground (g);
@@ -578,6 +935,8 @@ void NAMAudioProcessorEditor::paint (juce::Graphics& g)
 
     if (activeTab_ == Tab::Amp)
         paintAmpFaceplate (g, panelArea_);
+    else if (activeTab_ == Tab::Chain)
+        paintChainMap (g, panelArea_);
 
     for (auto& gp : groupPanels_)
         paintGroupPanel (g, gp.first, gp.second);
@@ -619,12 +978,14 @@ void NAMAudioProcessorEditor::resized()
         auto calCell     = h.removeFromRight (56).reduced (4, 2);
         calBtn.setBounds (calCell);
 
-        auto tabs = h.removeFromLeft (196).reduced (2, 4);
-        mainTabBtn.setBounds (tabs.removeFromLeft (60));
+        auto tabs = h.removeFromLeft (304).reduced (2, 4);
+        mainTabBtn .setBounds (tabs.removeFromLeft (56));
         tabs.removeFromLeft (4);
-        fxTabBtn  .setBounds (tabs.removeFromLeft (60));
+        fxTabBtn   .setBounds (tabs.removeFromLeft (48));
         tabs.removeFromLeft (4);
-        ampTabBtn .setBounds (tabs.removeFromLeft (60));
+        ampTabBtn  .setBounds (tabs.removeFromLeft (84));
+        tabs.removeFromLeft (4);
+        chainTabBtn.setBounds (tabs.removeFromLeft (84));
     }
 
     // Preset panel overlay (positioned offscreen-right when closed, slides in).
@@ -696,10 +1057,13 @@ void NAMAudioProcessorEditor::resized()
         for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &compBypass, &powerBypass,
                          &odBypass, &distBypass,
                          &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass,
-                         &trBypass, &irHpBypass, &irLpBypass, &irPhaseInv })
+                         &trBypass, &irHpBypass, &irLpBypass, &irPhaseInv,
+                         &splitBypass, &widthEnableBtn })
             b->setVisible (false);
         compGrMeter_.setVisible (false); // shown only inside the COMP section below
         compPosBox_.setVisible (false);  // shown only inside the COMP section below
+        splitModeBox_.setVisible (false);  // shown only inside the SPLITTER section below
+        splitModeLabel_.setVisible (false);
     }
 
     r.removeFromBottom (6);
@@ -717,6 +1081,7 @@ void NAMAudioProcessorEditor::resized()
             { "GATE",       { kGateThresh, kGateRelease } },
             { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
             { "DISTORTION", { kDistDrive, kDistTone, kDistLevel } },
+            { "SPLITTER",   { kSplitLeft, kSplitRight, kSplitBalance, kWidth } },
             { "AMP",        { kInput, kOutput } },
             { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
             { "POWER",      { kDepth, kRes, kResFreq } },
@@ -757,6 +1122,7 @@ void NAMAudioProcessorEditor::resized()
         if (name == "GATE")       return { &gateBypass };
         if (name == "OVERDRIVE")  return { &odBypass };
         if (name == "DISTORTION") return { &distBypass };
+        if (name == "SPLITTER")   return { &splitBypass, &widthEnableBtn };
         if (name == "AMP")        return { &ampBypass };
         if (name == "EQ")         return { &eqBypass };
         if (name == "CAB")        return { &irBypass };
@@ -803,6 +1169,16 @@ void NAMAudioProcessorEditor::resized()
             grStrip.removeFromTop (2);
             compGrMeter_.setVisible (true);
             compGrMeter_.setBounds (grStrip.reduced (2, 0));
+        }
+
+        // SPLITTER: Mono / Dual-Mono / Stereo selector at the top of the panel.
+        if (gr.name == "SPLITTER") {
+            auto modeStrip = inside.removeFromTop (20);
+            modeStrip.removeFromTop (2);
+            splitModeLabel_.setVisible (true);
+            splitModeLabel_.setBounds (modeStrip.removeFromLeft (44));
+            splitModeBox_.setVisible (true);
+            splitModeBox_.setBounds (modeStrip.reduced (2, 0));
         }
 
         // Show knobs in this group.

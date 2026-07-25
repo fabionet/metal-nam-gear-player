@@ -225,13 +225,43 @@ private:
     std::unique_ptr<BAtt> lnEnabledAtt;
     std::unique_ptr<BAtt> irPhaseInvAtt; // non-inverted: bool param is truthy=active // LN uses `ln_enabled` (already active-semantics), keep direct.
 
-    // Tab switcher (MAIN / FX / AMP).
-    juce::TextButton mainTabBtn { "MAIN" };
-    juce::TextButton fxTabBtn   { "FX" };
-    juce::TextButton ampTabBtn  { "AMP" };
-    enum class Tab { Main, Fx, Amp };
+    // Tab switcher (MAIN / FX / AMP SIM / CATENA).
+    juce::TextButton mainTabBtn  { "MAIN" };
+    juce::TextButton fxTabBtn    { "FX" };
+    juce::TextButton ampTabBtn   { "AMP SIM" };
+    juce::TextButton chainTabBtn { "CATENA" };
+    enum class Tab { Main, Fx, Amp, Chain };
     Tab activeTab_ = Tab::Main;
     void setActiveTab (Tab t);
+
+    // SPLITTER section (MAIN tab): channel-mode selector (reuses `channel_mode`),
+    // a stereo WIDENER enable, and a section bypass. The 4 knobs (LEFT/RIGHT/BAL/
+    // WIDTH) live in knobs_ (see kSplit* in the .cpp).
+    juce::TextButton splitBypass    { "SPLITTER" };
+    IBypass          splitBypassAtt;
+    juce::TextButton widthEnableBtn { "WIDENER" };
+    std::unique_ptr<BAtt> widthEnableAtt_;
+    juce::ComboBox   splitModeBox_;
+    juce::Label      splitModeLabel_ { {}, "MODE" };
+    std::unique_ptr<CAtt> splitModeAtt_;
+
+    // CATENA tab — interactive signal-path map. Each node maps to a bypass-style
+    // param; gold = active, grey = bypassed. Clicking a node toggles it.
+    struct ChainNode {
+        juce::Rectangle<int> rect;
+        juce::String label;
+        juce::String paramId;   // empty = non-clickable (INPUT / OUTPUT)
+        bool inverted = true;   // true: *_bypass (0 = active); false: *_enable (1 = active)
+        int  glyph    = 0;
+        int  rail     = 0;      // 0 = centre spine, 1 = left rail, 2 = right rail
+    };
+    std::vector<ChainNode> chainNodes_;
+    std::vector<std::pair<juce::Point<int>, juce::Point<int>>> chainLinks_;
+    void layoutChainNodes (juce::Rectangle<int>);
+    void paintChainMap    (juce::Graphics&, juce::Rectangle<int>);
+    void drawChainIcon    (juce::Graphics&, juce::Rectangle<float>, int glyph, bool active);
+    bool nodeActive       (const ChainNode&) const;
+    void mouseDown        (const juce::MouseEvent&) override;
 
     // Native tube amp ("GEAR SX"): enable toggle (next to Input/Output on MAIN),
     // 3-way channel selector, and 14 knobs shown on the AMP tab.
