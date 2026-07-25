@@ -91,6 +91,96 @@ private:
     float  lowGain_ = 1.f, highGain_ = 1.f;
 };
 
+// --- Compressor (Boss CS-1 style feed-forward sustainer) ---------------------
+// Original emulation: peak envelope detector → soft-knee gain computer whose
+// threshold/ratio are driven by a single SUSTAIN control, smoothed release,
+// TONE tilt and LEVEL make-up. Exposes gain-reduction (dB, <=0) for a meter.
+class CompressorFX {
+public:
+    void prepare (double sampleRate)
+    {
+        sr_ = sampleRate;
+        // Fast peak detector attack (~1 ms); attack time is user-controlled for
+        // the gain smoother, detector attack stays snappy.
+        detAtt_ = std::exp (-1.0f / (0.001f * (float) sr_));
+        detRel_ = std::exp (-1.0f / (0.120f * (float) sr_)); // ~120 ms
+        tilt_.prepare (sr_);
+        updateAttack();
+        relCoef_ = std::exp (-1.0f / (0.200f * (float) sr_)); // ~200 ms release
+        reset();
+    }
+    void reset()
+    {
+        env_ = 1e-6f; gain_ = 1.f; grDb_.store (0.f, std::memory_order_relaxed);
+        tilt_.reset();
+    }
+
+    void setSustain (float s)   { sustain_ = std::clamp (s, 0.f, 1.f); }
+    void setAttackMs(float ms)  { attackMs_ = std::clamp (ms, 1.f, 100.f); updateAttack(); }
+    void setToneDB  (float dB)  { tilt_.setToneDB (dB); }
+    void setLevelDB (float dB)  { levelLin_ = db2lin (dB); }
+    void setBypass  (bool b)    { bypass_ = b; }
+
+    float gainReductionDB() const { return grDb_.load (std::memory_order_relaxed); }
+
+    float process (float x)
+    {
+        if (bypass_) { grDb_.store (0.f, std::memory_order_relaxed); return x; }
+
+        // Peak envelope follower.
+        const float a = std::fabs (x);
+        const float dcoef = (a > env_) ? detAtt_ : detRel_;
+        env_ = dcoef * env_ + (1.f - dcoef) * a;
+
+        const float envDB = 20.f * std::log10 (std::max (env_, 1e-6f));
+
+        // SUSTAIN maps to threshold (more sustain → lower threshold) and ratio
+        // (more sustain → higher ratio). Real CS-1 gets very squishy at max.
+        const float threshDB = -6.f  - sustain_ * 30.f;   //  -6 .. -36 dB
+        const float ratio    =  2.f  + sustain_ * 6.f;    //   2 .. 8 : 1
+
+        // Soft-knee (6 dB) gain computer.
+        const float knee = 6.f;
+        float targetGrDB = 0.f;
+        const float over = envDB - threshDB;
+        if (over >= knee * 0.5f) {
+            targetGrDB = (threshDB + (envDB - threshDB) / ratio) - envDB;
+        } else if (over > -knee * 0.5f) {
+            const float t = (over + knee * 0.5f) / knee; // 0..1 across knee
+            const float compDB = (threshDB + (envDB - threshDB) / ratio) - envDB;
+            targetGrDB = compDB * t * t; // smooth quadratic entry
+        }
+        // targetGrDB is <= 0 (reduction).
+        const float targetGain = db2lin (targetGrDB);
+
+        // Attack when clamping harder (gain falling), release when recovering.
+        const float coef = (targetGain < gain_) ? attCoef_ : relCoef_;
+        gain_ = coef * gain_ + (1.f - coef) * targetGain;
+
+        grDb_.store (20.f * std::log10 (std::max (gain_, 1e-6f)),
+                     std::memory_order_relaxed);
+
+        float y = x * gain_;
+        y = tilt_.process (y);
+        return y * levelLin_;
+    }
+
+private:
+    void updateAttack()
+    {
+        attCoef_ = std::exp (-1.0f / (0.001f * attackMs_ * (float) sr_));
+    }
+    double sr_ = 48000.0;
+    float  sustain_  = 0.4f;
+    float  attackMs_ = 15.f;
+    float  levelLin_ = 1.f;
+    bool   bypass_   = false;
+    float  detAtt_ = 0.f, detRel_ = 0.f, attCoef_ = 0.f, relCoef_ = 0.f;
+    float  env_ = 1e-6f, gain_ = 1.f;
+    std::atomic<float> grDb_ { 0.f };
+    TiltOnePole tilt_;
+};
+
 // --- Overdrive: tanh soft clip + tone tilt -----------------------------------
 class Overdrive {
 public:

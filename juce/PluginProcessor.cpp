@@ -92,6 +92,14 @@ namespace ids {
     constexpr auto ampTreble3    = "amp_treble3";
     constexpr auto ampGain3      = "amp_gain3";
     constexpr auto ampMaster3    = "amp_master3";
+    // Compressor (Boss CS-1 style, front of chain)
+    constexpr auto compBypass    = "comp_bypass";
+    constexpr auto compSustain   = "comp_sustain";
+    constexpr auto compAttack    = "comp_attack";
+    constexpr auto compTone      = "comp_tone";
+    constexpr auto compLevel     = "comp_level";
+    // POWER section (depth/resonance) bypass
+    constexpr auto powerBypass   = "power_bypass";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createParameterLayout()
@@ -210,6 +218,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::ampTreble3,1},  "Amp Treble 3", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::ampGain3,1},    "Amp Gain 3",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.6f));
     add (std::make_unique<P>(juce::ParameterID{ids::ampMaster3,1},  "Amp Master 3", juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
+
+    // Compressor (Boss CS-1 style, front of chain).
+    add (std::make_unique<B>(juce::ParameterID{ids::compBypass,1},  "Comp Bypass",  true));
+    add (std::make_unique<P>(juce::ParameterID{ids::compSustain,1}, "Comp Sustain", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.4f));
+    add (std::make_unique<P>(juce::ParameterID{ids::compAttack,1},  "Comp Attack",  juce::NormalisableRange<float>(1.f, 100.f, 0.1f), 15.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::compTone,1},    "Comp Tone",    juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::compLevel,1},   "Comp Level",   juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+
+    // POWER section (depth/resonance) bypass.
+    add (std::make_unique<B>(juce::ParameterID{ids::powerBypass,1}, "Power Bypass", false));
 
     return layout;
 }
@@ -372,6 +390,13 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float aG3  = apvts.getRawParameterValue (ids::ampGain3)->load();
     const float aMa3 = apvts.getRawParameterValue (ids::ampMaster3)->load();
 
+    const bool  cpBp = apvts.getRawParameterValue (ids::compBypass)->load()  > 0.5f;
+    const float cpS  = apvts.getRawParameterValue (ids::compSustain)->load();
+    const float cpA  = apvts.getRawParameterValue (ids::compAttack)->load();
+    const float cpTn = apvts.getRawParameterValue (ids::compTone)->load();
+    const float cpL  = apvts.getRawParameterValue (ids::compLevel)->load();
+    const bool  pwBp = apvts.getRawParameterValue (ids::powerBypass)->load() > 0.5f;
+
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
         p.setOutputGainDB (out_);
@@ -405,6 +430,8 @@ void NAMAudioProcessor::pushParametersToPipelines()
                         aB1, aM1, aT1, aG1, aMa1,
                         aG2, aMa2,
                         aB3, aM3, aT3, aG3, aMa3);
+        p.setCompressor (cpS, cpA, cpTn, cpL, cpBp);
+        p.setDepthBypass (pwBp);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);
@@ -489,6 +516,9 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     // Output meter taps (post-DSP).
     sampleAbsPeak (meterOutL_, L, n);
     if (R) sampleAbsPeak (meterOutR_, R, n);
+
+    // Compressor gain-reduction meter tap (L pipeline is representative).
+    compGr_.store (pipelineL_->compGainReductionDB(), std::memory_order_relaxed);
 
     // CPU load % (EMA smoothing).
     const double dt = juce::Time::highResolutionTicksToSeconds (

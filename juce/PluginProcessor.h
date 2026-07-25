@@ -75,6 +75,9 @@ public:
     // CPU load %, updated at every processBlock (EMA).
     float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
 
+    // Compressor gain-reduction (dB, <= 0), updated at every processBlock.
+    float getCompGrDb() const noexcept { return compGr_.load (std::memory_order_relaxed); }
+
     // Oversampling (session-local; not APVTS).
     void setOversamplingEnabled (bool on);
     bool isOversamplingEnabled() const noexcept { return oversamplingOn_.load(); }
@@ -85,6 +88,7 @@ private:
     std::atomic<float> meterOutL_ { 0.f };
     std::atomic<float> meterOutR_ { 0.f };
     std::atomic<float> cpuLoad_   { 0.f };
+    std::atomic<float> compGr_    { 0.f };
 
     // Two pipelines for 3 channel modes (mono mirror / dual-mono / stereo split).
     std::unique_ptr<NAMPipeline> pipelineL_;
