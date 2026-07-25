@@ -294,6 +294,13 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // GR meter for COMP (MAIN tab).
     addAndMakeVisible (compGrMeter_);
 
+    // COMP routing-position selector (visible only inside the COMP section).
+    compPosBox_.addItem ("Front",     1);
+    compPosBox_.addItem ("Post-Gate", 2);
+    compPosBox_.addItem ("Post-IR",   3);
+    addAndMakeVisible (compPosBox_);
+    compPosAtt_ = std::make_unique<CAtt> (processorRef.apvts, "comp_pos", compPosBox_);
+
     addAndMakeVisible (ampChannelLabel_);
     ampChannelLabel_.setJustificationType (juce::Justification::centredRight);
     ampChannelLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
@@ -692,6 +699,7 @@ void NAMAudioProcessorEditor::resized()
                          &trBypass, &irHpBypass, &irLpBypass, &irPhaseInv })
             b->setVisible (false);
         compGrMeter_.setVisible (false); // shown only inside the COMP section below
+        compPosBox_.setVisible (false);  // shown only inside the COMP section below
     }
 
     r.removeFromBottom (6);
@@ -784,8 +792,13 @@ void NAMAudioProcessorEditor::resized()
             }
         }
 
-        // COMP: small gain-reduction meter just above the bypass button.
+        // COMP: routing-position selector (top) + gain-reduction meter (bottom).
         if (gr.name == "COMP") {
+            auto posStrip = inside.removeFromTop (20);
+            posStrip.removeFromTop (2);
+            compPosBox_.setVisible (true);
+            compPosBox_.setBounds (posStrip.reduced (2, 0));
+
             auto grStrip = inside.removeFromBottom (16);
             grStrip.removeFromTop (2);
             compGrMeter_.setVisible (true);

@@ -191,6 +191,10 @@ private:
     // Gain-reduction readout for the COMP section (MAIN tab).
     GrMeterComponent compGrMeter_ { [this] { return processorRef.getCompGrDb(); } };
 
+    // COMP routing-position selector (Front / Post-Gate / Post-IR), COMP section.
+    juce::ComboBox compPosBox_;
+    std::unique_ptr<CAtt> compPosAtt_;
+
     // Knobs (indexed by param id).
     std::vector<std::unique_ptr<KnobBox>> knobs_;
 
