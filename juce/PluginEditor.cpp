@@ -564,7 +564,7 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
 
     // POWER LED (lit when the amp is enabled).
     const bool on = tubeToggle_.getToggleState();
-    auto led = strip.removeFromRight (60.f);
+    auto led = strip.removeFromRight (72.f);
     auto dot = led.removeFromLeft (14.f).withSizeKeepingCentre (10.f, 10.f);
     g.setColour (on ? juce::Colour (0xffff5030) : juce::Colour (0xff3a1a12));
     g.fillEllipse (dot);
@@ -573,7 +573,7 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
         g.fillEllipse (dot.expanded (3.f));
     }
     g.setColour (gold.withAlpha (0.8f));
-    g.setFont (juce::Font (juce::FontOptions (11.0f).withStyle ("Bold")));
+    g.setFont (juce::Font (juce::FontOptions (14.0f).withStyle ("Bold")));
     g.drawText ("POWER", led, juce::Justification::centredLeft);
 
     // "GEAR SX" logo, left-aligned in the metal display font.
@@ -1076,9 +1076,9 @@ void NAMAudioProcessorEditor::resized()
     std::vector<Group> groups;
     if (activeTab_ == Tab::Main) {
         groups = {
-            { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
             { "NGATE",      { kNgThresh, kNgRelease } },
             { "GATE",       { kGateThresh, kGateRelease } },
+            { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
             { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
             { "DISTORTION", { kDistDrive, kDistTone, kDistLevel } },
             { "SPLITTER",   { kSplitLeft, kSplitRight, kSplitBalance, kWidth } },
@@ -1158,17 +1158,17 @@ void NAMAudioProcessorEditor::resized()
             }
         }
 
-        // COMP: small gain-reduction meter just above the bypass button.
+        // COMP: routing-position selector (top) + vertical gain-reduction meter (right).
         if (gr.name == "COMP") {
             auto posStrip = inside.removeFromTop (20);
             posStrip.removeFromTop (2);
             compPosBox_.setVisible (true);
             compPosBox_.setBounds (posStrip.reduced (2, 0));
 
-            auto grStrip = inside.removeFromBottom (16);
-            grStrip.removeFromTop (2);
+            auto grCol = inside.removeFromRight (20);
+            grCol.removeFromLeft (3);
             compGrMeter_.setVisible (true);
-            compGrMeter_.setBounds (grStrip.reduced (2, 0));
+            compGrMeter_.setBounds (grCol.reduced (0, 2));
         }
 
         // SPLITTER: Mono / Dual-Mono / Stereo selector at the top of the panel.
@@ -1232,7 +1232,8 @@ void NAMAudioProcessorEditor::resized()
         // other sections), sitting above the control rows on the AMP page.
         {
             auto header = area.removeFromTop (30);
-            ampEnableBtn2_.setBounds (header.removeFromLeft (140).reduced (2, 3));
+            header.removeFromRight (84);   // clear the painted POWER LED zone (top-right)
+            ampEnableBtn2_.setBounds (header.removeFromRight (130).reduced (2, 3));
         }
         area.removeFromTop (6);
 
