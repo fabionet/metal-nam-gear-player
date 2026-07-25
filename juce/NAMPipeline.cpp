@@ -17,6 +17,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
 
     eq_.prepare(sampleRate, 1);
     depth_.prepare(sampleRate, 1);
+    comp_.prepare(sampleRate);
     gate_.prepare(sampleRate);
     od_.prepare(sampleRate);
     dist_.prepare(sampleRate);
@@ -48,6 +49,7 @@ void NAMPipeline::reset()
 {
     eq_.reset();
     depth_.reset();
+    comp_.reset();
     gate_.reset();
     od_.reset();
     dist_.reset();
@@ -153,9 +155,10 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] = in[i] * desiredIn;
     }
 
-    // --- Pre-FX: NoiseGate → Gate → Overdrive → Distortion ---
+    // --- Pre-FX: Compressor → NoiseGate → Gate → Overdrive → Distortion ---
     for (int i = 0; i < n; ++i) {
         float s = out[i];
+        s = comp_.process (s);
         s = ng_.process   (s);
         s = gate_.process (s);
         s = od_.process   (s);
@@ -186,8 +189,9 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
     }
 
-    // --- Depth + Resonance ---
-    for (int i = 0; i < n; ++i) out[i] = depth_.processSample(0, out[i]);
+    // --- Depth + Resonance (POWER section, bypassable) ---
+    if (!depthBypass_.load())
+        for (int i = 0; i < n; ++i) out[i] = depth_.processSample(0, out[i]);
 
     // --- 5-band EQ ---
     for (int i = 0; i < n; ++i) out[i] = eq_.processSample(0, out[i]);

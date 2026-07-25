@@ -57,6 +57,44 @@ public:
         std::function<float()> getCpu_;
     };
 
+    // Small gain-reduction readout for the COMP section. Polled at 15 Hz.
+    // Shows GR in dB as a horizontal bar filling right-to-left with depth.
+    class GrMeterComponent : public juce::Component, private juce::Timer
+    {
+    public:
+        explicit GrMeterComponent (std::function<float()> getGr)
+            : getGr_ (std::move (getGr))
+        {
+            startTimerHz (15);
+            setInterceptsMouseClicks (false, false);
+        }
+        ~GrMeterComponent() override { stopTimer(); }
+
+        void paint (juce::Graphics& g) override
+        {
+            // getGr_ returns dB <= 0 (0 = no reduction). Map 0..-18 dB to 0..1.
+            const float grDb = juce::jlimit (-18.f, 0.f, getGr_ ? getGr_() : 0.f);
+            const float frac = juce::jlimit (0.f, 1.f, -grDb / 18.f);
+            auto r = getLocalBounds().toFloat();
+            g.setColour (juce::Colours::black.withAlpha (0.55f));
+            g.fillRoundedRectangle (r, 3.f);
+            auto bar = r.reduced (2.f);
+            const float w = bar.getWidth() * frac;
+            juce::Colour col = juce::Colours::lime;
+            if (frac > 0.4f) col = juce::Colours::yellow;
+            if (frac > 0.7f) col = juce::Colours::orangered;
+            g.setColour (col.withAlpha (0.85f));
+            g.fillRoundedRectangle (bar.withWidth (w), 2.f);
+            g.setColour (juce::Colours::white.withAlpha (0.9f));
+            g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 10.f, juce::Font::bold));
+            g.drawText ("GR " + juce::String (grDb, 1) + " dB",
+                        getLocalBounds(), juce::Justification::centred);
+        }
+    private:
+        void timerCallback() override { repaint(); }
+        std::function<float()> getGr_;
+    };
+
 private:
     using SAtt = juce::AudioProcessorValueTreeState::SliderAttachment;
     using CAtt = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -65,11 +103,11 @@ private:
     // Adapter: makes a ToggleButton represent the INVERSE of a bool
     // `xxx_bypass` parameter — checked = active, unchecked = bypass.
     struct InvertBypassBinding {
-        juce::ToggleButton& btn;
+        juce::Button& btn;
         juce::ParameterAttachment att;
         InvertBypassBinding (juce::AudioProcessorValueTreeState& apvts,
                              const juce::String& paramId,
-                             juce::ToggleButton& b)
+                             juce::Button& b)
           : btn (b),
             att (*apvts.getParameter (paramId),
                  [this] (float v) {
@@ -152,30 +190,36 @@ private:
     // CPU load readout, rightmost widget of the header bar.
     CpuMeterComponent cpuMeter_ { [this] { return processorRef.getCpuLoadPct(); } };
 
+    // Gain-reduction readout for the COMP section (MAIN tab).
+    GrMeterComponent compGrMeter_ { [this] { return processorRef.getCompGrDb(); } };
+
     // Knobs (indexed by param id).
     std::vector<std::unique_ptr<KnobBox>> knobs_;
 
     // Bypass toggles.
-    juce::ToggleButton ampBypass  { "AMP" };
-    juce::ToggleButton irBypass   { "CAB" };
-    juce::ToggleButton ngBypass   { "NG" };
-    juce::ToggleButton gateBypass { "GATE" };
-    juce::ToggleButton odBypass   { "OD" };
-    juce::ToggleButton distBypass { "DIST" };
-    juce::ToggleButton eqBypass   { "EQ" };
-    juce::ToggleButton hpBypass   { "HP" };
-    juce::ToggleButton lnEnabled  { "LN" };
-    juce::ToggleButton delBypass  { "DELAY" };
-    juce::ToggleButton chBypass   { "CHOR" };
-    juce::ToggleButton flBypass   { "FLAN" };
-    juce::ToggleButton rvBypass   { "REV" };
-    juce::ToggleButton trBypass   { "TREM" };
-    juce::ToggleButton irHpBypass { "iHP" };
-    juce::ToggleButton irLpBypass { "iLP" };
-    juce::ToggleButton irPhaseInv { juce::CharPointer_UTF8 ("\xcf\x86") };
+    juce::TextButton ampBypass  { "AMP" };
+    juce::TextButton irBypass   { "CABINET" };
+    juce::TextButton ngBypass   { "NOISE GATE" };
+    juce::TextButton gateBypass { "GATE" };
+    juce::TextButton compBypass { "COMP" };
+    juce::TextButton powerBypass{ "POWER" };
+    juce::TextButton odBypass   { "OVERDRIVE" };
+    juce::TextButton distBypass { "DISTORTION" };
+    juce::TextButton eqBypass   { "EQUALIZER" };
+    juce::TextButton hpBypass   { "HIGH-PASS" };
+    juce::TextButton lnEnabled  { "LOUDNESS" };
+    juce::TextButton delBypass  { "DELAY" };
+    juce::TextButton chBypass   { "CHORUS" };
+    juce::TextButton flBypass   { "FLANGER" };
+    juce::TextButton rvBypass   { "REVERB" };
+    juce::TextButton trBypass   { "TREMOLO" };
+    juce::TextButton irHpBypass { "HI-PASS" };
+    juce::TextButton irLpBypass { "LO-PASS" };
+    juce::TextButton irPhaseInv { "PHASE" };
     IBypass ampBypassAtt, irBypassAtt, ngBypassAtt, gateBypassAtt, odBypassAtt, distBypassAtt;
     IBypass hpBypassAtt, delBypassAtt, chBypassAtt, flBypassAtt, eqBypassAtt, rvBypassAtt, trBypassAtt;
     IBypass irHpBypassAtt, irLpBypassAtt;
+    IBypass compBypassAtt, powerBypassAtt;
     std::unique_ptr<BAtt> lnEnabledAtt;
     std::unique_ptr<BAtt> irPhaseInvAtt; // non-inverted: bool param is truthy=active // LN uses `ln_enabled` (already active-semantics), keep direct.
 
@@ -189,8 +233,12 @@ private:
 
     // Native tube amp ("GEAR SX"): enable toggle (next to Input/Output on MAIN),
     // 3-way channel selector, and 14 knobs shown on the AMP tab.
-    juce::ToggleButton tubeToggle_ { "TUBE" };
+    juce::TextButton tubeToggle_ { "TUBE" };
     std::unique_ptr<BAtt> tubeToggleAtt_;
+    // Second GEAR SX enable toggle, shown on the AMP tab as the section bypass.
+    // Bound to the same `amp_enable` param → stays in sync with tubeToggle_.
+    juce::TextButton ampEnableBtn2_ { "GEAR SX" };
+    std::unique_ptr<BAtt> ampEnableBtn2Att_;
     juce::ComboBox ampChannelBox_;
     juce::Label    ampChannelLabel_ { {}, "CHANNEL" };
     std::unique_ptr<CAtt> ampChannelAtt_;

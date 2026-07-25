@@ -36,6 +36,7 @@ namespace {
         kRvRoom, kRvDamp, kRvMix,
         kTrRate, kTrDepth, kTrShape,
         kIrHp, kIrLp, kIrTrim,
+        kCompSustain, kCompAttack, kCompTone, kCompLevel,
         kCount
     };
 
@@ -57,7 +58,8 @@ namespace {
         {"flanger_rate_hz","RATE"},   {"flanger_depth","DEPTH"}, {"flanger_feedback","FBK"}, {"flanger_mix","MIX"},
         {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"},
         {"tremolo_rate_hz","RATE"},   {"tremolo_depth","DEPTH"}, {"tremolo_shape",    "SHAPE"},
-        {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"}
+        {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"},
+        {"comp_sustain",   "SUSTAIN"},{"comp_attack",  "ATTACK"},{"comp_tone",   "TONE"}, {"comp_level","LEVEL"}
     }};
 }
 
@@ -201,8 +203,12 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
             {"amp_bass3",   "BASS"},   {"amp_mid3",  "MID"},   {"amp_treble3", "TREBLE"},
             {"amp_gain3",   "GAIN"},   {"amp_master3","MASTER"}
         }};
-        for (auto& d : ampDefs)
-            ampKnobs_.push_back (&addKnob (d.id, d.label));
+        for (auto& d : ampDefs) {
+            auto& kb = addKnob (d.id, d.label);
+            // Larger, brighter captions on the AMP page for readability.
+            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            ampKnobs_.push_back (&kb);
+        }
     }
 
     // Mode + bypass toggles.
@@ -216,16 +222,22 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     modeLabel.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
     modeAtt = std::make_unique<CAtt> (processorRef.apvts, "channel_mode", modeBox);
 
-    for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &odBypass, &distBypass,
+    for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &compBypass, &powerBypass, &odBypass, &distBypass,
                      &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass, &trBypass,
                      &irHpBypass, &irLpBypass, &irPhaseInv }) {
         addAndMakeVisible (*b);
-        b->setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
+        b->setClickingTogglesState (true);
+        b->setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+        b->setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+        b->setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a)); // grey = bypassed/off
+        b->setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020)); // red  = active/on
     }
     ampBypassAtt  = std::make_unique<InvertBypassBinding> (processorRef.apvts, "model_bypass", ampBypass);
     irBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ir_bypass",    irBypass);
     ngBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "ng_bypass",    ngBypass);
     gateBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "gate_bypass",  gateBypass);
+    compBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "comp_bypass",  compBypass);
+    powerBypassAtt= std::make_unique<InvertBypassBinding> (processorRef.apvts, "power_bypass", powerBypass);
     odBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "od_bypass",    odBypass);
     distBypassAtt = std::make_unique<InvertBypassBinding> (processorRef.apvts, "dist_bypass",  distBypass);
     eqBypassAtt   = std::make_unique<InvertBypassBinding> (processorRef.apvts, "eq_bypass",    eqBypass);
@@ -259,9 +271,28 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // Native tube-amp enable toggle (shown on MAIN, next to Input/Output) +
     // 3-way channel selector (shown on AMP tab).
     addAndMakeVisible (tubeToggle_);
-    tubeToggle_.setColour (juce::ToggleButton::textColourId, juce::Colour (0xfff0e6c2));
+    tubeToggle_.setClickingTogglesState (true);
+    tubeToggle_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+    tubeToggle_.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+    tubeToggle_.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a)); // grey = off
+    tubeToggle_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020)); // red  = on
+    tubeToggle_.setTooltip ("Enable native GEAR SX tube amp (NAM becomes a drive pedal)");
     tubeToggleAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", tubeToggle_);
     tubeToggle_.onStateChange = [this] { refreshLabels(); };
+
+    // Second GEAR SX enable toggle for the AMP tab (acts as the section bypass,
+    // same red/grey rule). Bound to the same `amp_enable` param as tubeToggle_.
+    addAndMakeVisible (ampEnableBtn2_);
+    ampEnableBtn2_.setClickingTogglesState (true);
+    ampEnableBtn2_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+    ampEnableBtn2_.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+    ampEnableBtn2_.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a));
+    ampEnableBtn2_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
+    ampEnableBtn2_.setTooltip ("Enable native GEAR SX tube amp");
+    ampEnableBtn2Att_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", ampEnableBtn2_);
+
+    // GR meter for COMP (MAIN tab).
+    addAndMakeVisible (compGrMeter_);
 
     addAndMakeVisible (ampChannelLabel_);
     ampChannelLabel_.setJustificationType (juce::Justification::centredRight);
@@ -652,43 +683,15 @@ void NAMAudioProcessorEditor::resized()
         modeBox  .setBounds (modeCell.reduced (4, 10));
         optionsBtn.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
 
-        auto hideBtn = [] (juce::ToggleButton& b) { b.setVisible (false); };
-        auto placeBtn = [&] (juce::ToggleButton& b) {
-            b.setVisible (true);
-            b.setBounds (f.removeFromLeft (cellW).reduced (6, 10));
-        };
-
-        if (activeTab_ == Tab::Main) {
-            placeBtn (ngBypass);
-            placeBtn (gateBypass);
-            placeBtn (odBypass);
-            placeBtn (distBypass);
-            placeBtn (ampBypass);
-            placeBtn (eqBypass);
-            placeBtn (irBypass);
-            placeBtn (hpBypass);
-            placeBtn (lnEnabled);
-            placeBtn (irHpBypass);
-            placeBtn (irLpBypass);
-            placeBtn (irPhaseInv);
-            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass); hideBtn (trBypass);
-        } else if (activeTab_ == Tab::Fx) {
-            placeBtn (delBypass);
-            placeBtn (chBypass);
-            placeBtn (flBypass);
-            placeBtn (rvBypass);
-            placeBtn (trBypass);
-            hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
-            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
-            hideBtn (hpBypass); hideBtn (lnEnabled);
-            hideBtn (irHpBypass); hideBtn (irLpBypass); hideBtn (irPhaseInv);
-        } else { // Tab::Amp — no per-effect bypass row on the amp page.
-            hideBtn (ngBypass); hideBtn (gateBypass); hideBtn (odBypass);
-            hideBtn (distBypass); hideBtn (ampBypass); hideBtn (eqBypass); hideBtn (irBypass);
-            hideBtn (hpBypass); hideBtn (lnEnabled);
-            hideBtn (irHpBypass); hideBtn (irLpBypass); hideBtn (irPhaseInv);
-            hideBtn (delBypass); hideBtn (chBypass); hideBtn (flBypass); hideBtn (rvBypass); hideBtn (trBypass);
-        }
+        // Bypass buttons now live inside each section's panel (placed in the
+        // group loop below). Hide them all here; the group loop re-shows only
+        // the ones whose section is present on the active tab.
+        for (auto* b : { &ampBypass, &irBypass, &ngBypass, &gateBypass, &compBypass, &powerBypass,
+                         &odBypass, &distBypass,
+                         &eqBypass, &hpBypass, &lnEnabled, &delBypass, &chBypass, &flBypass, &rvBypass,
+                         &trBypass, &irHpBypass, &irLpBypass, &irPhaseInv })
+            b->setVisible (false);
+        compGrMeter_.setVisible (false); // shown only inside the COMP section below
     }
 
     r.removeFromBottom (6);
@@ -701,6 +704,7 @@ void NAMAudioProcessorEditor::resized()
     std::vector<Group> groups;
     if (activeTab_ == Tab::Main) {
         groups = {
+            { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
             { "NGATE",      { kNgThresh, kNgRelease } },
             { "GATE",       { kGateThresh, kGateRelease } },
             { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
@@ -736,6 +740,27 @@ void NAMAudioProcessorEditor::resized()
     int availW = panelArea_.getWidth() - gap * ((int) groups.size() - 1);
     auto cursorRect = panelArea_;
 
+    // Maps a group panel name to the bypass button(s) that belong inside it.
+    auto bypassButtonsFor = [&] (const juce::String& name) -> std::vector<juce::TextButton*> {
+        if (name == "COMP")       return { &compBypass };
+        if (name == "POWER")      return { &powerBypass };
+        if (name == "NGATE")      return { &ngBypass };
+        if (name == "GATE")       return { &gateBypass };
+        if (name == "OVERDRIVE")  return { &odBypass };
+        if (name == "DISTORTION") return { &distBypass };
+        if (name == "AMP")        return { &ampBypass };
+        if (name == "EQ")         return { &eqBypass };
+        if (name == "CAB")        return { &irBypass };
+        if (name == "IR TOOLS")   return { &irHpBypass, &irLpBypass, &irPhaseInv };
+        if (name == "MASTER")     return { &hpBypass, &lnEnabled };
+        if (name == "DELAY")      return { &delBypass };
+        if (name == "CHORUS")     return { &chBypass };
+        if (name == "FLANGER")    return { &flBypass };
+        if (name == "REVERB")     return { &rvBypass };
+        if (name == "TREMOLO")    return { &trBypass };
+        return {};
+    };
+
     for (size_t gi = 0; gi < groups.size(); ++gi)
     {
         auto& gr = groups[gi];
@@ -745,6 +770,27 @@ void NAMAudioProcessorEditor::resized()
 
         auto inside = panel.reduced (6, 4);
         inside.removeFromTop (30); // title strip
+
+        // Per-section bypass button(s) live in a reserved strip at the bottom
+        // of the panel — red when active, grey when bypassed.
+        auto sectionBtns = bypassButtonsFor (gr.name);
+        if (! sectionBtns.empty()) {
+            auto strip = inside.removeFromBottom (24);
+            strip.removeFromTop (3);
+            const int bw = strip.getWidth() / (int) sectionBtns.size();
+            for (auto* b : sectionBtns) {
+                b->setVisible (true);
+                b->setBounds (strip.removeFromLeft (bw).reduced (2, 1));
+            }
+        }
+
+        // COMP: small gain-reduction meter just above the bypass button.
+        if (gr.name == "COMP") {
+            auto grStrip = inside.removeFromBottom (16);
+            grStrip.removeFromTop (2);
+            compGrMeter_.setVisible (true);
+            compGrMeter_.setBounds (grStrip.reduced (2, 0));
+        }
 
         // Show knobs in this group.
         for (int idx : gr.ids) {
@@ -783,42 +829,43 @@ void NAMAudioProcessorEditor::resized()
             cursorRect.removeFromLeft (gap);
     }
 
-    // --- Native tube-amp enable toggle (MAIN tab, beside Input/Output). --------
-    tubeToggle_.setVisible (activeTab_ == Tab::Main);
-    if (activeTab_ == Tab::Main) {
-        for (auto& gp : groupPanels_) {
-            if (gp.second == "AMP") {
-                auto strip = gp.first.reduced (6, 4).removeFromTop (26);
-                tubeToggle_.setBounds (strip.removeFromRight (70).reduced (2, 4));
-                break;
-            }
-        }
-    }
-
     // --- Native amp page: CHANNEL selector + 14 knobs in 4 horizontal rows. ----
     const bool ampPage = (activeTab_ == Tab::Amp);
     ampChannelBox_  .setVisible (ampPage);
     ampChannelLabel_.setVisible (ampPage);
+    ampEnableBtn2_  .setVisible (ampPage);
     for (auto* kb : ampKnobs_) { kb->slider.setVisible (ampPage); kb->label.setVisible (ampPage); }
 
     if (ampPage) {
-        auto area = panelArea_.reduced (10, 8);
+        auto area = panelArea_.reduced (12, 10);
+
+        // Header strip: GEAR SX section-bypass button (same red/grey rule as the
+        // other sections), sitting above the control rows on the AMP page.
+        {
+            auto header = area.removeFromTop (30);
+            ampEnableBtn2_.setBounds (header.removeFromLeft (140).reduced (2, 3));
+        }
+        area.removeFromTop (6);
+
         const int rowH  = area.getHeight() / 4;
         const int cellW = area.getWidth()  / 5;
 
+        // Bigger label band + more inter-cell padding so the knob captions read
+        // clearly and the controls are well spaced from one another.
         auto placeKnob = [&] (juce::Rectangle<int>& row, int idx) {
-            auto cell = row.removeFromLeft (cellW).reduced (5, 4);
-            auto lab  = cell.removeFromTop (13);
+            auto cell = row.removeFromLeft (cellW).reduced (8, 6);
+            auto lab  = cell.removeFromTop (18);
             ampKnobs_[idx]->label .setBounds (lab);
+            cell.removeFromTop (2);
             ampKnobs_[idx]->slider.setBounds (cell);
         };
 
         { // Row 1: CHANNEL combo (2 cells) + THUMP + PRES
             auto row = area.removeFromTop (rowH);
-            auto comboCell = row.removeFromLeft (cellW * 2).reduced (8, 8);
-            ampChannelLabel_.setBounds (comboCell.removeFromTop (14));
-            comboCell.removeFromTop (2);
-            ampChannelBox_.setBounds (comboCell.removeFromTop (26));
+            auto comboCell = row.removeFromLeft (cellW * 2).reduced (10, 8);
+            ampChannelLabel_.setBounds (comboCell.removeFromTop (18));
+            comboCell.removeFromTop (3);
+            ampChannelBox_.setBounds (comboCell.removeFromTop (28));
             placeKnob (row, 0);
             placeKnob (row, 1);
         }
@@ -827,24 +874,29 @@ void NAMAudioProcessorEditor::resized()
         { auto row = area;                      for (int i : { 9,10,11,12,13 })  placeKnob (row, i); }
     }
 
-    // NORMAL toggle: place a small toggle strip on top of the OUTPUT knob cell,
-    // stealing ~14 px from the bottom of the knob slider. Only visible in Main tab.
+    // NORMAL + TUBE toggles: stacked at the bottom of the OUTPUT knob cell.
+    // NORMAL on top, TUBE just below it (red = amp on, grey = off). Main tab only.
     if (activeTab_ == Tab::Main
         && kOutput < (int) knobs_.size()
         && knobs_[kOutput]
         && knobs_[kOutput]->slider.isVisible()) {
         auto sb = knobs_[kOutput]->slider.getBounds();
         const int th = 16;
-        if (sb.getHeight() > th + 8) {
-            auto togRect = sb.removeFromBottom (th);
+        if (sb.getHeight() > th * 2 + 8) {
+            auto tubeRect   = sb.removeFromBottom (th);
+            auto normalRect = sb.removeFromBottom (th);
             knobs_[kOutput]->slider.setBounds (sb);
             normalToggle_.setVisible (true);
-            normalToggle_.setBounds (togRect.reduced (2, 1));
+            normalToggle_.setBounds (normalRect.reduced (2, 1));
+            tubeToggle_.setVisible (true);
+            tubeToggle_.setBounds (tubeRect.reduced (2, 1));
         } else {
             normalToggle_.setVisible (false);
+            tubeToggle_.setVisible (false);
         }
     } else {
         normalToggle_.setVisible (false);
+        tubeToggle_.setVisible (false);
     }
 }
 

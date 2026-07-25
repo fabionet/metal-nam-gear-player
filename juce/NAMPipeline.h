@@ -77,6 +77,10 @@ public:
 
     void setNoiseGate(float threshDB, float releaseMs, bool byp)
     { ng_.setThresholdDB(threshDB); ng_.setReleaseMs(releaseMs); ng_.setBypass(byp); }
+    void setCompressor(float sustain, float attackMs, float toneDB, float levelDB, bool byp)
+    { comp_.setSustain(sustain); comp_.setAttackMs(attackMs); comp_.setToneDB(toneDB); comp_.setLevelDB(levelDB); comp_.setBypass(byp); }
+    void setDepthBypass(bool byp) { depthBypass_.store(byp); }
+    float compGainReductionDB() const noexcept { return comp_.gainReductionDB(); }
     void setDelay(float timeMs, float feedback, float mix, bool byp)
     { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
     void setChorus(float rateHz, float depth, float mix, bool byp)
@@ -131,6 +135,7 @@ private:
     nam_dsp::FiveBandEQ   eq_;
     nam_dsp::DepthFilter  depth_;
 
+    preamp_fx::CompressorFX  comp_;
     preamp_fx::SmartGate     gate_;
     preamp_fx::Overdrive     od_;
     preamp_fx::Distortion    dist_;
@@ -172,6 +177,7 @@ private:
     std::atomic<bool>  modelBypass_   { false };
     std::atomic<bool>  isSlimmable_   { false };
     std::atomic<bool>  ampEnabled_    { false };
+    std::atomic<bool>  depthBypass_   { false };
 
     // Steve-style calibration state (UI-thread writes; audio-thread reads).
     std::atomic<OutputMode> outputMode_      { OutputMode::Normalized };
