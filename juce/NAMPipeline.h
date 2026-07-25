@@ -80,6 +80,8 @@ public:
     void setCompressor(float sustain, float attackMs, float toneDB, float levelDB, bool byp)
     { comp_.setSustain(sustain); comp_.setAttackMs(attackMs); comp_.setToneDB(toneDB); comp_.setLevelDB(levelDB); comp_.setBypass(byp); }
     void setDepthBypass(bool byp) { depthBypass_.store(byp); }
+    // Compressor routing position: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR.
+    void setCompPos(int p) { compPos_.store(p); }
     float compGainReductionDB() const noexcept { return comp_.gainReductionDB(); }
     void setDelay(float timeMs, float feedback, float mix, bool byp)
     { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
@@ -136,6 +138,7 @@ private:
     nam_dsp::DepthFilter  depth_;
 
     preamp_fx::CompressorFX  comp_;
+    std::atomic<int>         compPos_ { 0 };
     preamp_fx::SmartGate     gate_;
     preamp_fx::Overdrive     od_;
     preamp_fx::Distortion    dist_;

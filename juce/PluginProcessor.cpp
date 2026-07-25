@@ -98,6 +98,7 @@ namespace ids {
     constexpr auto compAttack    = "comp_attack";
     constexpr auto compTone      = "comp_tone";
     constexpr auto compLevel     = "comp_level";
+    constexpr auto compPos       = "comp_pos";
     // POWER section (depth/resonance) bypass
     constexpr auto powerBypass   = "power_bypass";
 }
@@ -225,6 +226,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::compAttack,1},  "Comp Attack",  juce::NormalisableRange<float>(1.f, 100.f, 0.1f), 15.f));
     add (std::make_unique<P>(juce::ParameterID{ids::compTone,1},    "Comp Tone",    juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::compLevel,1},   "Comp Level",   juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+    add (std::make_unique<C>(juce::ParameterID{ids::compPos,1},     "Comp Position",
+         juce::StringArray{ "Front", "Post-Gate", "Post-IR" }, 0));
 
     // POWER section (depth/resonance) bypass.
     add (std::make_unique<B>(juce::ParameterID{ids::powerBypass,1}, "Power Bypass", false));
@@ -395,6 +398,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float cpA  = apvts.getRawParameterValue (ids::compAttack)->load();
     const float cpTn = apvts.getRawParameterValue (ids::compTone)->load();
     const float cpL  = apvts.getRawParameterValue (ids::compLevel)->load();
+    const int   cpPos = (int) apvts.getRawParameterValue (ids::compPos)->load();
     const bool  pwBp = apvts.getRawParameterValue (ids::powerBypass)->load() > 0.5f;
 
     auto apply = [&](NAMPipeline& p) {
@@ -431,6 +435,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
                         aG2, aMa2,
                         aB3, aM3, aT3, aG3, aMa3);
         p.setCompressor (cpS, cpA, cpTn, cpL, cpBp);
+        p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
     };
     apply (*pipelineL_);

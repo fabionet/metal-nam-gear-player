@@ -155,12 +155,16 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] = in[i] * desiredIn;
     }
 
-    // --- Pre-FX: Compressor → NoiseGate → Gate → Overdrive → Distortion ---
+    // --- Pre-FX: (Compressor@Front) → NoiseGate → Gate → (Compressor@Post-Gate) → Overdrive → Distortion ---
+    // compPos_: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR. Only one position is
+    // active per block; the GR meter reads comp_ regardless of where it sits.
+    const int cpos = compPos_.load();
     for (int i = 0; i < n; ++i) {
         float s = out[i];
-        s = comp_.process (s);
+        if (cpos == 0) s = comp_.process (s);
         s = ng_.process   (s);
         s = gate_.process (s);
+        if (cpos == 1) s = comp_.process (s);
         s = od_.process   (s);
         s = dist_.process (s);
         out[i] = s;
@@ -221,6 +225,7 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = irHp_.process (s);
         s = irLp_.process (s);
         s *= irTrimGainSmoothed_;
+        if (cpos == 2) s = comp_.process (s);
         s = hp_.process   (s);
         s = loud_.process (s);
         s = delay_.process   (s);
