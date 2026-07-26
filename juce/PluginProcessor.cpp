@@ -677,7 +677,8 @@ static bool isLocalSafePath (const juce::String& p)
 {
     if (p.isEmpty()) return false;
 
-    // Reject Windows UNC paths: \\server\share
+    // Reject Windows UNC paths: \\server\share and //server/share
+    if (p.startsWith ("//")) return false;
     if (p.startsWith ("\\\\")) return false;
 
     // Reject Windows NT device / extended-length paths: \\?\ or \\.\
