@@ -1,5 +1,15 @@
 # METAL NAM GEAR PLAYER
 
+> ## ⚠️ Avviso di Sicurezza — Vulnerabilità nei binari pre-compilati v0.1.3
+>
+> È stata identificata e corretta nel codice sorgente una **vulnerabilità di sicurezza critica** (UNC path bypass — furto credenziali NetNTLM su Windows via SMB):  
+> la funzione `isLocalSafePath` in `PluginProcessor.cpp` non bloccava i percorsi UNC nella forma `//server/share`, consentendo a un progetto DAW malevolo di innescare una connessione SMB verso un server remoto e trasmettere l'hash NTLMv2 dell'utente.  
+>
+> **Il fix è presente nel codice sorgente** (branch `juce-rewrite`) ma **i binari pre-compilati della release v0.1.3 (Linux) e v0.1.3-windows contengono ancora la vulnerabilità non corretta.**  
+> Si raccomanda di **compilare dal sorgente** (vedi sezione [Building](#building-linux)) oppure di attendere la prossima release che includerà il fix.  
+>
+> Dettagli tecnici: [SECURITY.md](SECURITY.md)
+
 A full-featured guitar amp-sim plugin (VST3 / LV2 / Standalone) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
 
 The plugin is exposed to hosts as **"NAM Custom"**.
