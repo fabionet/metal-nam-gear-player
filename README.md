@@ -22,6 +22,10 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 ![MAIN tab](docs/screenshots/main_tab.png)
 
+**FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
+
+![FX tab](docs/screenshots/fx_tab.png)
+
 **AMP SIM (GEAR SX) tab** - Amplificator Simulation Voicing section (GEAR SX) -----
 
 ![AMP SIM (GEAR SX) tab](docs/screenshots/ampsim_tab.png)
@@ -30,14 +34,9 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 ![AMP SIM (MARCHELLOW) tab](docs/screenshots/ampsim2_tab.png)
 
-**FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
-
-![FX tab](docs/screenshots/fx_tab.png)
-
 **CATENA tab** - Signal direction section -----
 
 ![CATENA tab](docs/screenshots/catena_tab.png)
-
 
 ## Features
 
