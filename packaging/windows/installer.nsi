@@ -123,7 +123,7 @@ Section "Standalone application" SEC_STANDALONE
 SectionEnd
 
 Section "VST3 plugin (system-wide)" SEC_VST3
-  ; System-wide VST3 install path is $COMMONFILES64\VST3\
+  ; System-wide VST3 install path is Common Files\VST3
   SetOutPath "$COMMONFILES64\VST3"
   File /r "${STAGING}\NAM Custom.vst3"
 SectionEnd
