@@ -22,9 +22,22 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 ![MAIN tab](docs/screenshots/main-tab.png)
 
+**AMP SIM (GEAR SX) tab** - Amplificator Simulation Voicing section (GEAR SX) -----
+
+![AMP SIM (GEAR SX) tab](docs/screenshots/ampsim-tab.png)
+
+**AMP SIM (MARCHALLOW) tab** - Amplificator Simulation Voicing section (MARCHALLOW JCM 800 2203 1981) model EU/US tone -----
+
+![AMP SIM (MARCHALLOW) tab](docs/screenshots/ampsim2-tab.png)
+
 **FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
 
 ![FX tab](docs/screenshots/fx-tab.png)
+
+**CATENA tab** - Signal direction section -----
+
+![CATENA tab](docs/screenshots/catena-tab.png)
+
 
 ## Features
 
