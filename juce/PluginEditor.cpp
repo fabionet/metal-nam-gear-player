@@ -279,17 +279,19 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // Native tube-amp enable toggle (shown on MAIN, next to Input/Output) +
     // 3-way channel selector (shown on AMP tab).
     addAndMakeVisible (tubeToggle_);
-    tubeToggle_.setClickingTogglesState (true);
+    // TUBE is a STATUS INDICATOR only (not an activator): it lights red when at
+    // least one amp from the AMP-SIM list (GEAR SX or MARCHELLOW) is powered on.
+    // It is non-interactive; its lit state is driven by updateTubeIndicator().
+    tubeToggle_.setClickingTogglesState (false);
+    tubeToggle_.setInterceptsMouseClicks (false, false);
     tubeToggle_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
     tubeToggle_.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
     tubeToggle_.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a)); // grey = off
     tubeToggle_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020)); // red  = on
-    tubeToggle_.setTooltip ("Enable native GEAR SX tube amp (NAM becomes a drive pedal)");
-    tubeToggleAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", tubeToggle_);
-    tubeToggle_.onStateChange = [this] { refreshLabels(); repaint(); };
+    tubeToggle_.setTooltip ("Status: lit when an AMP SIM (GEAR SX or MARCHELLOW) is on");
 
-    // Second GEAR SX enable toggle for the AMP tab (acts as the section bypass,
-    // same red/grey rule). Bound to the same `amp_enable` param as tubeToggle_.
+    // GEAR SX power button for the AMP tab (acts as the section bypass, same
+    // red/grey rule). Bound to `amp_enable`; drives the TUBE status indicator.
     addAndMakeVisible (ampEnableBtn2_);
     ampEnableBtn2_.setClickingTogglesState (true);
     ampEnableBtn2_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
@@ -298,10 +300,39 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtn2_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
     ampEnableBtn2_.setTooltip ("Enable native GEAR SX tube amp");
     ampEnableBtn2Att_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", ampEnableBtn2_);
-    // Keep the Main-tab TUBE button, the POWER LED and the "PEDAL/MODEL" label in
-    // sync when GEAR SX is toggled from the AMP tab (shared param syncs the toggle
-    // state; the faceplate/labels need an explicit repaint).
-    ampEnableBtn2_.onStateChange = [this] { refreshLabels(); repaint(); };
+    // Mutual exclusion: turning GEAR SX on forces MARCHELLOW off so the two amps
+    // never run at once. Also refresh the TUBE indicator + faceplate/labels.
+    ampEnableBtn2_.onStateChange = [this] {
+        if (ampEnableBtn2_.getToggleState())
+            if (auto* pm = processorRef.apvts.getParameter ("amp_enable2");
+                pm != nullptr && pm->getValue() >= 0.5f)
+                pm->setValueNotifyingHost (0.f);
+        updateTubeIndicator();
+        refreshLabels();
+        repaint();
+    };
+
+    // MARCHELLOW power button — independent power state, bound to `amp_enable2`.
+    // Same slot/styling as ampEnableBtn2_; only one is visible at a time depending
+    // on the selected amp model.
+    addAndMakeVisible (ampEnableBtnMar_);
+    ampEnableBtnMar_.setClickingTogglesState (true);
+    ampEnableBtnMar_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+    ampEnableBtnMar_.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+    ampEnableBtnMar_.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a));
+    ampEnableBtnMar_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
+    ampEnableBtnMar_.setTooltip ("Enable MARCHELLOW (Marshall JCM800 2203) amp");
+    ampEnableBtnMarAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable2", ampEnableBtnMar_);
+    // Mutual exclusion: turning MARCHELLOW on forces GEAR SX off.
+    ampEnableBtnMar_.onStateChange = [this] {
+        if (ampEnableBtnMar_.getToggleState())
+            if (auto* pg = processorRef.apvts.getParameter ("amp_enable");
+                pg != nullptr && pg->getValue() >= 0.5f)
+                pg->setValueNotifyingHost (0.f);
+        updateTubeIndicator();
+        refreshLabels();
+        repaint();
+    };
 
     // GR meter for COMP (MAIN tab).
     addAndMakeVisible (compGrMeter_);
@@ -322,6 +353,79 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampChannelBox_.addItem ("Lead",   3);
     addAndMakeVisible (ampChannelBox_);
     ampChannelAtt_ = std::make_unique<CAtt> (processorRef.apvts, "amp_channel", ampChannelBox_);
+
+    // --- MARCHELLOW (Marshall JCM800 2203) controls -------------------------
+    // Six front-panel knobs (2203 order: Presence, Bass, Middle, Treble,
+    // Master, Preamp), two voicing combos (Valves EU/US, Sens Low/High) and a
+    // reserved FX-LOOP box whose Send/Return knobs are greyed/disabled.
+    {
+        static constexpr std::array<KnobDef, 6> marDefs {{
+            {"mar_presence", "PRESENCE"}, {"mar_bass",   "BASS"},
+            {"mar_mid",      "MIDDLE"},   {"mar_treble", "TREBLE"},
+            {"mar_master",   "MASTER"},   {"mar_preamp", "PREAMP"}
+        }};
+        for (auto& d : marDefs) {
+            auto& kb = addKnob (d.id, d.label);
+            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            marKnobs_.push_back (&kb);
+        }
+    }
+
+    // Valves selector: EU (4x EL34) vs US (4x 6550).
+    addAndMakeVisible (marValvesLabel_);
+    marValvesLabel_.setJustificationType (juce::Justification::centredRight);
+    marValvesLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    marValvesLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    marValvesBox_.addItem ("EU (EL34)", 1);
+    marValvesBox_.addItem ("US (6550)", 2);
+    addAndMakeVisible (marValvesBox_);
+    marValvesAtt_ = std::make_unique<CAtt> (processorRef.apvts, "mar_valves", marValvesBox_);
+
+    // Sensitivity selector: Low (one triode) vs High (both V1 triodes cascaded).
+    addAndMakeVisible (marSensLabel_);
+    marSensLabel_.setJustificationType (juce::Justification::centredRight);
+    marSensLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    marSensLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    marSensBox_.addItem ("Low",  1);
+    marSensBox_.addItem ("High", 2);
+    addAndMakeVisible (marSensBox_);
+    marSensAtt_ = std::make_unique<CAtt> (processorRef.apvts, "mar_sens", marSensBox_);
+
+    // FX-LOOP box (reserved): two knobs bound to params but disabled/greyed —
+    // no DSP routing (the 2203 loop is intentionally not modelled).
+    addAndMakeVisible (fxLoopLabel_);
+    fxLoopLabel_.setJustificationType (juce::Justification::centred);
+    fxLoopLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    fxLoopLabel_.setColour (juce::Label::textColourId, juce::Colour (0xff8a8272));
+    {
+        auto& sk = addKnob ("mar_fx_send", "SEND");
+        sk.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+        sk.label.setColour (juce::Label::textColourId, juce::Colour (0xff8a8272));
+        sk.slider.setEnabled (false);
+        fxSendKnob_ = &sk;
+        auto& rk = addKnob ("mar_fx_return", "RETURN");
+        rk.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+        rk.label.setColour (juce::Label::textColourId, juce::Colour (0xff8a8272));
+        rk.slider.setEnabled (false);
+        fxReturnKnob_ = &rk;
+    }
+
+    // Amp-model selector dropdown (GEAR SX / MARCHELLOW), shown beside the
+    // painted title in the faceplate strip. Bound to `amp_model` via a
+    // ComboBoxAttachment; onChange only re-lays-out + repaints the title. It is
+    // independent from the power button/LED (amp_enable) — selecting an amp does
+    // NOT power it on.
+    addAndMakeVisible (ampModelBox_);
+    ampModelBox_.addItem ("GEAR SX",    1);
+    ampModelBox_.addItem ("MARCHELLOW", 2);
+    ampModelBox_.setColour (juce::ComboBox::textColourId,       juce::Colour (0xfff0e6c2));
+    ampModelBox_.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff2a2a2a));
+    ampModelBox_.setColour (juce::ComboBox::outlineColourId,    juce::Colour (0xffd9a200).withAlpha (0.7f));
+    ampModelBox_.setColour (juce::ComboBox::arrowColourId,      juce::Colour (0xffd9a200));
+    ampModelBox_.setTooltip ("Select amp model: GEAR SX / MARCHELLOW");
+    ampModelBox_.onChange = [this] { updateAmpModelUI(); };
+    ampModelAtt_ = std::make_unique<CAtt> (processorRef.apvts, "amp_model", ampModelBox_);
+    updateAmpModelUI();
 
     // SPLITTER mode selector (MAIN tab) — a second view onto `channel_mode`,
     // synced with the footer modeBox via the shared APVTS param.
@@ -434,6 +538,19 @@ void NAMAudioProcessorEditor::updateSlimEnabled()
 void NAMAudioProcessorEditor::timerCallback()
 {
     updateSlimEnabled();
+    updateTubeIndicator();
+}
+
+// TUBE button acts as a pure status indicator: lit red when at least one AMP SIM
+// (GEAR SX / amp_enable, or MARCHELLOW / amp_enable2) is powered on.
+void NAMAudioProcessorEditor::updateTubeIndicator()
+{
+    auto* pg = processorRef.apvts.getRawParameterValue ("amp_enable");
+    auto* pm = processorRef.apvts.getRawParameterValue ("amp_enable2");
+    const bool anyOn = (pg != nullptr && pg->load() >= 0.5f)
+                    || (pm != nullptr && pm->load() >= 0.5f);
+    if (tubeToggle_.getToggleState() != anyOn)
+        tubeToggle_.setToggleState (anyOn, juce::dontSendNotification);
 }
 
 // ---------------- Painting --------------------------------------------------
@@ -559,11 +676,16 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
     g.setColour (juce::Colour (0xff000000).withAlpha (0.6f));
     g.drawRoundedRectangle (a.reduced (4.f), 5.f, 1.0f);
 
-    // Top brand strip: "GEAR SX" logo + POWER LED.
+    // Top brand strip: selected-amp logo + POWER LED.
+    const bool marshall =
+        processorRef.apvts.getRawParameterValue ("amp_model")->load() >= 0.5f;
+    const juce::String brand = marshall ? "MARCHELLOW" : "GEAR SX";
     auto strip = a.removeFromTop (34.f).reduced (14.f, 4.f);
 
-    // POWER LED (lit when the amp is enabled).
-    const bool on = tubeToggle_.getToggleState();
+    // POWER LED (lit when the SELECTED amp is enabled — each amp has its own power).
+    const bool on = processorRef.apvts
+                        .getRawParameterValue (marshall ? "amp_enable2" : "amp_enable")
+                        ->load() >= 0.5f;
     auto led = strip.removeFromRight (72.f);
     auto dot = led.removeFromLeft (14.f).withSizeKeepingCentre (10.f, 10.f);
     g.setColour (on ? juce::Colour (0xffff5030) : juce::Colour (0xff3a1a12));
@@ -576,12 +698,12 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
     g.setFont (juce::Font (juce::FontOptions (14.0f).withStyle ("Bold")));
     g.drawText ("POWER", led, juce::Justification::centredLeft);
 
-    // "GEAR SX" logo, left-aligned in the metal display font.
+    // Amp logo, left-aligned in the metal display font.
     g.setFont (juce::Font (juce::FontOptions().withTypeface (metalManiaTypeface()).withHeight (26.0f)));
     g.setColour (juce::Colour (0xff000000).withAlpha (0.7f));
-    g.drawText ("GEAR SX", strip.toNearestInt().translated (1, 1), juce::Justification::centredLeft);
+    g.drawText (brand, strip.toNearestInt().translated (1, 1), juce::Justification::centredLeft);
     g.setColour (gold);
-    g.drawText ("GEAR SX", strip.toNearestInt(), juce::Justification::centredLeft);
+    g.drawText (brand, strip.toNearestInt(), juce::Justification::centredLeft);
 
     // Thin gold divider under the brand strip.
     g.setColour (gold.withAlpha (0.4f));
@@ -1219,49 +1341,123 @@ void NAMAudioProcessorEditor::resized()
     }
 
     // --- Native amp page: CHANNEL selector + 14 knobs in 4 horizontal rows. ----
-    const bool ampPage = (activeTab_ == Tab::Amp);
-    ampChannelBox_  .setVisible (ampPage);
-    ampChannelLabel_.setVisible (ampPage);
-    ampEnableBtn2_  .setVisible (ampPage);
-    for (auto* kb : ampKnobs_) { kb->slider.setVisible (ampPage); kb->label.setVisible (ampPage); }
+    const bool ampPage  = (activeTab_ == Tab::Amp);
+    const bool marshall =
+        processorRef.apvts.getRawParameterValue ("amp_model")->load() >= 0.5f;
+    const bool gearPage = ampPage && ! marshall;   // GEAR SX (NativeAmp) controls
+    const bool marPage  = ampPage &&   marshall;   // MARCHELLOW (2203) controls
+
+    // GEAR SX controls: visible only when its model is the selected amp.
+    ampChannelBox_  .setVisible (gearPage);
+    ampChannelLabel_.setVisible (gearPage);
+    for (auto* kb : ampKnobs_) { kb->slider.setVisible (gearPage); kb->label.setVisible (gearPage); }
+
+    // MARCHELLOW controls: visible only when its model is the selected amp.
+    for (auto* kb : marKnobs_) { kb->slider.setVisible (marPage); kb->label.setVisible (marPage); }
+    marValvesBox_  .setVisible (marPage);
+    marValvesLabel_.setVisible (marPage);
+    marSensBox_    .setVisible (marPage);
+    marSensLabel_  .setVisible (marPage);
+    fxLoopLabel_   .setVisible (marPage);
+    if (fxSendKnob_)   { fxSendKnob_->slider  .setVisible (marPage); fxSendKnob_->label  .setVisible (marPage); }
+    if (fxReturnKnob_) { fxReturnKnob_->slider.setVisible (marPage); fxReturnKnob_->label.setVisible (marPage); }
+
+    // Per-amp power buttons share the header slot; only the selected amp's is shown.
+    ampEnableBtn2_  .setVisible (gearPage);
+    ampEnableBtnMar_.setVisible (marPage);
+    ampModelBox_    .setVisible (ampPage);
 
     if (ampPage) {
         auto area = panelArea_.reduced (12, 10);
 
-        // Header strip: GEAR SX section-bypass button (same red/grey rule as the
-        // other sections), sitting above the control rows on the AMP page.
+        // Header strip: painted amp title (far left) + amp-model dropdown beside
+        // it + section-bypass/power button (right). The painted POWER LED zone
+        // (top-right) is deliberately left clear — its geometry is unchanged
+        // regardless of the selected amp.
         {
             auto header = area.removeFromTop (30);
             header.removeFromRight (84);   // clear the painted POWER LED zone (top-right)
-            ampEnableBtn2_.setBounds (header.removeFromRight (130).reduced (2, 3));
+            const auto powerRect = header.removeFromRight (130).reduced (2, 3);
+            ampEnableBtn2_  .setBounds (powerRect);   // both power buttons share the slot
+            ampEnableBtnMar_.setBounds (powerRect);
+            header.removeFromLeft (150);   // reserve room for the painted amp title
+            ampModelBox_  .setBounds (header.removeFromLeft (150).reduced (2, 4));
         }
         area.removeFromTop (6);
 
         const int rowH  = area.getHeight() / 4;
         const int cellW = area.getWidth()  / 5;
 
-        // Bigger label band + more inter-cell padding so the knob captions read
-        // clearly and the controls are well spaced from one another.
-        auto placeKnob = [&] (juce::Rectangle<int>& row, int idx) {
-            auto cell = row.removeFromLeft (cellW).reduced (8, 6);
-            auto lab  = cell.removeFromTop (18);
-            ampKnobs_[idx]->label .setBounds (lab);
-            cell.removeFromTop (2);
-            ampKnobs_[idx]->slider.setBounds (cell);
-        };
+        if (! marshall) {
+            // ---- GEAR SX (NativeAmp): CHANNEL combo + 14 knobs, 4 rows -------
+            // Bigger label band + more inter-cell padding so the knob captions
+            // read clearly and the controls are well spaced from one another.
+            auto placeKnob = [&] (juce::Rectangle<int>& row, int idx) {
+                auto cell = row.removeFromLeft (cellW).reduced (8, 6);
+                auto lab  = cell.removeFromTop (18);
+                ampKnobs_[idx]->label .setBounds (lab);
+                cell.removeFromTop (2);
+                ampKnobs_[idx]->slider.setBounds (cell);
+            };
 
-        { // Row 1: CHANNEL combo (2 cells) + THUMP + PRES
-            auto row = area.removeFromTop (rowH);
-            auto comboCell = row.removeFromLeft (cellW * 2).reduced (10, 8);
-            ampChannelLabel_.setBounds (comboCell.removeFromTop (18));
-            comboCell.removeFromTop (3);
-            ampChannelBox_.setBounds (comboCell.removeFromTop (28));
-            placeKnob (row, 0);
-            placeKnob (row, 1);
+            { // Row 1: CHANNEL combo (2 cells) + THUMP + PRES
+                auto row = area.removeFromTop (rowH);
+                auto comboCell = row.removeFromLeft (cellW * 2).reduced (10, 8);
+                ampChannelLabel_.setBounds (comboCell.removeFromTop (18));
+                comboCell.removeFromTop (3);
+                ampChannelBox_.setBounds (comboCell.removeFromTop (28));
+                placeKnob (row, 0);
+                placeKnob (row, 1);
+            }
+            { auto row = area.removeFromTop (rowH); for (int i : { 2, 3, 4, 5, 6 })  placeKnob (row, i); }
+            { auto row = area.removeFromTop (rowH); for (int i : { 7, 8 })           placeKnob (row, i); }
+            { auto row = area;                      for (int i : { 9,10,11,12,13 })  placeKnob (row, i); }
+        } else {
+            // ---- MARCHELLOW (JCM800 2203) front-panel layout ----------------
+            // marKnobs_ order: 0 PRESENCE, 1 BASS, 2 MIDDLE, 3 TREBLE, 4 MASTER,
+            // 5 PREAMP. Row 1 = tone stack + VALVES; row 2 = gain/master + SENS;
+            // rows 3-4 = reserved FX-LOOP box (greyed Send/Return).
+            auto placeMar = [&] (juce::Rectangle<int>& row, int idx) {
+                auto cell = row.removeFromLeft (cellW).reduced (8, 6);
+                auto lab  = cell.removeFromTop (18);
+                marKnobs_[idx]->label .setBounds (lab);
+                cell.removeFromTop (2);
+                marKnobs_[idx]->slider.setBounds (cell);
+            };
+            auto placeCombo = [&] (juce::Rectangle<int>& row, juce::Label& lbl, juce::ComboBox& box) {
+                auto cell = row.removeFromLeft (cellW).reduced (8, 8);
+                lbl.setBounds (cell.removeFromTop (18));
+                cell.removeFromTop (3);
+                box.setBounds (cell.removeFromTop (28));
+            };
+
+            { // Row 1: PRESENCE, BASS, MIDDLE, TREBLE + VALVES selector
+                auto row = area.removeFromTop (rowH);
+                placeMar (row, 0); placeMar (row, 1); placeMar (row, 2); placeMar (row, 3);
+                placeCombo (row, marValvesLabel_, marValvesBox_);
+            }
+            { // Row 2: PREAMP, MASTER + SENS selector
+                auto row = area.removeFromTop (rowH);
+                placeMar (row, 5); placeMar (row, 4);
+                placeCombo (row, marSensLabel_, marSensBox_);
+            }
+            { // Rows 3-4: reserved FX-LOOP box (label + two centred greyed knobs)
+                auto box = area;
+                fxLoopLabel_.setBounds (box.removeFromTop (18));
+                box.removeFromTop (2);
+                const int fxCellW = box.getWidth() / 5;
+                auto placeFx = [&] (KnobBox* k, juce::Rectangle<int> cell) {
+                    cell = cell.reduced (8, 6);
+                    auto lab = cell.removeFromTop (18);
+                    k->label .setBounds (lab);
+                    cell.removeFromTop (2);
+                    k->slider.setBounds (cell);
+                };
+                box.removeFromLeft (fxCellW + fxCellW / 2);   // left pad → centre the pair
+                if (fxSendKnob_)   placeFx (fxSendKnob_,   box.removeFromLeft (fxCellW));
+                if (fxReturnKnob_) placeFx (fxReturnKnob_, box.removeFromLeft (fxCellW));
+            }
         }
-        { auto row = area.removeFromTop (rowH); for (int i : { 2, 3, 4, 5, 6 })  placeKnob (row, i); }
-        { auto row = area.removeFromTop (rowH); for (int i : { 7, 8 })           placeKnob (row, i); }
-        { auto row = area;                      for (int i : { 9,10,11,12,13 })  placeKnob (row, i); }
     }
 
     // NORMAL + TUBE toggles: stacked at the bottom of the OUTPUT knob cell.
@@ -1394,10 +1590,23 @@ void NAMAudioProcessorEditor::refreshLabels()
         juce::File f (ip);
         if (f.existsAsFile()) rescanIRDir (f);
     }
-    // When the native tube amp is engaged the NAM slot acts as a drive PEDAL
-    // in front of it, so relabel the loader accordingly.
+    // When a native amp is engaged the NAM slot acts as a drive PEDAL in front of
+    // it, so relabel the loader accordingly. The TUBE indicator tracks "any amp on".
+    updateTubeIndicator();
     modelTitleLabel.setText (tubeToggle_.getToggleState() ? "PEDAL" : "MODEL",
                              juce::dontSendNotification);
+}
+
+// Reflects the selected amp model across the AMP page. Called by the
+// ampModelBox_ onChange (or a preset load via the attachment). Sets the power
+// re-lays-out and repaints so the shown per-amp power button, painted faceplate
+// title, and POWER LED all follow the dropdown. Each amp keeps its own power
+// state (amp_enable / amp_enable2); selecting an amp only swaps which power
+// button is visible — it does NOT switch the amp on.
+void NAMAudioProcessorEditor::updateAmpModelUI()
+{
+    resized();
+    repaint();
 }
 
 void NAMAudioProcessorEditor::togglePresetPanel()

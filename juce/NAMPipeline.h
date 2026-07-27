@@ -13,6 +13,7 @@
 #include "IRConvolver.h"
 #include "PreampFX.h"
 #include "NativeAmp.h"
+#include "MarshallAmp.h"
 
 class NAMPipeline {
 public:
@@ -113,6 +114,20 @@ public:
         amp_.setChannel3(b3, m3, t3, g3, ma3);
     }
 
+    // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp).
+    void setAmpModel(int m) { ampModel_.store(m <= 0 ? 0 : 1); }
+
+    // MARCHELLOW (Marshall JCM800 2203). Enable is gated by the caller so the
+    // non-selected amp receives en=false and stays idle.
+    void setMarshall(bool en, int valves, int sens, float preamp01, float masterDB,
+                     float bassDB, float midDB, float trebleDB, float presenceDB)
+    {
+        marshall_.setEnabled(en);
+        marshall_.setValves(valves);
+        marshall_.setSens(sens);
+        marshall_.setControls(preamp01, masterDB, bassDB, midDB, trebleDB, presenceDB);
+    }
+
     // --- Model / IR loading (call from non-audio thread) ---
     // Returns true on success. Old model/IR is destroyed.
     bool loadModel(const std::string& path);
@@ -153,6 +168,8 @@ private:
 
     // IR post-processing tools (Fase 2a).
     preamp_fx::NativeAmp     amp_;
+    preamp_fx::MarshallAmp   marshall_;
+    std::atomic<int>         ampModel_ { 0 };
 
     preamp_fx::BiquadHPF     irHp_;
     preamp_fx::BiquadLPF     irLp_;

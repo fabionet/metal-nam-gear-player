@@ -274,15 +274,42 @@ private:
     // 3-way channel selector, and 14 knobs shown on the AMP tab.
     juce::TextButton tubeToggle_ { "TUBE" };
     std::unique_ptr<BAtt> tubeToggleAtt_;
-    // Second GEAR SX enable toggle, shown on the AMP tab as the section bypass.
-    // Bound to the same `amp_enable` param → stays in sync with tubeToggle_.
+    // AMP-tab power buttons, one per amp with independent state. ampEnableBtn2_
+    // is GEAR SX (bound to amp_enable, in sync with tubeToggle_); ampEnableBtnMar_
+    // is MARCHELLOW (bound to amp_enable2). Only the button for the selected amp
+    // model is shown; both occupy the same header slot.
     juce::TextButton ampEnableBtn2_ { "GEAR SX" };
     std::unique_ptr<BAtt> ampEnableBtn2Att_;
+    juce::TextButton ampEnableBtnMar_ { "MARCHELLOW" };
+    std::unique_ptr<BAtt> ampEnableBtnMarAtt_;
     juce::ComboBox ampChannelBox_;
     juce::Label    ampChannelLabel_ { {}, "CHANNEL" };
     std::unique_ptr<CAtt> ampChannelAtt_;
     std::vector<KnobBox*> ampKnobs_;   // pointers into knobs_, in layout order
     void paintAmpFaceplate (juce::Graphics&, juce::Rectangle<int>);
+
+    // Amp-model selector: a dropdown bound to `amp_model` (0 = GEAR SX,
+    // 1 = MARCHELLOW), placed beside the painted title in the faceplate strip.
+    // Selection changes the active amp + title and swaps which per-amp power
+    // button (and POWER LED state) is shown; each amp keeps its own power.
+    juce::ComboBox ampModelBox_;
+    std::unique_ptr<CAtt> ampModelAtt_;
+    void updateAmpModelUI();
+
+    // Refreshes the TUBE status indicator (lit iff amp_enable || amp_enable2).
+    void updateTubeIndicator();
+
+    // MARCHELLOW (Marshall JCM800 2203) controls, shown on the AMP tab when
+    // amp_model == 1. Six knobs laid out like the real 2203 front panel.
+    std::vector<KnobBox*> marKnobs_;   // pointers into knobs_, in layout order
+    juce::ComboBox marValvesBox_, marSensBox_;
+    juce::Label    marValvesLabel_ { {}, "VALVES" };
+    juce::Label    marSensLabel_   { {}, "SENS" };
+    std::unique_ptr<CAtt> marValvesAtt_, marSensAtt_;
+    // FX loop (Send/Return) — reserved, greyed-out, no DSP routing.
+    KnobBox* fxSendKnob_   = nullptr;
+    KnobBox* fxReturnKnob_ = nullptr;
+    juce::Label fxLoopLabel_ { {}, "FX LOOP (reserved)" };
 
     // Mode.
     juce::ComboBox modeBox;

@@ -92,6 +92,19 @@ namespace ids {
     constexpr auto ampTreble3    = "amp_treble3";
     constexpr auto ampGain3      = "amp_gain3";
     constexpr auto ampMaster3    = "amp_master3";
+    // Amp-model selector + MARCHELLOW (Marshall JCM800 2203)
+    constexpr auto ampModel      = "amp_model";
+    constexpr auto ampEnable2    = "amp_enable2";   // MARCHELLOW independent power
+    constexpr auto marPreamp     = "mar_preamp";
+    constexpr auto marMaster     = "mar_master";
+    constexpr auto marBass       = "mar_bass";
+    constexpr auto marMid        = "mar_mid";
+    constexpr auto marTreble     = "mar_treble";
+    constexpr auto marPresence   = "mar_presence";
+    constexpr auto marValves     = "mar_valves";
+    constexpr auto marSens       = "mar_sens";
+    constexpr auto marFxSend     = "mar_fx_send";   // reserved (FX loop, no DSP)
+    constexpr auto marFxReturn   = "mar_fx_return"; // reserved (FX loop, no DSP)
     // Compressor (Boss CS-1 style, front of chain)
     constexpr auto compBypass    = "comp_bypass";
     constexpr auto compSustain   = "comp_sustain";
@@ -226,6 +239,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::ampTreble3,1},  "Amp Treble 3", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::ampGain3,1},    "Amp Gain 3",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.6f));
     add (std::make_unique<P>(juce::ParameterID{ids::ampMaster3,1},  "Amp Master 3", juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
+
+    // Amp-model selector + MARCHELLOW (Marshall JCM800 2203). This selector routes
+    // GEAR SX (0) vs MARCHELLOW (1). Each amp has its own independent power state:
+    // ampEnable = GEAR SX power, ampEnable2 = MARCHELLOW power.
+    add (std::make_unique<C>(juce::ParameterID{ids::ampModel,1},    "Amp Model",    juce::StringArray{"GEAR SX","MARCHELLOW"}, 0));
+    add (std::make_unique<B>(juce::ParameterID{ids::ampEnable2,1},  "Amp Enable 2", false));
+    add (std::make_unique<P>(juce::ParameterID{ids::marPreamp,1},   "Mar Preamp",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.6f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marMaster,1},   "Mar Master",   juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marBass,1},     "Mar Bass",     juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marMid,1},      "Mar Middle",   juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marTreble,1},   "Mar Treble",   juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marPresence,1}, "Mar Presence", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<C>(juce::ParameterID{ids::marValves,1},   "Mar Valves",   juce::StringArray{"EU (EL34)","US (6550)"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::marSens,1},     "Mar Sens",     juce::StringArray{"Low","High"}, 1));
+    // FX loop Send/Return: reserved placeholders, intentionally NOT routed in DSP.
+    add (std::make_unique<P>(juce::ParameterID{ids::marFxSend,1},   "Mar FX Send",  juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::marFxReturn,1}, "Mar FX Return",juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
 
     // Compressor (Boss CS-1 style, front of chain).
     add (std::make_unique<B>(juce::ParameterID{ids::compBypass,1},  "Comp Bypass",  true));
@@ -392,6 +422,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float calDBu= apvts.getRawParameterValue (ids::inputCalLevel)->load();
 
     const bool  aEn  = apvts.getRawParameterValue (ids::ampEnable)->load() > 0.5f;
+    const bool  aEn2 = apvts.getRawParameterValue (ids::ampEnable2)->load() > 0.5f;
     const int   aCh  = (int) apvts.getRawParameterValue (ids::ampChannel)->load();
     const float aTh  = apvts.getRawParameterValue (ids::ampThump)->load();
     const float aPr  = apvts.getRawParameterValue (ids::ampPresence)->load();
@@ -407,6 +438,16 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float aT3  = apvts.getRawParameterValue (ids::ampTreble3)->load();
     const float aG3  = apvts.getRawParameterValue (ids::ampGain3)->load();
     const float aMa3 = apvts.getRawParameterValue (ids::ampMaster3)->load();
+
+    const int   aModel = (int) apvts.getRawParameterValue (ids::ampModel)->load();
+    const float mPre = apvts.getRawParameterValue (ids::marPreamp)->load();
+    const float mMas = apvts.getRawParameterValue (ids::marMaster)->load();
+    const float mB   = apvts.getRawParameterValue (ids::marBass)->load();
+    const float mM   = apvts.getRawParameterValue (ids::marMid)->load();
+    const float mT   = apvts.getRawParameterValue (ids::marTreble)->load();
+    const float mPr  = apvts.getRawParameterValue (ids::marPresence)->load();
+    const int   mVal = (int) apvts.getRawParameterValue (ids::marValves)->load();
+    const int   mSens= (int) apvts.getRawParameterValue (ids::marSens)->load();
 
     const bool  cpBp = apvts.getRawParameterValue (ids::compBypass)->load()  > 0.5f;
     const float cpS  = apvts.getRawParameterValue (ids::compSustain)->load();
@@ -445,10 +486,12 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setOutputMode (static_cast<NAMPipeline::OutputMode>(outMd));
         p.setCalibrateInput (calIn);
         p.setInputCalibrationLevelDBu (calDBu);
-        p.setNativeAmp (aEn, aCh, aTh, aPr,
+        p.setAmpModel  (aModel);
+        p.setNativeAmp (aEn && aModel == 0, aCh, aTh, aPr,
                         aB1, aM1, aT1, aG1, aMa1,
                         aG2, aMa2,
                         aB3, aM3, aT3, aG3, aMa3);
+        p.setMarshall  (aEn2 && aModel == 1, mVal, mSens, mPre, mMas, mB, mM, mT, mPr);
         p.setCompressor (cpS, cpA, cpTn, cpL, cpBp);
         p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
