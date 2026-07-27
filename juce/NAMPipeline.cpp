@@ -30,6 +30,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     reverb_.prepare(sampleRate);
     tremolo_.prepare(sampleRate);
     amp_.prepare(sampleRate);
+    marshall_.prepare(sampleRate);
     irHp_.reset();
     irLp_.reset();
 
@@ -62,6 +63,7 @@ void NAMPipeline::reset()
     reverb_.reset();
     tremolo_.reset();
     amp_.reset();
+    marshall_.reset();
     irHp_.reset();
     irLp_.reset();
     if (ir_) ir_->reset();
@@ -190,7 +192,10 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // Placed after the model gain-stage and before Depth so the routing is
     // pre-FX → NAM(pedal) → native amp → depth/EQ → IR cab → post-FX.
     if (ampEnabled_.load()) {
-        for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
+        if (ampModel_.load() == 0)
+            for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
+        else
+            for (int i = 0; i < n; ++i) out[i] = marshall_.process(out[i]);
     }
 
     // --- Depth + Resonance (POWER section, bypassable) ---
@@ -307,7 +312,11 @@ bool NAMPipeline::loadIR(const std::string& path)
 {
     if (path.empty()) { clearIR(); return false; }
     auto next = std::make_unique<nam_dsp::IRConvolver>();
-    if (!next->loadFromFile(path, sampleRate_)) return false;
+    try {
+        if (!next->loadFromFile(path, sampleRate_)) return false;
+    } catch (...) {
+        return false; // corrupt/oversized WAV must not crash the host
+    }
     next->prepare(128, 1024);
     ir_ = std::move(next);
     return true;
