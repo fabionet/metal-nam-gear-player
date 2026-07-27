@@ -669,6 +669,30 @@ void NAMAudioProcessor::clearIR()
 
 // --- State ------------------------------------------------------------------
 
+// Returns true only for non-empty paths that refer to a regular local file
+// (not a UNC/network/device path). This guards state-restore from crafted
+// project files that could trigger outbound network authentication (e.g.
+// NetNTLM via SMB on Windows, or network-mount URIs on macOS/Linux).
+static bool isLocalSafePath (const juce::String& p)
+{
+    if (p.isEmpty()) return false;
+
+    // Reject Windows UNC paths: \\server\share and //server/share
+    if (p.startsWith ("//")) return false;
+    if (p.startsWith ("\\\\")) return false;
+
+    // Reject Windows NT device / extended-length paths: \\?\ or \\.\
+    if (p.startsWith ("\\\\.") || p.startsWith ("\\\\?")) return false;
+
+    // Reject network URI schemes used on macOS and Linux
+    for (const auto* scheme : { "smb://", "nfs://", "afp://", "ftp://",
+                                 "http://", "https://", "cifs://",
+                                 "dav://", "davs://", "file://" })
+        if (p.startsWithIgnoreCase (scheme)) return false;
+
+    return true;
+}
+
 void NAMAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
@@ -687,8 +711,11 @@ void NAMAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     apvts.replaceState (state);
     const auto mp = state.getProperty ("modelPath").toString();
     const auto ip = state.getProperty ("irPath").toString();
-    if (mp.isNotEmpty()) loadModelAsync (juce::File (mp));
-    if (ip.isNotEmpty()) loadIRAsync    (juce::File (ip));
+    if (isLocalSafePath (mp)) loadModelAsync (juce::File (mp));
+    // isNotEmpty() guards the warning: an absent path is expected and not a security event.
+    else if (mp.isNotEmpty()) DBG ("setStateInformation: modelPath rejected (non-local path)");
+    if (isLocalSafePath (ip)) loadIRAsync    (juce::File (ip));
+    else if (ip.isNotEmpty()) DBG ("setStateInformation: irPath rejected (non-local path)");
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
