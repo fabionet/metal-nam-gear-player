@@ -20,23 +20,23 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 **MAIN tab** — Noise Gate, Overdrive/Distortion, Amp (NAM model), 5-band EQ, Power (Depth/Resonance), Cab (IR mix), IR Tools (HP/LP/Trim), Master (Loudness Normalization):
 
-![MAIN tab](docs/screenshots/main-tab.png)
+![MAIN tab](docs/screenshots/main_tab.png)
 
 **AMP SIM (GEAR SX) tab** - Amplificator Simulation Voicing section (GEAR SX) -----
 
-![AMP SIM (GEAR SX) tab](docs/screenshots/ampsim-tab.png)
+![AMP SIM (GEAR SX) tab](docs/screenshots/ampsim_tab.png)
 
-**AMP SIM (MARCHALLOW) tab** - Amplificator Simulation Voicing section (MARCHALLOW JCM 800 2203 1981) model EU/US tone -----
+**AMP SIM (MARCHELLOW) tab** - Amplificator Simulation Voicing section (MARCHELLOW JCM 800 2203 1981) model EU/US tone -----
 
-![AMP SIM (MARCHALLOW) tab](docs/screenshots/ampsim2-tab.png)
+![AMP SIM (MARCHELLOW) tab](docs/screenshots/ampsim2_tab.png)
 
 **FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
 
-![FX tab](docs/screenshots/fx-tab.png)
+![FX tab](docs/screenshots/fx_tab.png)
 
 **CATENA tab** - Signal direction section -----
 
-![CATENA tab](docs/screenshots/catena-tab.png)
+![CATENA tab](docs/screenshots/catena_tab.png)
 
 
 ## Features
