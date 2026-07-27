@@ -40,7 +40,7 @@ RequestExecutionLevel admin
 ShowInstDetails show
 ShowUnInstDetails show
 
-VIProductVersion  "0.1.1.0"
+VIProductVersion  "0.1.5.0"
 VIAddVersionKey   "ProductName"     "${APPNAME}"
 VIAddVersionKey   "CompanyName"     "${VENDOR}"
 VIAddVersionKey   "LegalCopyright"  "AGPL-3.0-or-later"

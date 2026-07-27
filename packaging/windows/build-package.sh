@@ -9,7 +9,7 @@
 # Docs source: sibling checkout of neural-amp-modeler-lv2 (juce-rewrite branch).
 set -euo pipefail
 
-VERSION="${1:-0.1.1}"
+VERSION="${1:-0.1.5}"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="$ROOT/build-win"
