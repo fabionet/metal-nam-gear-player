@@ -18,7 +18,7 @@
       <PARAM id="resonance" value="0"/>
       <PARAM id="resonance_freq" value="100"/>
       <PARAM id="channel_mode" value="0"/>
-      <PARAM id="quality_scale" value="0"/>
+      <PARAM id="quality_scale" value="1"/>
       <PARAM id="ir_mix" value="1"/>
       <PARAM id="ir_bypass" value="1"/>
       <PARAM id="model_bypass" value="0"/>

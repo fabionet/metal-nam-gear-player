@@ -14,6 +14,8 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
 {
     sampleRate_ = sampleRate;
     blockSize_  = blockSize;
+    preparedSampleRate_ = sampleRate;
+    preparedBlockSize_  = blockSize;
 
     eq_.prepare(sampleRate, 1);
     depth_.prepare(sampleRate, 1);
@@ -191,10 +193,14 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // --- Native tube amp (optional; NAM acts as a drive pedal upstream) ---
     // Placed after the model gain-stage and before Depth so the routing is
     // pre-FX → NAM(pedal) → native amp → depth/EQ → IR cab → post-FX.
-    if (ampEnabled_.load()) {
-        if (ampModel_.load() == 0)
+    // Each amp carries its own power state: ampEnabled_ for GEAR SX, marshallEnabled_
+    // for MARCHELLOW. Gating on ampEnabled_ alone made the MARCHELLOW branch
+    // unreachable (ampEnabled_ is only ever true while ampModel_ == 0).
+    if (ampModel_.load() == 0) {
+        if (ampEnabled_.load())
             for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
-        else
+    } else {
+        if (marshallEnabled_.load())
             for (int i = 0; i < n; ++i) out[i] = marshall_.process(out[i]);
     }
 
@@ -291,6 +297,10 @@ bool NAMPipeline::loadModel(const std::string& path)
 
 void NAMPipeline::setQualityScaleRuntime(float s)
 {
+    // Called once per processBlock from the audio thread: bail out unless the
+    // value actually moved. SetQualityScaleFactor() on an on-demand composite
+    // model can trigger Prewarm(), which is not realtime-safe.
+    if (s == qualityScale_.load()) return;
     qualityScale_.store(s);
     if (model_ && isSlimmable_.load()) {
         model_->SetQualityScaleFactor(s);

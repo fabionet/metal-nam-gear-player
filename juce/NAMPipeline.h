@@ -122,6 +122,7 @@ public:
     void setMarshall(bool en, int valves, int sens, float preamp01, float masterDB,
                      float bassDB, float midDB, float trebleDB, float presenceDB)
     {
+        marshallEnabled_.store(en);
         marshall_.setEnabled(en);
         marshall_.setValves(valves);
         marshall_.setSens(sens);
@@ -197,6 +198,16 @@ private:
     std::atomic<bool>  modelBypass_   { false };
     std::atomic<bool>  isSlimmable_   { false };
     std::atomic<bool>  ampEnabled_    { false };
+    std::atomic<bool>  marshallEnabled_ { false };
+
+public:
+    // True when prepare() has already run for exactly this sr/blocksize. Lets the
+    // audio thread skip a redundant (allocating) re-prepare on pipeline swap.
+    bool isPreparedFor(double sr, int bs) const noexcept
+    { return preparedSampleRate_ == sr && preparedBlockSize_ == bs; }
+private:
+    double preparedSampleRate_ = 0.0;
+    int    preparedBlockSize_  = 0;
     std::atomic<bool>  depthBypass_   { false };
 
     // Steve-style calibration state (UI-thread writes; audio-thread reads).

@@ -146,7 +146,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::resonance,1},     "Resonance",juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonanceFreq,1}, "Res Freq", juce::NormalisableRange<float>(60.f, 250.f, 1.f, 0.5f), 100.f));
     add (std::make_unique<C>(juce::ParameterID{ids::channelMode,1},   "Mode",     juce::StringArray{"Mono","Dual-Mono","Stereo"}, 0));
-    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
@@ -502,12 +502,16 @@ void NAMAudioProcessor::pushParametersToPipelines()
 
 void NAMAudioProcessor::consumePendingSwaps()
 {
+    // The loader thread already called prepare() with the sr/blocksize captured
+    // when the load was requested. Re-preparing here would allocate (tmp_.assign,
+    // ir_->prepare) on the audio thread on every model/IR swap — only do it if the
+    // rate or block size actually changed underneath us in the meantime.
     if (auto* p = pendingL_.exchange (nullptr)) {
-        p->prepare (sampleRate_, blockSize_);
+        if (! p->isPreparedFor (sampleRate_, blockSize_)) p->prepare (sampleRate_, blockSize_);
         pipelineL_.reset (p);
     }
     if (auto* p = pendingR_.exchange (nullptr)) {
-        p->prepare (sampleRate_, blockSize_);
+        if (! p->isPreparedFor (sampleRate_, blockSize_)) p->prepare (sampleRate_, blockSize_);
         pipelineR_.reset (p);
     }
 }
@@ -550,9 +554,12 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         float gL = db2lin (apvts.getRawParameterValue (ids::splitLeft)->load());
         float gR = db2lin (apvts.getRawParameterValue (ids::splitRight)->load());
         const float bal   = apvts.getRawParameterValue (ids::splitBalance)->load(); // -1..1
-        const float theta = (bal * 0.5f + 0.5f) * juce::MathConstants<float>::halfPi;
-        gL *= std::cos (theta);
-        gR *= std::sin (theta);
+        // Balance law: unity on both sides at centre, attenuating only the
+        // opposite channel towards the extremes, and never boosting. The previous
+        // equal-power pan law (cos/sin of theta) cost both channels 3.01 dB as
+        // soon as the splitter was switched in with every control still neutral.
+        gL *= std::min (1.f, 1.f - bal);
+        gR *= std::min (1.f, 1.f + bal);
         juce::FloatVectorOperations::multiply (L, gL, n);
         juce::FloatVectorOperations::multiply (R, gR, n);
     }
@@ -595,7 +602,9 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     // --- Widener (mid/side) at end of chain, stereo only ---
-    if (widthEnable && ! splitBypass && mode == 2 && R) {
+    // The widener is an independent control: it must not require the splitter
+    // to be switched in (split_bypass defaults to true, which silently disabled it).
+    if (widthEnable && mode == 2 && R) {
         const float w = widthAmount;
         for (int i = 0; i < n; ++i) {
             const float m = (L[i] + R[i]) * 0.5f;
