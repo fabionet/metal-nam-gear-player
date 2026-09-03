@@ -157,6 +157,15 @@ private:
     bool lastSlimmable_ = true;
     void updateSlimEnabled();
 
+    // --- Lettore NAM: volume + meter orizzontale (sotto lo SLIM) ------------
+    juce::Slider modelVolSlider_;
+    juce::Label  modelVolLabel_ { {}, "VOL" };
+    std::unique_ptr<SAtt> modelVolAtt_;
+    std::unique_ptr<MeterStripComponent> modelMeter_;
+    // --- Tonestack dedicato del lettore NAM (colonna a fianco dell'ampli) ---
+    std::vector<KnobBox*> namToneKnobs_;   // BASS, MID, TREBLE
+    juce::Label namToneTitle_ { {}, "NAM TONE" };
+
     juce::TextButton irPrevBtn      { "<" };
     juce::TextButton irNextBtn      { ">" };
     juce::TextButton irBrowseBtn    { "Browse" };

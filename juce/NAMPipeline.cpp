@@ -5,6 +5,19 @@
 namespace {
     constexpr float kSmoothEpsilon = 1e-5f;
     inline float db2lin(float dB) { return std::pow(10.0f, dB * 0.05f); }
+
+    // Rete di sicurezza sull'uscita: sotto -1 dBFS non tocca un bit, sopra piega
+    // il segnale con un ginocchio tanh che tende asintoticamente a 1.0. Serve a
+    // impedire che un modello caldo o un preset spinto mandino l'host in over;
+    // non sostituisce una calibrazione corretta, la protegge soltanto.
+    constexpr float kClipKnee = 0.891251f;   // -1 dBFS
+    inline float safetyClip(float x) {
+        const float a = std::fabs(x);
+        if (a <= kClipKnee) return x;
+        const float head   = 1.0f - kClipKnee;
+        const float shaped = kClipKnee + head * std::tanh((a - kClipKnee) / head);
+        return x < 0.f ? -shaped : shaped;
+    }
 }
 
 NAMPipeline::NAMPipeline()  = default;
@@ -38,12 +51,22 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
 
     tmp_.assign(static_cast<size_t>(std::max(blockSize, 1)), 0.f);
 
+    // Aggancia i follower di guadagno al bersaglio corrente. Senza questo una
+    // pipeline appena costruita parte da 1.0 (0 dB) e ci mette ~10 ms a scendere:
+    // con un preset che chiede -18 dB di uscita, ogni caricamento di modello
+    // lasciava passare una raffica di quella durata al livello vecchio.
+    inputGainLin_  = db2lin(inputGainDB_.load());
+    outputGainLin_ = db2lin(outputGainDB_.load());
+    irTrimGainSmoothed_ = irTrimGain_;
+
     // Force a re-push of cached DSP coeffs.
     eqBassCached_ = 999.f;
     eqMidFreqCached_ = -1.f; eqMidQCached_ = -1.f; eqMidDBCached_ = 999.f;
     eqPresCached_ = eqTrebleCached_ = eqAirCached_ = 999.f;
     depthCached_  = 999.f;
     resDBCached_  = 999.f; resFreqCached_ = -1.f;
+    modelBassCached_ = modelMidCached_ = modelTrebCached_ = 999.f;
+    modelVolLin_ = db2lin(modelVolDB_);
 
     if (ir_) ir_->prepare(128, 1024);
 }
@@ -72,6 +95,9 @@ void NAMPipeline::reset()
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
     irTrimGainSmoothed_ = irTrimGain_;  // snap follower to current target
+    modelBass_.reset(); modelMid_.reset(); modelTreble_.reset();
+    modelVolLin_   = db2lin(modelVolDB_);
+    lastModelPeak_ = 0.f;
 }
 
 void NAMPipeline::updateCachedDsp()
@@ -86,6 +112,9 @@ void NAMPipeline::updateCachedDsp()
         eqMidQCached_    = eqMidQ_;
         eqMidDBCached_   = eqMidDB_;
     }
+    if (modelBassDB_ != modelBassCached_) { modelBass_.setLowShelf   (sampleRate_, 120.0,  0.7, modelBassDB_); modelBassCached_ = modelBassDB_; }
+    if (modelMidDB_  != modelMidCached_)  { modelMid_.setPeak        (sampleRate_, 750.0,  0.8, modelMidDB_);  modelMidCached_  = modelMidDB_;  }
+    if (modelTrebDB_ != modelTrebCached_) { modelTreble_.setHighShelf(sampleRate_, 3000.0, 0.7, modelTrebDB_); modelTrebCached_ = modelTrebDB_; }
     if (depthDB_ != depthCached_) { depth_.setDepth(depthDB_); depthCached_ = depthDB_; }
     if (resDB_ != resDBCached_ || resFreq_ != resFreqCached_) {
         depth_.setResonance(resDB_, resFreq_);
@@ -190,6 +219,28 @@ void NAMPipeline::process(const float* in, float* out, int n)
         for (int i = 0; i < n; ++i) out[i] *= modelOutLin;
     }
 
+    // --- Stadio del lettore NAM: tonestack 3 bande + volume + tap del meter ---
+    // Sta dopo il gain-stage del modello e prima dell'ampli nativo: il volume
+    // regola quanto il NAM spinge nell'ampli, e il meter mostra esattamente
+    // il livello che esce dal lettore.
+    {
+        const float desiredMv = db2lin(modelVolDB_);
+        float g  = modelVolLin_;
+        float pk = 0.f;
+        for (int i = 0; i < n; ++i) {
+            g = 0.99f * g + 0.01f * desiredMv;
+            float s = modelBass_.process(out[i]);
+            s = modelMid_.process(s);
+            s = modelTreble_.process(s);
+            s *= g;
+            out[i] = s;
+            const float a = std::fabs(s);
+            if (a > pk) pk = a;
+        }
+        modelVolLin_   = g;
+        lastModelPeak_ = pk;
+    }
+
     // --- Native tube amp (optional; NAM acts as a drive pedal upstream) ---
     // Placed after the model gain-stage and before Depth so the routing is
     // pre-FX → NAM(pedal) → native amp → depth/EQ → IR cab → post-FX.
@@ -260,6 +311,8 @@ void NAMPipeline::process(const float* in, float* out, int n)
         outputGainLin_ = desiredOut;
         for (int i = 0; i < n; ++i) out[i] *= desiredOut;
     }
+
+    for (int i = 0; i < n; ++i) out[i] = safetyClip(out[i]);
 }
 
 bool NAMPipeline::loadModel(const std::string& path)

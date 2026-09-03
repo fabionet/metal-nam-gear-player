@@ -449,6 +449,40 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     slimSlider_.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (slimSlider_);
     slimAtt_ = std::make_unique<SAtt> (processorRef.apvts, "quality_scale", slimSlider_);
+
+    // Volume del lettore NAM: slider orizzontale sotto lo SLIM, con sotto il
+    // meter del livello che esce dal lettore (post tonestack e post volume).
+    modelVolSlider_.setSliderStyle (juce::Slider::LinearHorizontal);
+    modelVolSlider_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 16);
+    modelVolSlider_.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    addAndMakeVisible (modelVolSlider_);
+    modelVolLabel_.setJustificationType (juce::Justification::centredLeft);
+    modelVolLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+    modelVolLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    addAndMakeVisible (modelVolLabel_);
+    modelVolAtt_ = std::make_unique<SAtt> (processorRef.apvts, "model_volume", modelVolSlider_);
+
+    modelMeter_ = std::make_unique<MeterStripComponent> (
+        processorRef.getMeterModelL(), processorRef.getMeterModelR(),
+        [this] { return (int) processorRef.apvts.getRawParameterValue ("channel_mode")->load() == 2; });
+    modelMeter_->setHorizontal (true);
+    addAndMakeVisible (*modelMeter_);
+
+    // Tonestack del lettore NAM, colonna verticale accanto all'ampli.
+    {
+        static constexpr std::array<KnobDef, 3> namToneDefs {{
+            {"model_bass", "BASS"}, {"model_mid", "MID"}, {"model_treble", "TREBLE"}
+        }};
+        for (auto& d : namToneDefs) {
+            auto& kb = addKnob (d.id, d.label);
+            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            namToneKnobs_.push_back (&kb);
+        }
+        namToneTitle_.setJustificationType (juce::Justification::centred);
+        namToneTitle_.setFont (juce::Font (juce::FontOptions (12.0f).withStyle ("Bold")));
+        namToneTitle_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+        addAndMakeVisible (namToneTitle_);
+    }
     updateSlimEnabled();
     startTimerHz (8);
 
@@ -1123,7 +1157,7 @@ void NAMAudioProcessorEditor::resized()
     r.removeFromTop (6);
 
     // Loader strip (very bottom): MODEL  ◀ [combo ▾] ▶ [Browse]   |   IR  ◀ [combo ▾] ▶ [Browse]
-    loaderArea_ = r.removeFromBottom (92);
+    loaderArea_ = r.removeFromBottom (140);
     {
         auto strip = loaderArea_.reduced (4, 8);
         auto half = strip.getWidth() / 2;
@@ -1160,6 +1194,20 @@ void NAMAudioProcessorEditor::resized()
         slimLabel_ .setBounds (slimRow.removeFromLeft (60));
         slimRow.removeFromLeft (4);
         slimSlider_.setBounds (slimRow);
+
+        // Volume del lettore NAM subito sotto lo SLIM, e sotto ancora il meter.
+        modelBlock.removeFromTop (4);
+        auto volRow = modelBlock.removeFromTop (24);
+        modelVolLabel_.setBounds (volRow.removeFromLeft (60));
+        volRow.removeFromLeft (4);
+        modelVolSlider_.setBounds (volRow);
+
+        modelBlock.removeFromTop (3);
+        auto meterRow = modelBlock.removeFromTop (14);
+        meterRow.removeFromLeft (64);
+        // resized() viene chiamata anche a meta' costruttore, dagli attachment
+        // delle ComboBox: a quel punto il meter non esiste ancora.
+        if (modelMeter_) modelMeter_->setBounds (meterRow.reduced (0, 1));
     }
     r.removeFromBottom (4);
 
@@ -1352,6 +1400,11 @@ void NAMAudioProcessorEditor::resized()
     ampChannelLabel_.setVisible (gearPage);
     for (auto* kb : ampKnobs_) { kb->slider.setVisible (gearPage); kb->label.setVisible (gearPage); }
 
+    // Tonestack del lettore NAM: sta sulla pagina AMP con entrambi gli ampli,
+    // perche' agisce sul segnale del modello, non su quello dell'ampli nativo.
+    namToneTitle_.setVisible (ampPage);
+    for (auto* kb : namToneKnobs_) { kb->slider.setVisible (ampPage); kb->label.setVisible (ampPage); }
+
     // MARCHELLOW controls: visible only when its model is the selected amp.
     for (auto* kb : marKnobs_) { kb->slider.setVisible (marPage); kb->label.setVisible (marPage); }
     marValvesBox_  .setVisible (marPage);
@@ -1384,6 +1437,24 @@ void NAMAudioProcessorEditor::resized()
             ampModelBox_  .setBounds (header.removeFromLeft (150).reduced (2, 4));
         }
         area.removeFromTop (6);
+
+        // Colonna verticale NAM TONE, affiancata all'ampli sul lato destro.
+        // Va tolta da `area` prima di calcolare le celle dell'ampli, cosi' i
+        // knob dell'ampli si ridistribuiscono sulla larghezza rimanente.
+        if (! namToneKnobs_.empty())
+        {
+            auto namCol = area.removeFromRight (118);
+            area.removeFromRight (8);
+            namToneTitle_.setBounds (namCol.removeFromTop (20));
+            namCol.removeFromTop (4);
+            const int cellH = namCol.getHeight() / (int) namToneKnobs_.size();
+            for (auto* kb : namToneKnobs_) {
+                auto cell = namCol.removeFromTop (cellH).reduced (10, 6);
+                kb->label .setBounds (cell.removeFromTop (18));
+                cell.removeFromTop (2);
+                kb->slider.setBounds (cell);
+            }
+        }
 
         const int rowH  = area.getHeight() / 4;
         const int cellW = area.getWidth()  / 5;

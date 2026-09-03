@@ -71,6 +71,8 @@ public:
     std::atomic<float>& getMeterInR()  noexcept { return meterInR_;  }
     std::atomic<float>& getMeterOutL() noexcept { return meterOutL_; }
     std::atomic<float>& getMeterOutR() noexcept { return meterOutR_; }
+    std::atomic<float>& getMeterModelL() noexcept { return meterModelL_; }
+    std::atomic<float>& getMeterModelR() noexcept { return meterModelR_; }
 
     // CPU load %, updated at every processBlock (EMA).
     float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
@@ -87,6 +89,8 @@ private:
     std::atomic<float> meterInR_  { 0.f };
     std::atomic<float> meterOutL_ { 0.f };
     std::atomic<float> meterOutR_ { 0.f };
+    std::atomic<float> meterModelL_ { 0.f };
+    std::atomic<float> meterModelR_ { 0.f };
     std::atomic<float> cpuLoad_   { 0.f };
     std::atomic<float> compGr_    { 0.f };
 

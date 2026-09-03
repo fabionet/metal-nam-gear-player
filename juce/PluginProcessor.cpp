@@ -112,6 +112,11 @@ namespace ids {
     constexpr auto compTone      = "comp_tone";
     constexpr auto compLevel     = "comp_level";
     constexpr auto compPos       = "comp_pos";
+    // Lettore NAM: volume + tonestack dedicato (post-modello, pre-ampli)
+    constexpr auto modelVolume   = "model_volume";
+    constexpr auto modelBass     = "model_bass";
+    constexpr auto modelMid      = "model_mid";
+    constexpr auto modelTreble   = "model_treble";
     // POWER section (depth/resonance) bypass
     constexpr auto powerBypass   = "power_bypass";
     // Splitter / Widener (cross-channel, lives in processBlock)
@@ -265,6 +270,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::compLevel,1},   "Comp Level",   juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
     add (std::make_unique<C>(juce::ParameterID{ids::compPos,1},     "Comp Position",
          juce::StringArray{ "Front", "Post-Gate", "Post-IR" }, 0));
+
+    // Lettore NAM: volume di regolazione + tonestack a 3 bande.
+    add (std::make_unique<P>(juce::ParameterID{ids::modelVolume,1}, "NAM Volume", juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::modelBass,1},   "NAM Bass",   juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::modelMid,1},    "NAM Mid",    juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::modelTreble,1}, "NAM Treble", juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
 
     // POWER section (depth/resonance) bypass.
     add (std::make_unique<B>(juce::ParameterID{ids::powerBypass,1}, "Power Bypass", false));
@@ -456,6 +467,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float cpL  = apvts.getRawParameterValue (ids::compLevel)->load();
     const int   cpPos = (int) apvts.getRawParameterValue (ids::compPos)->load();
     const bool  pwBp = apvts.getRawParameterValue (ids::powerBypass)->load() > 0.5f;
+    const float mVol = apvts.getRawParameterValue (ids::modelVolume)->load();
+    const float mBs  = apvts.getRawParameterValue (ids::modelBass)->load();
+    const float mMd  = apvts.getRawParameterValue (ids::modelMid)->load();
+    const float mTr  = apvts.getRawParameterValue (ids::modelTreble)->load();
 
     auto apply = [&](NAMPipeline& p) {
         p.setInputGainDB  (in_);
@@ -495,6 +510,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setCompressor (cpS, cpA, cpTn, cpL, cpBp);
         p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
+        p.setModelStage (mVol, mBs, mMd, mTr);
     };
     apply (*pipelineL_);
     apply (*pipelineR_);
@@ -617,6 +633,19 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     // Output meter taps (post-DSP).
     sampleAbsPeak (meterOutL_, L, n);
     if (R) sampleAbsPeak (meterOutR_, R, n);
+
+    // Meter del lettore NAM: il picco e' calcolato dentro la pipeline, subito
+    // dopo tonestack e volume, e qui viene accumulato come per gli altri meter.
+    {
+        auto accum = [] (std::atomic<float>& dst, float peak) {
+            float cur = dst.load (std::memory_order_relaxed);
+            while (peak > cur && ! dst.compare_exchange_weak (cur, peak, std::memory_order_relaxed)) {}
+        };
+        const float pkL = pipelineL_->lastModelStagePeak();
+        const bool  dual = (numCh > 1 && mode != 0);
+        accum (meterModelL_, pkL);
+        accum (meterModelR_, dual ? pipelineR_->lastModelStagePeak() : pkL);
+    }
 
     // Compressor gain-reduction meter tap (L pipeline is representative).
     compGr_.store (pipelineL_->compGainReductionDB(), std::memory_order_relaxed);

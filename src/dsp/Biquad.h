@@ -10,7 +10,9 @@ class Biquad {
 public:
     enum class Type { LowShelf, HighShelf, Peak };
 
-    void reset() { z1_ = z2_ = 0.0; }
+    // Azzera anche la storia di uscita: lasciare y1_/y2_ sporchi faceva
+    // ripartire il filtro con una coda del segnale precedente.
+    void reset() { z1_ = z2_ = y1_ = y2_ = 0.0; }
 
     void setLowShelf(double sampleRate, double freqHz, double q, double gainDB);
     void setHighShelf(double sampleRate, double freqHz, double q, double gainDB);

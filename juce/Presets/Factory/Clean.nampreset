@@ -5,7 +5,7 @@
   <Parameters>
     <PARAMS>
       <PARAM id="input_level" value="-2"/>
-      <PARAM id="output_level" value="0"/>
+      <PARAM id="output_level" value="-3.1"/>
       <PARAM id="eq_bass" value="1"/>
       <PARAM id="eq_mid_freq" value="700"/>
       <PARAM id="eq_mid_q" value="0.707"/>
