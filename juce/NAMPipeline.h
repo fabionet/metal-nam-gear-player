@@ -14,6 +14,7 @@
 #include "PreampFX.h"
 #include "NativeAmp.h"
 #include "MarshallAmp.h"
+#include "Biquad.h"
 
 class NAMPipeline {
 public:
@@ -114,6 +115,17 @@ public:
         amp_.setChannel3(b3, m3, t3, g3, ma3);
     }
 
+    // Stadio del lettore NAM: tonestack a 3 bande + volume, applicati
+    // subito dopo il modello e prima dell'ampli nativo.
+    void setModelStage(float volumeDB, float bassDB, float midDB, float trebleDB)
+    {
+        modelVolDB_  = volumeDB; modelBassDB_ = bassDB;
+        modelMidDB_  = midDB;    modelTrebDB_ = trebleDB;
+    }
+    // Picco del blocco appena elaborato all'uscita dello stadio NAM.
+    // Scritto e letto dal solo thread audio, subito dopo process().
+    float lastModelStagePeak() const noexcept { return lastModelPeak_; }
+
     // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp).
     void setAmpModel(int m) { ampModel_.store(m <= 0 ? 0 : 1); }
 
@@ -171,6 +183,12 @@ private:
     preamp_fx::NativeAmp     amp_;
     preamp_fx::MarshallAmp   marshall_;
     std::atomic<int>         ampModel_ { 0 };
+
+    nam_dsp::Biquad modelBass_, modelMid_, modelTreble_;
+    float modelVolDB_  = 0.f, modelBassDB_ = 0.f, modelMidDB_ = 0.f, modelTrebDB_ = 0.f;
+    float modelBassCached_ = 999.f, modelMidCached_ = 999.f, modelTrebCached_ = 999.f;
+    float modelVolLin_ = 1.f;
+    float lastModelPeak_ = 0.f;
 
     preamp_fx::BiquadHPF     irHp_;
     preamp_fx::BiquadLPF     irLp_;

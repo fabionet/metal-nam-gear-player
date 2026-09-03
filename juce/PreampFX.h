@@ -296,8 +296,13 @@ public:
 
         const float rmsDB = 10.f * std::log10 (std::max (rms_, 1e-10f));
         const float diffDB = targetDB_ - rmsDB;
-        // Clamp correction to avoid runaway when input is silent.
-        const float clampedDB = std::clamp (diffDB, -12.f, 12.f);
+        // Clamp asimmetrico. Il +12 dB simmetrico originale era la causa dominante
+        // dell'over: su un DI dinamico (RMS -36 dB, picchi -8) la correzione RMS
+        // andava al massimo e spingeva i picchi ben oltre il fondo scala, perche'
+        // qui non c'e' nessun tetto sul picco. Attenuare molto resta utile, alzare
+        // va limitato: 6 dB bastano a pareggiare i modelli scarsi senza far saltare
+        // la catena.
+        const float clampedDB = std::clamp (diffDB, -18.f, 6.f);
         const float targetGain = db2lin (clampedDB);
         gain_ = gainCoef_ * gain_ + (1.f - gainCoef_) * targetGain;
         return x * gain_;
