@@ -462,6 +462,12 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (modelVolLabel_);
     modelVolAtt_ = std::make_unique<SAtt> (processorRef.apvts, "model_volume", modelVolSlider_);
 
+    loadStatusLabel_.setJustificationType (juce::Justification::centredLeft);
+    loadStatusLabel_.setFont (juce::Font (juce::FontOptions (10.5f).withStyle ("Bold")));
+    loadStatusLabel_.setColour (juce::Label::textColourId, juce::Colour (0xffff5555));
+    loadStatusLabel_.setInterceptsMouseClicks (false, false);
+    addAndMakeVisible (loadStatusLabel_);
+
     modelMeter_ = std::make_unique<MeterStripComponent> (
         processorRef.getMeterModelL(), processorRef.getMeterModelR(),
         [this] { return (int) processorRef.apvts.getRawParameterValue ("channel_mode")->load() == 2; });
@@ -485,6 +491,14 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     }
     updateSlimEnabled();
     startTimerHz (8);
+
+    // Popola le liste dall'ultima cartella usata, senza aspettare un browse.
+    {
+        const auto md = GlobalSettings::get().getLastModelDir();
+        if (md.isNotEmpty() && juce::File (md).isDirectory()) rescanModelDir (juce::File (md));
+        const auto id = GlobalSettings::get().getLastIRDir();
+        if (id.isNotEmpty() && juce::File (id).isDirectory()) rescanIRDir (juce::File (id));
+    }
 
     applyUiScale (GlobalSettings::get().getUiScalePercent());
 }
@@ -573,6 +587,28 @@ void NAMAudioProcessorEditor::timerCallback()
 {
     updateSlimEnabled();
     updateTubeIndicator();
+    updateLoadStatus();
+}
+
+// Un file mancante o illeggibile veniva scartato in silenzio: la UI restava
+// identica al caso "nessun modello caricato", quindi SLIM disabilitato e il
+// tasto AMP senza effetto sembravano difetti del plugin. Ora lo si vede.
+void NAMAudioProcessorEditor::updateLoadStatus()
+{
+    using LS = NAMAudioProcessor::LoadStatus;
+    const auto ms = processorRef.modelLoadStatus();
+    const auto is = processorRef.irLoadStatus();
+
+    juce::String msg;
+    if      (ms == LS::FileMissing) msg = "MODELLO NON TROVATO: " + processorRef.lastModelName();
+    else if (ms == LS::LoadFailed)  msg = "MODELLO ILLEGGIBILE: " + processorRef.lastModelName();
+    else if (is == LS::FileMissing) msg = "IR NON TROVATO: " + processorRef.lastIRName();
+    else if (is == LS::LoadFailed)  msg = "IR ILLEGGIBILE: " + processorRef.lastIRName();
+
+    if (loadStatusLabel_.getText() != msg) {
+        loadStatusLabel_.setText (msg, juce::dontSendNotification);
+        loadStatusLabel_.setTooltip (msg);
+    }
 }
 
 // TUBE button acts as a pure status indicator: lit red when at least one AMP SIM
@@ -1208,6 +1244,9 @@ void NAMAudioProcessorEditor::resized()
         // resized() viene chiamata anche a meta' costruttore, dagli attachment
         // delle ComboBox: a quel punto il meter non esiste ancora.
         if (modelMeter_) modelMeter_->setBounds (meterRow.reduced (0, 1));
+
+        modelBlock.removeFromTop (2);
+        loadStatusLabel_.setBounds (modelBlock.removeFromTop (16));
     }
     r.removeFromBottom (4);
 
@@ -1603,40 +1642,51 @@ void NAMAudioProcessorEditor::browseIR()
 
 void NAMAudioProcessorEditor::rescanModelDir (const juce::File& sel)
 {
-    modelDir_ = sel.getParentDirectory();
+    // `sel` puo' essere un file (si usa la sua cartella) oppure direttamente una
+    // cartella, cosi' la lista si puo' popolare all'avvio senza passare dal browse.
+    modelDir_ = sel.isDirectory() ? sel : sel.getParentDirectory();
     if (modelDir_.isDirectory())
         GlobalSettings::get().setLastModelDir (modelDir_.getFullPathName());
     modelFiles_.clear();
     if (modelDir_.isDirectory()) {
         juce::Array<juce::File> files;
-        modelDir_.findChildFiles (files, juce::File::findFiles, false, "*.nam");
-        for (auto& f : files) modelFiles_.add (f.getFileName());
+        // Ricorsiva: i pack di modelli sono quasi sempre organizzati in
+        // sottocartelle (AMP, AMP+CAB, PEDAL...), e con la scansione piatta
+        // puntare alla radice del pack restituiva zero file.
+        modelDir_.findChildFiles (files, juce::File::findFiles, true, "*.nam");
+        for (auto& f : files) modelFiles_.add (f.getRelativePathFrom (modelDir_));
         modelFiles_.sortNatural();
     }
     modelCombo.clear (juce::dontSendNotification);
     for (int i = 0; i < modelFiles_.size(); ++i)
         modelCombo.addItem (modelFiles_[i], i + 1);
-    const int sIdx = modelFiles_.indexOf (sel.getFileName());
-    if (sIdx >= 0) modelCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+    if (! sel.isDirectory()) {
+        const int sIdx = modelFiles_.indexOf (sel.getRelativePathFrom (modelDir_));
+        if (sIdx >= 0) modelCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+    }
 }
 
 void NAMAudioProcessorEditor::rescanIRDir (const juce::File& sel)
 {
-    irDir_ = sel.getParentDirectory();
+    // Come per i modelli: accetta un file o direttamente una cartella, e scandisce
+    // in modo ricorsivo perche' anche i pack di IR usano sottocartelle.
+    irDir_ = sel.isDirectory() ? sel : sel.getParentDirectory();
     if (irDir_.isDirectory())
         GlobalSettings::get().setLastIRDir (irDir_.getFullPathName());
     irFiles_.clear();
     if (irDir_.isDirectory()) {
         juce::Array<juce::File> files;
-        irDir_.findChildFiles (files, juce::File::findFiles, false, "*.wav");
-        for (auto& f : files) irFiles_.add (f.getFileName());
+        irDir_.findChildFiles (files, juce::File::findFiles, true, "*.wav");
+        for (auto& f : files) irFiles_.add (f.getRelativePathFrom (irDir_));
         irFiles_.sortNatural();
     }
     irCombo.clear (juce::dontSendNotification);
     for (int i = 0; i < irFiles_.size(); ++i)
         irCombo.addItem (irFiles_[i], i + 1);
-    const int sIdx = irFiles_.indexOf (sel.getFileName());
-    if (sIdx >= 0) irCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+    if (! sel.isDirectory()) {
+        const int sIdx = irFiles_.indexOf (sel.getRelativePathFrom (irDir_));
+        if (sIdx >= 0) irCombo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+    }
 }
 
 void NAMAudioProcessorEditor::stepCombo (juce::ComboBox& cb, int delta)
