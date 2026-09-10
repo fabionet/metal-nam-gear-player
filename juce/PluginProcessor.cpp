@@ -671,7 +671,12 @@ juce::AudioProcessorEditor* NAMAudioProcessor::createEditor()
 
 void NAMAudioProcessor::loadModelAsync (const juce::File& f)
 {
-    if (! f.existsAsFile()) { clearModel(); return; }
+    lastModelName_ = f.getFileName();
+    if (! f.existsAsFile()) {
+        modelStatus_.store (LoadStatus::FileMissing);
+        clearModel();
+        return;
+    }
     currentModelPath_ = f.getFullPathName();
     const auto path = currentModelPath_.toStdString();
     const double sr = sampleRate_;
@@ -689,7 +694,9 @@ void NAMAudioProcessor::loadModelAsync (const juce::File& f)
         // H2 fix: never publish to pendingL_/R_ after the processor has
         // begun teardown — the atomics may already be gone. Free what we
         // built and bail. Sample the latch after each expensive build.
-        if (auto* a = buildOne()) {
+        auto* a = buildOne();
+        modelStatus_.store (a != nullptr ? LoadStatus::Ok : LoadStatus::LoadFailed);
+        if (a) {
             if (shuttingDown_.load (std::memory_order_acquire)) { delete a; return; }
             if (auto* old = pendingL_.exchange (a)) delete old;
         }
@@ -702,7 +709,12 @@ void NAMAudioProcessor::loadModelAsync (const juce::File& f)
 
 void NAMAudioProcessor::loadIRAsync (const juce::File& f)
 {
-    if (! f.existsAsFile()) { clearIR(); return; }
+    lastIRName_ = f.getFileName();
+    if (! f.existsAsFile()) {
+        irStatus_.store (LoadStatus::FileMissing);
+        clearIR();
+        return;
+    }
     currentIRPath_ = f.getFullPathName();
     const auto path = currentIRPath_.toStdString();
     const double sr = sampleRate_;
@@ -717,7 +729,9 @@ void NAMAudioProcessor::loadIRAsync (const juce::File& f)
             if (! pl->loadIR (path)) return nullptr;
             return pl.release();
         };
-        if (auto* a = buildOne()) {
+        auto* a = buildOne();
+        irStatus_.store (a != nullptr ? LoadStatus::Ok : LoadStatus::LoadFailed);
+        if (a) {
             if (shuttingDown_.load (std::memory_order_acquire)) { delete a; return; }
             if (auto* old = pendingL_.exchange (a)) delete old;
         }

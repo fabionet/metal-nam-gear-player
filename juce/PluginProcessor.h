@@ -74,6 +74,15 @@ public:
     std::atomic<float>& getMeterModelL() noexcept { return meterModelL_; }
     std::atomic<float>& getMeterModelR() noexcept { return meterModelR_; }
 
+    // Esito dell'ultimo caricamento asincrono. Serve all'editor per dirlo
+    // all'utente: prima un file mancante veniva scartato in silenzio e la UI
+    // restava identica a "nessun modello", senza modo di distinguere i casi.
+    enum class LoadStatus { None, Ok, FileMissing, LoadFailed };
+    LoadStatus modelLoadStatus() const noexcept { return modelStatus_.load(); }
+    LoadStatus irLoadStatus()    const noexcept { return irStatus_.load(); }
+    juce::String lastModelName() const { return lastModelName_; }
+    juce::String lastIRName()    const { return lastIRName_; }
+
     // CPU load %, updated at every processBlock (EMA).
     float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
 
@@ -91,6 +100,9 @@ private:
     std::atomic<float> meterOutR_ { 0.f };
     std::atomic<float> meterModelL_ { 0.f };
     std::atomic<float> meterModelR_ { 0.f };
+    std::atomic<LoadStatus> modelStatus_ { LoadStatus::None };
+    std::atomic<LoadStatus> irStatus_    { LoadStatus::None };
+    juce::String lastModelName_, lastIRName_;
     std::atomic<float> cpuLoad_   { 0.f };
     std::atomic<float> compGr_    { 0.f };
 

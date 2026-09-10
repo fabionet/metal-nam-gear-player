@@ -163,6 +163,10 @@ private:
     std::unique_ptr<MeterStripComponent> modelMeter_;
     // --- Tonestack dedicato del lettore NAM (colonna a fianco dell'ampli) ---
     std::vector<KnobBox*> namToneKnobs_;   // BASS, MID, TREBLE
+    // Riga di stato del loader: vuota quando va tutto bene, rossa quando un
+    // modello o un IR non si carica.
+    juce::Label loadStatusLabel_;
+    void updateLoadStatus();
     juce::Label namToneTitle_ { {}, "NAM TONE" };
 
     juce::TextButton irPrevBtn      { "<" };
