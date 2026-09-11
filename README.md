@@ -2,7 +2,7 @@
 
 [![wakatime](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player.svg)](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player) [![wakatime](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826.svg)](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826)
 
-> ## ✅ Avviso di Sicurezza — risolto in v0.2.0 attensione alle versioni antecedenti per la versione windows
+> ## ✅ Avviso di Sicurezza — risolto in v0.2.0 -- attensione per le versioni antecedenti relativo alla build per windows
 >
 > La vulnerabilità **UNC path bypass** (sul rischio di Leack di credenziali NetNTLM su sistema operativo Windows via SMB) segnalata per la v0.1.3 è **corretta anche nei binari** a partire dalla **v0.2.0**.
 >
