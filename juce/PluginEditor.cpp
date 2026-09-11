@@ -515,6 +515,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (modelVolLabel_);
     modelVolAtt_ = std::make_unique<SAtt> (processorRef.apvts, "model_volume", modelVolSlider_);
 
+    eqAnalyser_ = std::make_unique<EQAnalyserComponent> (processorRef, processorRef.apvts);
+    addChildComponent (*eqAnalyser_);
+
     loadStatusLabel_.setJustificationType (juce::Justification::centredLeft);
     loadStatusLabel_.setFont (juce::Font (juce::FontOptions (10.5f).withStyle ("Bold")));
     loadStatusLabel_.setColour (juce::Label::textColourId, juce::Colour (0xffff5555));
@@ -1427,6 +1430,7 @@ void NAMAudioProcessorEditor::resized()
         compPosBox_.setVisible (false);  // shown only inside the COMP section below
         splitModeBox_.setVisible (false);  // shown only inside the SPLITTER section below
         splitModeLabel_.setVisible (false);
+        if (eqAnalyser_) eqAnalyser_->setVisible (false);  // solo dentro la sezione EQ
     }
 
     r.removeFromBottom (6);
@@ -1532,6 +1536,15 @@ void NAMAudioProcessorEditor::resized()
             grCol.removeFromLeft (3);
             compGrMeter_.setVisible (true);
             compGrMeter_.setBounds (grCol.reduced (0, 2));
+        }
+
+        // EQ: analizzatore di spettro con sopra la curva, fra i pomelli e il
+        // tasto di attivazione. La striscia del tasto e' gia' stata tolta dal
+        // fondo, quindi togliendo ancora dal fondo si finisce sopra di esso.
+        if (gr.name == "EQ" && eqAnalyser_) {
+            inside.removeFromBottom (3);
+            eqAnalyser_->setVisible (true);
+            eqAnalyser_->setBounds (inside.removeFromBottom (118).reduced (2, 0));
         }
 
         // SPLITTER: Mono / Dual-Mono / Stereo selector at the top of the panel.

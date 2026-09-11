@@ -34,6 +34,20 @@ void FiveBandEQ::setPresence(float dB)  { presDB_ = dB; updateBand(2); }
 void FiveBandEQ::setTreble(float dB)    { treDB_  = dB; updateBand(3); }
 void FiveBandEQ::setAir(float dB)       { airDB_  = dB; updateBand(4); }
 
+float FiveBandEQ::responseDB (double sampleRate, double freqHz,
+                              float bassDB, float midFreq, float midQ, float midDB,
+                              float presDB, float trebleDB, float airDB)
+{
+    Biquad b;
+    double mag = 1.0;
+    b.setLowShelf (sampleRate, kBassFreq,     kShelfQ,    bassDB);   mag *= b.magnitudeAt(freqHz, sampleRate);
+    b.setPeak     (sampleRate, midFreq,       midQ,       midDB);    mag *= b.magnitudeAt(freqHz, sampleRate);
+    b.setPeak     (sampleRate, kPresenceFreq, kPresenceQ, presDB);   mag *= b.magnitudeAt(freqHz, sampleRate);
+    b.setHighShelf(sampleRate, kTrebleFreq,   kShelfQ,    trebleDB); mag *= b.magnitudeAt(freqHz, sampleRate);
+    b.setHighShelf(sampleRate, kAirFreq,      kShelfQ,    airDB);    mag *= b.magnitudeAt(freqHz, sampleRate);
+    return (float) (20.0 * std::log10 (mag > 1e-9 ? mag : 1e-9));
+}
+
 void FiveBandEQ::updateBand(int band) {
     for (int ch = 0; ch < kMaxChannels; ++ch) {
         Biquad& bq = bands_[band][ch];

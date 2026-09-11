@@ -3,6 +3,7 @@
 // RT-safe in process(); loadModel/loadIR are sync and must run off the audio thread.
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <string>
@@ -137,6 +138,12 @@ public:
     float lastModelStagePeak() const noexcept { return lastModelPeak_; }
     // Picco della parte wet di ciascun convolutore IR, prelevato prima del
     // dry/wet: alimenta i due meter sotto ai rispettivi caricatori.
+    // Coda circolare per l'analizzatore di spettro, riempita dopo lo stadio
+    // EQ. La lettura dal thread grafico non si sincronizza: al limite si legge
+    // un blocco a cavallo di una scrittura, che su un analizzatore non si vede.
+    static constexpr int kScopeSize = 4096;
+    void readScope (float* dst, int n) const;
+
     float lastIR1Peak() const noexcept { return lastIr1Peak_; }
     float lastIR2Peak() const noexcept { return lastIr2Peak_; }
 
@@ -210,6 +217,8 @@ private:
     float modelBassCached_ = 999.f, modelMidCached_ = 999.f, modelTrebCached_ = 999.f;
     float modelVolLin_ = 1.f;
     float lastModelPeak_ = 0.f;
+    std::array<float, kScopeSize> scope_ {};
+    std::atomic<int> scopeWrite_ { 0 };
     float lastIr1Peak_   = 0.f;
     float lastIr2Peak_   = 0.f;
 

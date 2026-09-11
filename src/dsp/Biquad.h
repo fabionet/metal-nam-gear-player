@@ -18,6 +18,18 @@ public:
     void setHighShelf(double sampleRate, double freqHz, double q, double gainDB);
     void setPeak(double sampleRate, double freqHz, double q, double gainDB);
 
+    // Risposta in ampiezza a una frequenza, per disegnare la curva
+    // nell'analizzatore senza duplicare il calcolo dei coefficienti.
+    double magnitudeAt(double freqHz, double sampleRate) const {
+        const double w = 2.0 * 3.14159265358979323846 * freqHz / sampleRate;
+        const double c1 = std::cos(-w),      s1 = std::sin(-w);
+        const double c2 = std::cos(-2.0*w),  s2 = std::sin(-2.0*w);
+        const double nr = b0_ + b1_*c1 + b2_*c2, ni = b1_*s1 + b2_*s2;
+        const double dr = 1.0 + a1_*c1 + a2_*c2, di = a1_*s1 + a2_*s2;
+        const double den = std::sqrt(dr*dr + di*di);
+        return den > 1e-18 ? std::sqrt(nr*nr + ni*ni) / den : 1.0;
+    }
+
     inline float process(float x) {
         double y = b0_ * x + b1_ * z1_ + b2_ * z2_ - a1_ * y1_ - a2_ * y2_;
         z2_ = z1_; z1_ = x;

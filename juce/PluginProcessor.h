@@ -56,6 +56,12 @@ public:
     // the Quality knob and the new Slim slider under the loader.
     // Il modello caricato contiene gia' la cassa? L'editor lo usa per
     // escludere automaticamente il primo IR.
+    // Ultimi campioni post-EQ per l'analizzatore di spettro.
+    void readScope (float* dst, int n) const
+    {
+        if (pipelineL_) pipelineL_->readScope (dst, n);
+    }
+
     bool currentModelHasCab() const noexcept
     {
         return pipelineL_ && pipelineL_->modelHasCab();

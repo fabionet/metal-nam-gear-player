@@ -30,6 +30,22 @@ public:
 
     void reset();
 
+    // Le frequenze fisse delle bande non parametriche, esposte perche'
+    // l'analizzatore deve sapere dove piazzare le maniglie.
+    static constexpr double kBassFreqHz     = 100.0;
+    static constexpr double kPresenceFreqHz = 3000.0;
+    static constexpr double kPresenceQVal   = 0.8;
+    static constexpr double kTrebleFreqHz   = 5000.0;
+    static constexpr double kAirFreqHz      = 10000.0;
+    static constexpr double kShelfQVal      = 0.707;
+
+    // Risposta complessiva in dB a una frequenza, calcolata su biquad
+    // temporanei con gli stessi setter usati dalla catena audio: la curva
+    // disegnata non puo' divergere da quella che si sente.
+    static float responseDB (double sampleRate, double freqHz,
+                             float bassDB, float midFreq, float midQ, float midDB,
+                             float presDB, float trebleDB, float airDB);
+
 private:
     double sampleRate_ = 48000.0;
     int numChannels_ = 1;
