@@ -13,7 +13,7 @@ else()
 endif()
 
 juce_add_plugin(NAMCustom
-    VERSION               0.1.5
+    VERSION               0.2.0
     PRODUCT_NAME          "NAM Custom"
     COMPANY_NAME          "fabionet"
     BUNDLE_ID             "com.fabionet.namcustom"
