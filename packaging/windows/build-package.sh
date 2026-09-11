@@ -17,13 +17,16 @@ DOCS_SRC="${DOCS_SRC:-$ROOT/../neural-amp-modeler-lv2/docs}"
 
 DIST="$ROOT/dist"
 STAGE="$DIST/staging"
-BASENAME="MetalNAMGearPlayer-windows-x64"
+# Nome del prodotto come lo genera JUCE da PRODUCT_NAME.
+PRODUCT="Metal NAM Gear Players Neo"
+# Base distinta dalla linea "Full", che usa MetalNAMGearPlayer.
+BASENAME="MetalNAMGearPlayersNeo-windows-x64"
 ZIP_OUT="$DIST/${BASENAME}-portable.zip"
 NSI_OUT="$DIST/${BASENAME}-setup.exe"
 
-STANDALONE="$BUILD/juce/NAMCustom_artefacts/Release/Standalone/NAM Custom.exe"
-VST3_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3"
-LV2_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/LV2/NAM Custom.lv2"
+STANDALONE="$BUILD/juce/NAMCustom_artefacts/Release/Standalone/$PRODUCT.exe"
+VST3_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/VST3/$PRODUCT.vst3"
+LV2_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/LV2/$PRODUCT.lv2"
 
 # --- checks ---
 for f in "$STANDALONE" "$VST3_BUNDLE" "$LV2_BUNDLE"; do
@@ -54,9 +57,9 @@ Metal NAM Gear Players - Neo Edition v${VERSION} - Windows x64 portable
 
 Contents
 --------
-NAM Custom.exe        Standalone application (ASIO / MME / DirectSound)
-NAM Custom.vst3/      VST3 plugin bundle
-NAM Custom.lv2/       LV2 plugin bundle
+Metal NAM Gear Players Neo.exe    Standalone (ASIO / MME / DirectSound)
+Metal NAM Gear Players Neo.vst3/  VST3 plugin bundle
+Metal NAM Gear Players Neo.lv2/   LV2 plugin bundle
 docs/                 Italian user guides (Guida Rapida + Guida Tecnica)
 LICENSE               AGPL-3.0-or-later
 LICENSE-fonts.txt     SIL OFL 1.1 for the three embedded UI fonts
@@ -65,16 +68,16 @@ extras/reaper/        ReaScript helper: inserts a "NAM Custom" track and
 
 Installation
 ------------
-1. Copy the whole "NAM Custom.vst3" folder to your VST3 directory:
+1. Copy the whole "Metal NAM Gear Players Neo.vst3" folder to your VST3 directory:
      System-wide:  C:\\Program Files\\Common Files\\VST3\\
      Per-user:     %APPDATA%\\VST3\\
    Then rescan the folder in your DAW.
 
-2. Copy the whole "NAM Custom.lv2" folder to your LV2 directory:
+2. Copy the whole "Metal NAM Gear Players Neo.lv2" folder to your LV2 directory:
      Per-user:     %APPDATA%\\LV2\\
    Then rescan in a host that supports LV2 (Reaper, Ardour, Carla).
 
-3. Double-click "NAM Custom.exe" for standalone use.
+3. Double-click "Metal NAM Gear Players Neo.exe" for standalone use.
 
 4. Load a .nam model (from https://tone3000.com) and optionally an IR .wav
    through the plugin UI. See docs\\guida-rapida.pdf for a quick start.

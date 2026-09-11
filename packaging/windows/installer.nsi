@@ -6,8 +6,9 @@
 ;            packaging/windows/installer.nsi
 ;
 ; STAGING must contain:
-;   NAM Custom.exe
-;   NAM Custom.vst3/          (VST3 bundle, real dir tree)
+;   Metal NAM Gear Players Neo.exe
+;   Metal NAM Gear Players Neo.vst3/   (VST3 bundle, real dir tree)
+;   Metal NAM Gear Players Neo.lv2/    (LV2 bundle)
 ;   docs/
 ;   LICENSE
 ;   README.txt
@@ -27,7 +28,8 @@ SetCompressor /SOLID lzma
 
 !define APPNAME       "Metal NAM Gear Players - Neo Edition"
 !define VENDOR        "fabionet"
-!define REGKEY        "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalNAMGearPlayer"
+; Chiave di registro distinta: la linea "Full" usa MetalNAMGearPlayer.
+!define REGKEY        "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalNAMGearPlayersNeo"
 !define URL_HOMEPAGE  "https://github.com/fabionet/metal-nam-gear-player"
 
 Name        "${APPNAME}"
@@ -88,7 +90,7 @@ FunctionEnd
 Section "Standalone application" SEC_STANDALONE
   SectionIn RO
   SetOutPath "$INSTDIR"
-  File "${STAGING}\NAM Custom.exe"
+  File "${STAGING}\Metal NAM Gear Players Neo.exe"
   File "${STAGING}\LICENSE"
   File "${STAGING}\LICENSE-fonts.txt"
   File "${STAGING}\README.txt"
@@ -101,11 +103,11 @@ Section "Standalone application" SEC_STANDALONE
 
   ; Start Menu shortcut for the standalone
   CreateDirectory "$SMPROGRAMS\Metal NAM Gear Players"
-  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\NAM Custom (Standalone).lnk" \
-                  "$INSTDIR\NAM Custom.exe"
-  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\User guide (Italian).lnk" \
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players Neo\Metal NAM Gear Players Neo.lnk" \
+                  "$INSTDIR\Metal NAM Gear Players Neo.exe"
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players Neo\User guide (Italian).lnk" \
                   "$INSTDIR\docs\guida-rapida.pdf"
-  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\Uninstall.lnk" \
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players Neo\Uninstall.lnk" \
                   "$INSTDIR\uninstall.exe"
 
   ; Uninstaller + Add/Remove Programs entry
@@ -127,14 +129,14 @@ SectionEnd
 Section "VST3 plugin (system-wide)" SEC_VST3
   ; System-wide VST3 install path is Common Files\VST3
   SetOutPath "$COMMONFILES64\VST3"
-  File /r "${STAGING}\NAM Custom.vst3"
+  File /r "${STAGING}\Metal NAM Gear Players Neo.vst3"
 SectionEnd
 
 Section "LV2 plugin (per-user)" SEC_LV2
   ; Su Windows i bundle LV2 stanno in %APPDATA%\LV2, che e' per utente:
   ; non esiste un percorso di sistema convenzionale come per il VST3.
   SetOutPath "$APPDATA\LV2"
-  File /r "${STAGING}\NAM Custom.lv2"
+  File /r "${STAGING}\Metal NAM Gear Players Neo.lv2"
 SectionEnd
 
 ; Section descriptions
@@ -155,7 +157,7 @@ Section "Uninstall"
   SetRegView 64
 
   ; Standalone tree
-  Delete "$INSTDIR\NAM Custom.exe"
+  Delete "$INSTDIR\Metal NAM Gear Players Neo.exe"
   Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\LICENSE-fonts.txt"
   Delete "$INSTDIR\README.txt"
@@ -165,16 +167,16 @@ Section "Uninstall"
   RMDir "$INSTDIR"
 
   ; VST3 bundle
-  RMDir /r "$COMMONFILES64\VST3\NAM Custom.vst3"
+  RMDir /r "$COMMONFILES64\VST3\Metal NAM Gear Players Neo.vst3"
 
   ; LV2 bundle
-  RMDir /r "$APPDATA\LV2\NAM Custom.lv2"
+  RMDir /r "$APPDATA\LV2\Metal NAM Gear Players Neo.lv2"
 
   ; Start Menu
-  Delete   "$SMPROGRAMS\Metal NAM Gear Players\NAM Custom (Standalone).lnk"
-  Delete   "$SMPROGRAMS\Metal NAM Gear Players\User guide (Italian).lnk"
-  Delete   "$SMPROGRAMS\Metal NAM Gear Players\Uninstall.lnk"
-  RMDir    "$SMPROGRAMS\Metal NAM Gear Players"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players Neo\Metal NAM Gear Players Neo.lnk"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players Neo\User guide (Italian).lnk"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players Neo\Uninstall.lnk"
+  RMDir    "$SMPROGRAMS\Metal NAM Gear Players Neo"
 
   DeleteRegKey HKLM "${REGKEY}"
 SectionEnd
