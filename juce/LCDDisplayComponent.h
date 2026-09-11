@@ -7,6 +7,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <deque>
+#include "DotMatrixFont.h"
 
 class NAMAudioProcessor;
 class PresetManager;
@@ -53,6 +54,12 @@ private:
 
     // Riquadri calcolati in resized() e usati da paint().
     juce::Rectangle<int> nameArea_, bankLabelArea_, bpmArea_, metroVolLabelArea_;
+
+    // Matrice di punti: testo mostrato, scorrimento e disegno.
+    juce::String matrixText() const;
+    void drawDotMatrix (juce::Graphics&, juce::Rectangle<int> area, const juce::String&);
+    double scrollDots_ = 0.0;   // sfasamento in colonne di punti
+    int    lastTextW_  = 0;     // larghezza dell'ultimo testo, in colonne
 
     std::deque<juce::int64> tapTimes_;   // millisecondi degli ultimi tocchi
     bool  blinkOn_   = false;
