@@ -1,5 +1,7 @@
 # Metal NAM Gear Players — Neo Edition — Windows (MinGW cross-build)
 
+[![wakatime](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player.svg)](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player) [![wakatime](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826.svg)](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826)
+
 A full-featured guitar amp-sim plugin (VST3 + LV2 + Standalone `.exe`) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
 
 Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
