@@ -1,18 +1,18 @@
-# METAL NAM GEAR PLAYER
+# Metal NAM Gear Players — Neo Edition
 
-> ## ⚠️ Avviso di Sicurezza — Vulnerabilità nei binari pre-compilati v0.1.3
+> ## ✅ Avviso di Sicurezza — risolto in v0.2.0
 >
-> È stata identificata e corretta nel codice sorgente una **vulnerabilità di sicurezza critica** (UNC path bypass — furto credenziali NetNTLM su Windows via SMB):  
-> la funzione `isLocalSafePath` in `PluginProcessor.cpp` non bloccava i percorsi UNC nella forma `//server/share`, consentendo a un progetto DAW malevolo di innescare una connessione SMB verso un server remoto e trasmettere l'hash NTLMv2 dell'utente.  
+> La vulnerabilità **UNC path bypass** (furto credenziali NetNTLM su Windows via SMB) segnalata per la v0.1.3 è **corretta anche nei binari** a partire dalla **v0.2.0**.
 >
-> **Il fix è presente nel codice sorgente** (branch `juce-rewrite`) ma **i binari pre-compilati della release v0.1.3 (Linux) e v0.1.3-windows contengono ancora la vulnerabilità non corretta.**  
-> Si raccomanda di **compilare dal sorgente** (vedi sezione [Building](#building-linux)) oppure di attendere la prossima release che includerà il fix.  
+> `isLocalSafePath` in `PluginProcessor.cpp` ora rifiuta i percorsi UNC in entrambe le forme (`//server/share` e `\\server\share`), i percorsi device NT (`\\?\`, `\\.\`) e gli schemi di rete `smb:` `nfs:` `afp:` `ftp:` `http:` `https:` `cifs:` `dav:` `davs:` `file:`. Il controllo si applica al percorso del modello, dell'IR e del **secondo IR**.
 >
-> Dettagli tecnici: [SECURITY.md](SECURITY.md)
+> **Chi usa i binari v0.1.3 deve aggiornare.** Dettagli tecnici: [SECURITY.md](SECURITY.md)
 
 A full-featured guitar amp-sim plugin (VST3 / LV2 / Standalone) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
 
-The plugin is exposed to hosts as **"NAM Custom"**.
+Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
+
+> **Convivenza con l'edizione Full.** Questa è la linea **Neo**, con identità propria: codice VST3 `NgpN`, URI LV2 `urn:fabionet:metalnamgearplayers-neo`, pacchetto Debian `metal-nam-gear-players-neo`. Non condivide nessun identificatore né alcun file con l'edizione **Full** (`metal-nam-gear-player`), quindi le due si installano e si caricano insieme nella stessa DAW.
 
 > The original headless LV2 plugin lives on the [`custom-dual-stereo`](../../tree/custom-dual-stereo) branch. Active development happens on [`juce-rewrite`](../../tree/juce-rewrite) (default branch).
 
@@ -40,22 +40,26 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 ## Features
 
-- **NAM model playback** — supports both V1 (WaveNet/LSTM) and A2 (SlimmableContainer) models, with a **Slim** slider for real-time quality scaling on A2 models
-- **IR loader** with quality tools: high-pass / low-pass filters, trim, phase invert
+- **NAM model playback** — supports both V1 (WaveNet/LSTM) and A2 (SlimmableContainer) models, with a **Slim** slider for real-time quality scaling. The slider is enabled only on models that actually carry sub-models: on a V1 it is greyed out, because there is nothing to choose.
+- **Two IR loaders** — each with its own volume and level meter, crossfaded by an **IR BAL** knob in the IR Tools section. The second one switches on automatically in Dual-Mono and Stereo, and can be enabled by hand in Mono.
+- **Automatic cab bypass** — when the loaded model already contains the cabinet (`gear_type` `amp_cab` or `full-rig`), the first IR loader goes into true bypass and greys out, so you never stack two cabinets. The second stays available.
+- **IR quality tools**: high-pass / low-pass filters, trim, phase invert
 - **Full FX chain**:
   - Pre-model: Smart Gate, Overdrive, Distortion
   - Post-model: 5-band EQ + Depth + Resonance, Noise Gate, High-Pass, Loudness Normalization
   - Post-cab: Delay, Chorus, Flanger, Reverb, Tremolo
 - **Gain-staging / calibration** (ported from the reference [NeuralAmpModelerPlugin](https://github.com/sdatkinson/NeuralAmpModelerPlugin)): Output Mode (Raw / Normalized / Calibrated) and Calibrate Input with dBu level — with automatic fallback when a model lacks calibration metadata
-- **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal), user presets, direct link to [Tone3000](https://www.tone3000.com/) for more models
+- **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal) plus a neutral **Default**, user presets, **import** of `.prs` (single) and `.prstl` (list), **export** of the current preset and a **full library backup** that embeds the `.nam` and IR files it references. Only our own formats are accepted; anything else is rejected without being opened.
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
+- **EQ spectrum analyser** — real-time FFT with the EQ response curve drawn on top and one draggable handle per band; the MID band also takes frequency on the horizontal axis and Q on the mouse wheel. The curve is computed with the same filter coefficients as the audio path, so it cannot drift from what you hear.
+- **LCD display** — preset name and bank on a lit dot-matrix panel that scrolls when the text does not fit, four banks A/B/C/D for variants of the same preset, blinking **TAP** tempo, and a cowbell **metronome** with its own volume and time signatures (4/4, 3/4, 2/4, 6/8, 5/4, 7/8)
 - CPU meter, level meters, Info popup with credits
 - **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click LV2/VST3 track insertion and `.nam` / IR autoload (see [Reaper quick-start helpers](#reaper-quick-start-helpers) below)
 
 ## Requirements
 
 - Run your host at the sample rate the model was trained at (usually **48 kHz**)
-- Linux is the primary target. A **Windows MinGW cross-build** lives on the [`windows-mingw`](../../tree/windows-mingw) branch — pinned to JUCE 7.0.12 (JUCE 8 does not build under MinGW) with a small `JuceFontCompat.h` shim so the sources stay in sync with the Linux tree; toolchain in `cmake/mingw-w64-x86_64.cmake` and a required post-clone patch in `patches/juce-vst3-helper-wine.patch`.
+- Linux is the primary target. A **Windows MinGW cross-build** lives on the [`windows-mingw`](../../tree/windows-mingw) branch — pinned to JUCE 7.0.12 (JUCE 8 does not build under MinGW) with a small `JuceFontCompat.h` shim so the sources stay in sync with the Linux tree; toolchain in `cmake/mingw-w64-x86_64.cmake` and a required post-clone patch in `patches/juce-mingw-crossbuild.patch`. Since v0.2.0 the Windows build also produces the **LV2** bundle.
 
 ## Building (Linux)
 
@@ -68,11 +72,31 @@ cmake --build build-juce -j 2
 
 > **Note:** `-DCMAKE_BUILD_TYPE=Release` is required — an empty build type produces an unoptimized binary that stutters under load.
 
-The VST3 bundle is produced at `build-juce/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3`. There is no install target; copy it to your user VST3 folder:
+Artefacts land in `build-juce/juce/NAMCustom_artefacts/Release/`:
+
+| Format     | Path                                            |
+|------------|-------------------------------------------------|
+| Standalone | `Standalone/Metal NAM Gear Players Neo`         |
+| VST3       | `VST3/Metal NAM Gear Players Neo.vst3`          |
+| LV2        | `LV2/Metal NAM Gear Players Neo.lv2`            |
+
+There is no install target. Either copy the bundles by hand:
 
 ```bash
-rsync -a --delete "build-juce/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3/" "$HOME/.vst3/NAM Custom.vst3/"
+rsync -a --delete "build-juce/juce/NAMCustom_artefacts/Release/VST3/Metal NAM Gear Players Neo.vst3/" \
+                  "$HOME/.vst3/Metal NAM Gear Players Neo.vst3/"
+rsync -a --delete "build-juce/juce/NAMCustom_artefacts/Release/LV2/Metal NAM Gear Players Neo.lv2/" \
+                  "$HOME/.lv2/Metal NAM Gear Players Neo.lv2/"
 ```
+
+…or build a Debian package that places all three where hosts look for them:
+
+```bash
+./packaging/linux/build-deb.sh 0.2.0
+sudo dpkg -i dist/metal-nam-gear-players-neo_0.2.0_amd64.deb
+```
+
+The package installs the VST3 in `/usr/lib/vst3`, the LV2 in `/usr/lib/lv2`, the standalone in `/usr/lib/metal-nam-gear-players-neo` with a symlink in `/usr/bin`, plus a desktop entry, the licences and both Italian guides.
 
 ### Submodule note
 
@@ -88,7 +112,7 @@ Three ReaScripts in `extras/reaper/` cover different Reaper builds and formats:
 
 | Script                     | Format | Target                       | Behaviour                                              |
 |----------------------------|--------|------------------------------|--------------------------------------------------------|
-| `nam_insert.lua`           | LV2    | Reaper Linux                 | Insert an "NAM Custom" track, load the LV2 plugin      |
+| `nam_insert.lua`           | LV2    | Reaper Linux                 | Insert a plugin track, load the LV2 build              |
 | `nam_autoload_lv2.lua`     | LV2    | Reaper Linux                 | Same as above, plus prompts for a `.nam` model and IR  |
 | `nam_autoload_vst3.lua`    | VST3   | Reaper Windows (or wine)     | Insert the VST3, prompt for `.nam` + optional IR       |
 
