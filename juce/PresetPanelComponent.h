@@ -23,6 +23,7 @@ private:
     void paintListBoxItem (int row, juce::Graphics&, int w, int h, bool selected) override;
     void listBoxItemClicked (int row, const juce::MouseEvent&) override;
     void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override;
+    int  selectedRow_ = -1;   // riga scelta col clic singolo
 
     void doSaveAs();
     void updateEnableState();

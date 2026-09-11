@@ -264,11 +264,23 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
 // Si accetta anche .nampreset, che e' lo stesso contenuto con altro nome.
 // I nomi gia' presenti vengono resi univoci con un suffisso numerico, cosi'
 // un'importazione non sovrascrive mai il lavoro dell'utente.
+bool PresetManager::isSupportedPresetFile (const juce::File& f)
+{
+    // Solo i nostri formati: .prs (singolo), .prstl (elenco) e .nampreset
+    // (nativo). Qualunque altra estensione viene rifiutata senza aprirla.
+    return f.hasFileExtension ("prs") || f.hasFileExtension ("prstl")
+        || f.hasFileExtension ("nampreset");
+}
+
 int PresetManager::importFrom (const juce::File& f)
 {
     if (! f.existsAsFile()) return 0;
+    if (! isSupportedPresetFile (f)) return 0;
     auto xml = juce::parseXML (f);
+    // Anche con l'estensione giusta il contenuto deve essere nostro: la radice
+    // dev'essere un <NAMPreset> o un contenitore che ne racchiude.
     if (! xml) return 0;
+    if (! xml->hasTagName (kRoot) && xml->getChildByName (kRoot) == nullptr) return 0;
 
     std::vector<const juce::XmlElement*> items;
     if (xml->hasTagName (kRoot))

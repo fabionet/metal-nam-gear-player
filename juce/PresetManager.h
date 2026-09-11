@@ -49,6 +49,9 @@ public:
     // sono stati scritti nella cartella utente.
     int importFrom (const juce::File& f);
 
+    // Vero solo per i nostri formati: .prs, .prstl, .nampreset.
+    static bool isSupportedPresetFile (const juce::File& f);
+
     // Esporta il preset corrente come .prs (un solo <NAMPreset>).
     bool exportCurrent (const juce::File& dest);
 

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "NAMPipeline.h"
+#include "Metronome.h"
 
 class PresetManager;
 
@@ -57,6 +58,9 @@ public:
     // Il modello caricato contiene gia' la cassa? L'editor lo usa per
     // escludere automaticamente il primo IR.
     // Ultimi campioni post-EQ per l'analizzatore di spettro.
+    // Il lampeggio del TAP segue il click: l'interfaccia consuma la bandiera.
+    bool consumeMetroBeat() { return metronome_.consumeBeatFlag(); }
+
     void readScope (float* dst, int n) const
     {
         if (pipelineL_) pipelineL_->readScope (dst, n);
@@ -125,6 +129,7 @@ private:
     std::atomic<float> meterModelR_ { 0.f };
     std::atomic<float> meterIr1L_ { 0.f }, meterIr1R_ { 0.f };
     std::atomic<float> meterIr2L_ { 0.f }, meterIr2R_ { 0.f };
+    nam_dsp::Metronome metronome_;
     std::atomic<LoadStatus> modelStatus_ { LoadStatus::None };
     std::atomic<LoadStatus> irStatus_    { LoadStatus::None };
     std::atomic<LoadStatus> ir2Status_   { LoadStatus::None };
