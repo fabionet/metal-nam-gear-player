@@ -3,6 +3,7 @@
 #include "JuceFontCompat.h"
 #include "PluginProcessor.h"
 #include "PresetManager.h"
+#include <cmath>
 
 namespace {
     const juce::Colour kLcdBack   { 0xff0a1410 };   // vetro spento
@@ -157,6 +158,18 @@ void LCDDisplayComponent::timerCallback()
 
     tapBtn_.setColour (juce::TextButton::buttonColourId, blinkOn_ ? kBtnOn : kBtnOff);
 
+    // Scorrimento della matrice: avanza solo quando il testo non ci sta, e va
+    // verso destra, cioe' le colonne entrano da sinistra. La velocita' e' in
+    // colonne di punti al secondo, indipendente dallo zoom.
+    {
+        const int areaCols = nameArea_.getWidth() > 0
+                           ? (int) ((float) nameArea_.getWidth()
+                                    / juce::jmax (1.6f, (float) nameArea_.getHeight() / 9.0f))
+                           : 0;
+        if (lastTextW_ > areaCols) scrollDots_ += 6.0 / 30.0;   // ~6 colonne al secondo, leggibile
+        else                       scrollDots_ = 0.0;
+    }
+
     // I quattro banchi riflettono il parametro a scelta: acceso solo quello
     // attivo, senza gruppo radio di JUCE che duplicherebbe lo stato.
     const int bank = juce::jlimit (0, 3, (int) paramValue ("preset_bank"));
@@ -178,20 +191,8 @@ void LCDDisplayComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black.withAlpha (0.75f));
     g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
 
-    // Nome del preset e banco.
-    const int bank = juce::jlimit (0, 3, (int) paramValue ("preset_bank"));
-    juce::String name = mgr_.getCurrentName();
-    if (name.isEmpty()) name = "- - -";
-    if (mgr_.isDirty()) name << " *";
-
-    g.setColour (kLcdInk);
-    g.setFont (juce::Font (juce::FontOptions (15.0f).withStyle ("Bold")));
-    g.drawText (name, nameArea_, juce::Justification::centredLeft, true);
-
-    g.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
-    g.setColour (kLcdDim);
-    g.drawText ("BANK " + juce::String::charToString ((juce::juce_wchar) ('A' + bank)),
-                bankLabelArea_, juce::Justification::centredLeft);
+    // Nome del preset e banco su matrice di punti.
+    drawDotMatrix (g, nameArea_, matrixText());
 
     // Lettura del tempo.
     g.setColour (kLcdInk);
@@ -228,6 +229,90 @@ void LCDDisplayComponent::resized()
         bankBtn_[i].setBounds (r.removeFromRight (26).reduced (1, 4));
     }
     r.removeFromRight (8);
-    bankLabelArea_ = r.removeFromBottom (12);
+    // La matrice prende tutta l'altezza disponibile: e' un unico blocco, non
+    // piu' due righe di testo sovrapposte.
+    bankLabelArea_ = {};
     nameArea_      = r;
+}
+
+// Il testo della matrice: nome del preset, stato di modifica e banco.
+juce::String LCDDisplayComponent::matrixText() const
+{
+    const int bank = juce::jlimit (0, 3, (int) paramValue ("preset_bank"));
+    juce::String name = mgr_.getCurrentName();
+    if (name.isEmpty()) name = "NO PRESET";
+    juce::String t = name.toUpperCase();
+    if (mgr_.isDirty()) t << "*";
+    t << "  -  BANK " << juce::String::charToString ((juce::juce_wchar) ('A' + bank));
+    return t;
+}
+
+// Disegna il testo come punti accesi. Il passo si ricava dall'altezza
+// disponibile, quindi la resa resta la stessa a ogni livello di zoom: cambia
+// il numero di pixel per punto, non la forma. Quando il testo non ci sta
+// scorre in continuo verso destra.
+void LCDDisplayComponent::drawDotMatrix (juce::Graphics& g,
+                                         juce::Rectangle<int> area,
+                                         const juce::String& text)
+{
+    using namespace nam_ui;
+    if (area.getWidth() <= 0 || area.getHeight() <= 0) return;
+
+    // Passo del punto: sette righe piu' un margine sopra e sotto.
+    const float pitch = juce::jmax (1.6f, (float) area.getHeight() / (kDotRows + 2.0f));
+    const float dot   = juce::jmax (1.0f, pitch * 0.78f);
+    const float top   = (float) area.getY() + (area.getHeight() - pitch * kDotRows) * 0.5f;
+
+    const int   nChars   = text.length();
+    const int   textCols = nChars * kDotAdvance;
+    const int   areaCols = (int) std::floor ((float) area.getWidth() / pitch);
+    lastTextW_ = textCols;
+
+    // Con il testo piu' lungo della finestra si aggiunge una pausa di alcune
+    // colonne fra una ripetizione e l'altra, altrimenti la fine e l'inizio si
+    // toccano e non si capisce dove ricomincia.
+    const int gapCols = 6;
+    const int cycle   = textCols + gapCols;
+    const bool scrolling = textCols > areaCols;
+
+    g.saveState();
+    g.reduceClipRegion (area);
+
+    for (int ci = 0; ci < nChars; ++ci)
+    {
+        const uint8_t* glyph = dotMatrixGlyph ((char) text[ci]);
+        for (int col = 0; col < kDotCols; ++col)
+        {
+            // Posizione in colonne di punti, con lo scorrimento applicato.
+            double x = (double) (ci * kDotAdvance + col);
+            if (scrolling) {
+                x += scrollDots_;
+                x = std::fmod (x, (double) cycle);
+                if (x < 0) x += cycle;
+            }
+            const float px = (float) area.getX() + (float) x * pitch;
+            if (px < area.getX() - pitch || px > area.getRight()) continue;
+
+            const uint8_t bits = glyph[col];
+            for (int row = 0; row < kDotRows; ++row)
+            {
+                const bool on = (bits >> row) & 1;
+                const float py = top + row * pitch;
+                if (on) {
+                    // Alone dietro il punto acceso: e' quello che da' l'aria
+                    // del pannello a LED invece del quadratino piatto.
+                    g.setColour (kLcdInk.withAlpha (0.22f));
+                    g.fillEllipse (px - dot * 0.35f, py - dot * 0.35f,
+                                   dot * 1.7f, dot * 1.7f);
+                    g.setColour (kLcdInk);
+                    g.fillEllipse (px, py, dot, dot);
+                } else {
+                    g.setColour (kLcdDim.withAlpha (0.30f));
+                    g.fillEllipse (px + dot * 0.22f, py + dot * 0.22f,
+                                   dot * 0.56f, dot * 0.56f);
+                }
+            }
+        }
+    }
+    g.restoreState();
 }
