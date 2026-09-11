@@ -38,6 +38,7 @@ namespace {
         kIrHp, kIrLp, kIrTrim,
         kCompSustain, kCompAttack, kCompTone, kCompLevel,
         kSplitLeft, kSplitRight, kSplitBalance, kWidth,
+        kIrBalance,
         kCount
     };
 
@@ -61,7 +62,8 @@ namespace {
         {"tremolo_rate_hz","RATE"},   {"tremolo_depth","DEPTH"}, {"tremolo_shape",    "SHAPE"},
         {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"},
         {"comp_sustain",   "SUSTAIN"},{"comp_attack",  "ATTACK"},{"comp_tone",   "TONE"}, {"comp_level","LEVEL"},
-        {"split_left",     "LEFT"},   {"split_right",  "RIGHT"}, {"split_balance","BAL"}, {"width_amount","WIDTH"}
+        {"split_left",     "LEFT"},   {"split_right",  "RIGHT"}, {"split_balance","BAL"}, {"width_amount","WIDTH"},
+        {"ir_balance",     "IR BAL"}
     }};
 }
 
@@ -153,14 +155,15 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
 
     // Loader strip (below footer).
     for (auto* b : { &modelPrevBtn, &modelNextBtn, &modelBrowseBtn,
-                     &irPrevBtn, &irNextBtn, &irBrowseBtn }) {
+                     &irPrevBtn, &irNextBtn, &irBrowseBtn,
+                     &ir2PrevBtn, &ir2NextBtn, &ir2BrowseBtn }) {
         addAndMakeVisible (*b);
     }
-    for (auto* cb : { &modelCombo, &irCombo }) {
+    for (auto* cb : { &modelCombo, &irCombo, &ir2Combo }) {
         addAndMakeVisible (*cb);
-        cb->setTextWhenNothingSelected ("— none —");
+        cb->setTextWhenNothingSelected ("- none -");
     }
-    for (auto* l : { &modelTitleLabel, &irTitleLabel }) {
+    for (auto* l : { &modelTitleLabel, &irTitleLabel, &ir2TitleLabel }) {
         addAndMakeVisible (*l);
         l->setJustificationType (juce::Justification::centredRight);
         l->setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
@@ -170,6 +173,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
 
     modelBrowseBtn.onClick = [this] { browseModel(); };
     irBrowseBtn   .onClick = [this] { browseIR(); };
+    ir2BrowseBtn  .onClick = [this] { browseIR2(); };
+    ir2PrevBtn    .onClick = [this] { stepCombo (ir2Combo, -1); };
+    ir2NextBtn    .onClick = [this] { stepCombo (ir2Combo, +1); };
     modelPrevBtn  .onClick = [this] { stepCombo (modelCombo, -1); };
     modelNextBtn  .onClick = [this] { stepCombo (modelCombo, +1); };
     irPrevBtn     .onClick = [this] { stepCombo (irCombo,    -1); };
@@ -189,6 +195,53 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
             if (f.existsAsFile()) processorRef.loadIRAsync (f);
         }
     };
+    ir2Combo.onChange = [this] {
+        const int idx = ir2Combo.getSelectedItemIndex();
+        if (idx >= 0 && idx < ir2Files_.size()) {
+            juce::File f = ir2Dir_.getChildFile (ir2Files_[idx]);
+            if (f.existsAsFile()) processorRef.loadIR2Async (f);
+        }
+    };
+
+    // Interruttore del secondo IR: rosso quando acceso, come gli altri toggle
+    // di sezione. Passando a Dual-Mono o Stereo lo accende il processore.
+    addAndMakeVisible (ir2EnableBtn);
+    ir2EnableBtn.setClickingTogglesState (true);
+    ir2EnableBtn.setTooltip ("Abilita il secondo IR (automatico in Dual-Mono e Stereo)");
+    ir2EnableBtn.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+    ir2EnableBtn.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+    ir2EnableBtn.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a));
+    ir2EnableBtn.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
+    ir2EnableAtt_ = std::make_unique<BAtt> (processorRef.apvts, "ir2_enable", ir2EnableBtn);
+
+    // Volume indipendente per ciascun IR, con il meter subito sotto.
+    for (auto* s : { &irVol1Slider_, &irVol2Slider_ }) {
+        addAndMakeVisible (*s);
+        s->setSliderStyle (juce::Slider::LinearHorizontal);
+        s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 16);
+    }
+    for (auto* l : { &irVol1Label_, &irVol2Label_ }) {
+        addAndMakeVisible (*l);
+        l->setJustificationType (juce::Justification::centredRight);
+        l->setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+        l->setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    }
+    irVol1Att_ = std::make_unique<SAtt> (processorRef.apvts, "ir1_volume", irVol1Slider_);
+    irVol2Att_ = std::make_unique<SAtt> (processorRef.apvts, "ir2_volume", irVol2Slider_);
+
+    {
+        auto stereoFn = [this] {
+            return (int) processorRef.apvts.getRawParameterValue ("channel_mode")->load() == 2;
+        };
+        ir1Meter_ = std::make_unique<MeterStripComponent> (
+            processorRef.getMeterIr1L(), processorRef.getMeterIr1R(), stereoFn);
+        ir2Meter_ = std::make_unique<MeterStripComponent> (
+            processorRef.getMeterIr2L(), processorRef.getMeterIr2R(), stereoFn);
+        for (auto* m : { ir1Meter_.get(), ir2Meter_.get() }) {
+            m->setHorizontal (true);
+            addAndMakeVisible (*m);
+        }
+    }
 
     // Knobs.
     knobs_.reserve (kCount + 16);
@@ -497,7 +550,10 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         const auto md = GlobalSettings::get().getLastModelDir();
         if (md.isNotEmpty() && juce::File (md).isDirectory()) rescanModelDir (juce::File (md));
         const auto id = GlobalSettings::get().getLastIRDir();
-        if (id.isNotEmpty() && juce::File (id).isDirectory()) rescanIRDir (juce::File (id));
+        if (id.isNotEmpty() && juce::File (id).isDirectory()) {
+            rescanIRDir  (juce::File (id));
+            rescanIR2Dir (juce::File (id));   // stessa cartella all'avvio, poi indipendenti
+        }
     }
 
     applyUiScale (GlobalSettings::get().getUiScalePercent());
@@ -717,12 +773,18 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
 
     // Title strip at top.
     auto titleStrip = a.removeFromTop (30.f);
-    juce::Font groupFont (juce::FontOptions().withTypeface (metalManiaTypeface()).withHeight (26.0f));
+    // I titoli di sezione erano in Metal Mania a 26 px: bello ma di lettura
+    // faticosa alle dimensioni piccole, con le aste gotiche che confondono
+    // sigle come NGATE e GATE. Restano in oro con l'ombra che li stacca dal
+    // fondo, ma su un bastoni grassetto, piu' grande di contrasto e spaziato.
+    // Il carattere decorativo resta dov'e' davvero decorativo: il marchio.
+    juce::Font groupFont (juce::FontOptions (16.0f).withStyle ("Bold"));
+    groupFont.setExtraKerningFactor (0.08f);
     g.setFont (groupFont);
     // Shadow.
-    g.setColour (juce::Colour (0xff000000).withAlpha (0.7f));
+    g.setColour (juce::Colour (0xff000000).withAlpha (0.75f));
     g.drawText (title, titleStrip.toNearestInt().translated (1, 1), juce::Justification::centred);
-    g.setColour (juce::Colour (0xffd9a200));
+    g.setColour (juce::Colour (0xfff2c438));
     g.drawText (title, titleStrip.toNearestInt(), juce::Justification::centred);
 }
 
@@ -819,6 +881,9 @@ void NAMAudioProcessorEditor::layoutChainNodes (juce::Rectangle<int> area)
         { "EQ",      "eq_bypass",      true,  GEq     },
         { "POWER",   "power_bypass",   true,  GPower  },
         { "CAB",     "ir_bypass",      true,  GCab    },
+        // Il secondo IR compare nella catena solo quando e' acceso: ir2_enable
+        // non e' un bypass, quindi il nodo e' attivo quando il parametro e' 1.
+        { "CAB 2",   "ir2_enable",     false, GCab    },
         { "IR",      "ir_hp_bypass",   true,  GTools  },
         { "DELAY",   "delay_bypass",   true,  GDelay  },
         { "CHORUS",  "chorus_bypass",  true,  GMod    },
@@ -1206,7 +1271,8 @@ void NAMAudioProcessorEditor::resized()
         modelBlock.removeFromTop (4);
         auto slimRow = modelBlock.removeFromTop (24);
 
-        // IR side keeps a single row centered vertically for symmetry.
+        // Colonna IR: due caricatori impilati, ciascuno con il proprio volume e
+        // il proprio meter. Le altezze sommano ai 124 px utili della striscia.
         auto irRow = irStrip.removeFromTop (28);
 
         auto layoutOne = [] (juce::Rectangle<int> area,
@@ -1225,6 +1291,43 @@ void NAMAudioProcessorEditor::resized()
         };
         layoutOne (modelStrip, modelTitleLabel, modelPrevBtn, modelCombo, modelNextBtn, modelBrowseBtn);
         layoutOne (irRow,      irTitleLabel,    irPrevBtn,    irCombo,    irNextBtn,    irBrowseBtn);
+
+        // IR 1: volume e meter.
+        irStrip.removeFromTop (2);
+        {
+            auto v = irStrip.removeFromTop (18);
+            irVol1Label_ .setBounds (v.removeFromLeft (60));
+            v.removeFromLeft (4);
+            irVol1Slider_.setBounds (v);
+        }
+        irStrip.removeFromTop (2);
+        if (ir1Meter_) ir1Meter_->setBounds (irStrip.removeFromTop (10).withTrimmedLeft (64));
+
+        // IR 2: riga del caricatore con l'interruttore di abilitazione in testa.
+        irStrip.removeFromTop (4);
+        {
+            auto row = irStrip.removeFromTop (28);
+            ir2TitleLabel.setBounds (row.removeFromLeft (28));
+            row.removeFromLeft (2);
+            ir2EnableBtn .setBounds (row.removeFromLeft (38));
+            row.removeFromLeft (2);
+            ir2PrevBtn   .setBounds (row.removeFromLeft (28));
+            row.removeFromLeft (2);
+            ir2BrowseBtn .setBounds (row.removeFromRight (80));
+            row.removeFromRight (2);
+            ir2NextBtn   .setBounds (row.removeFromRight (28));
+            row.removeFromRight (2);
+            ir2Combo     .setBounds (row);
+        }
+        irStrip.removeFromTop (2);
+        {
+            auto v = irStrip.removeFromTop (18);
+            irVol2Label_ .setBounds (v.removeFromLeft (60));
+            v.removeFromLeft (4);
+            irVol2Slider_.setBounds (v);
+        }
+        irStrip.removeFromTop (2);
+        if (ir2Meter_) ir2Meter_->setBounds (irStrip.removeFromTop (10).withTrimmedLeft (64));
 
         // Slim label + slider aligned with combo column (skip the MODEL title width).
         slimLabel_ .setBounds (slimRow.removeFromLeft (60));
@@ -1295,7 +1398,7 @@ void NAMAudioProcessorEditor::resized()
             { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
             { "POWER",      { kDepth, kRes, kResFreq } },
             { "CAB",        { kIrMix, kQuality } },
-            { "IR TOOLS",   { kIrHp, kIrLp, kIrTrim } },
+            { "IR TOOLS",   { kIrHp, kIrLp, kIrTrim, kIrBalance } },
             { "MASTER",     { kHpFreq, kLnTarget } },
         };
     } else if (activeTab_ == Tab::Fx) {
@@ -1666,6 +1769,48 @@ void NAMAudioProcessorEditor::rescanModelDir (const juce::File& sel)
     }
 }
 
+void NAMAudioProcessorEditor::browseIR2()
+{
+    juce::File start = ir2Dir_.isDirectory() ? ir2Dir_ : irDir_;
+    if (! start.isDirectory()) {
+        auto persisted = GlobalSettings::get().getLastIRDir();
+        if (persisted.isNotEmpty() && juce::File (persisted).isDirectory())
+            start = juce::File (persisted);
+    }
+    chooser = std::make_unique<juce::FileChooser> (
+        "Load IR 2 (WAV)", start, "*.wav");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectFiles,
+        [this] (const juce::FileChooser& fc) {
+            auto f = fc.getResult();
+            if (f.existsAsFile()) {
+                processorRef.loadIR2Async (f);
+                rescanIR2Dir (f);
+            }
+        });
+}
+
+// Come rescanIRDir, ma su una cartella indipendente: i due IR possono venire
+// da pack diversi. Non tocca lastIRDir, che resta legato al primo caricatore.
+void NAMAudioProcessorEditor::rescanIR2Dir (const juce::File& sel)
+{
+    ir2Dir_ = sel.isDirectory() ? sel : sel.getParentDirectory();
+    ir2Files_.clear();
+    if (ir2Dir_.isDirectory()) {
+        juce::Array<juce::File> files;
+        ir2Dir_.findChildFiles (files, juce::File::findFiles, true, "*.wav");
+        for (auto& f : files) ir2Files_.add (f.getRelativePathFrom (ir2Dir_));
+        ir2Files_.sortNatural();
+    }
+    ir2Combo.clear (juce::dontSendNotification);
+    for (int i = 0; i < ir2Files_.size(); ++i)
+        ir2Combo.addItem (ir2Files_[i], i + 1);
+    if (! sel.isDirectory()) {
+        const int sIdx = ir2Files_.indexOf (sel.getRelativePathFrom (ir2Dir_));
+        if (sIdx >= 0) ir2Combo.setSelectedItemIndex (sIdx, juce::dontSendNotification);
+    }
+}
+
 void NAMAudioProcessorEditor::rescanIRDir (const juce::File& sel)
 {
     // Come per i modelli: accetta un file o direttamente una cartella, e scandisce
@@ -1741,7 +1886,9 @@ void NAMAudioProcessorEditor::togglePresetPanel()
     juce::Desktop::getInstance().getAnimator().animateComponent (
         &presetPanel,
         juce::Rectangle<int> (targetX, 0, pw, getHeight()),
-        1.0f, 200, false, 1.0, 1.0);
+        // Scorrimento con decelerazione: lineare a 200 ms passava quasi
+        // inosservato, e il pannello sembrava comparire di colpo.
+        1.0f, 280, false, 2.6, 0.15);
 }
 
 void NAMAudioProcessorEditor::showCalibrationPopup()

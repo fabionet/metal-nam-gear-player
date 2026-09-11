@@ -41,6 +41,16 @@ public:
     void setResonance(float dB, float freq) { resDB_ = dB; resFreq_ = freq; }
     void setIrMix(float mix)            { irMix_         = mix; }
     void setIrBypass(bool b)            { irBypass_      = b; }
+    // Secondo IR: abilitazione e bilanciamento fra i due (0 = solo IR1,
+    // 1 = solo IR2, 0.5 = miscela paritaria). Il bilanciamento agisce sulla
+    // parte wet, prima del dry/wet di irMix.
+    void setIr2Enable(bool b)           { ir2Enable_     = b; }
+    void setIrBalance(float b)          { irBalance_     = b; }
+    // Volume indipendente per ciascun IR, in dB, applicato alla rispettiva
+    // uscita wet prima dell'incrocio: permette di pareggiare due cabinet di
+    // livello diverso senza toccare il bilanciamento.
+    void setIr1VolumeDB(float db)       { ir1VolDB_      = db; }
+    void setIr2VolumeDB(float db)       { ir2VolDB_      = db; }
     void setModelBypass(bool b)         { modelBypass_   = b; }
     void setQualityScale(float s)       { qualityScale_  = s; }
 
@@ -125,6 +135,10 @@ public:
     // Picco del blocco appena elaborato all'uscita dello stadio NAM.
     // Scritto e letto dal solo thread audio, subito dopo process().
     float lastModelStagePeak() const noexcept { return lastModelPeak_; }
+    // Picco della parte wet di ciascun convolutore IR, prelevato prima del
+    // dry/wet: alimenta i due meter sotto ai rispettivi caricatori.
+    float lastIR1Peak() const noexcept { return lastIr1Peak_; }
+    float lastIR2Peak() const noexcept { return lastIr2Peak_; }
 
     // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp).
     void setAmpModel(int m) { ampModel_.store(m <= 0 ? 0 : 1); }
@@ -145,11 +159,14 @@ public:
     // Returns true on success. Old model/IR is destroyed.
     bool loadModel(const std::string& path);
     bool loadIR(const std::string& path);
+    bool loadIR2(const std::string& path);
     void clearModel();
     void clearIR();
+    void clearIR2();
 
     bool hasModel() const { return model_ != nullptr; }
-    bool hasIR()    const { return ir_ != nullptr && ir_->isReady(); }
+    bool hasIR()    const { return ir_  != nullptr && ir_ ->isReady(); }
+    bool hasIR2()   const { return ir2_ != nullptr && ir2_->isReady(); }
 
     float modelInputDBAdjustment()  const;
     float modelOutputDBAdjustment() const;
@@ -161,6 +178,7 @@ private:
     NeuralAudio::NeuralModelLoader loader_;
     std::unique_ptr<NeuralAudio::NeuralModel> model_;
     std::unique_ptr<nam_dsp::IRConvolver>     ir_;
+    std::unique_ptr<nam_dsp::IRConvolver>     ir2_;
 
     nam_dsp::FiveBandEQ   eq_;
     nam_dsp::DepthFilter  depth_;
@@ -189,6 +207,8 @@ private:
     float modelBassCached_ = 999.f, modelMidCached_ = 999.f, modelTrebCached_ = 999.f;
     float modelVolLin_ = 1.f;
     float lastModelPeak_ = 0.f;
+    float lastIr1Peak_   = 0.f;
+    float lastIr2Peak_   = 0.f;
 
     preamp_fx::BiquadHPF     irHp_;
     preamp_fx::BiquadLPF     irLp_;
@@ -213,6 +233,10 @@ private:
     std::atomic<float> irMix_         { 1.f };
     std::atomic<float> qualityScale_  { 1.f };
     std::atomic<bool>  irBypass_      { false };
+    std::atomic<bool>  ir2Enable_     { false };
+    std::atomic<float> irBalance_     { 0.5f };
+    std::atomic<float> ir1VolDB_      { 0.f };
+    std::atomic<float> ir2VolDB_      { 0.f };
     std::atomic<bool>  modelBypass_   { false };
     std::atomic<bool>  isSlimmable_   { false };
     std::atomic<bool>  ampEnabled_    { false };
@@ -247,6 +271,7 @@ private:
 
     // Temp buffer for IR wet/dry mixing.
     std::vector<float> tmp_;
+    std::vector<float> tmp2_;      // uscita del secondo convolutore IR
 
     void updateCachedDsp();
 };

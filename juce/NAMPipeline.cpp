@@ -68,7 +68,8 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     modelBassCached_ = modelMidCached_ = modelTrebCached_ = 999.f;
     modelVolLin_ = db2lin(modelVolDB_);
 
-    if (ir_) ir_->prepare(128, 1024);
+    if (ir_)  ir_ ->prepare(128, 1024);
+    if (ir2_) ir2_->prepare(128, 1024);
 }
 
 void NAMPipeline::reset()
@@ -91,13 +92,17 @@ void NAMPipeline::reset()
     marshall_.reset();
     irHp_.reset();
     irLp_.reset();
-    if (ir_) ir_->reset();
+    if (ir_)  ir_ ->reset();
+    if (ir2_) ir2_->reset();
+    lastIr1Peak_ = lastIr2Peak_ = 0.f;
     inputGainLin_  = db2lin(inputGainDB_.load());
     outputGainLin_ = db2lin(outputGainDB_.load());
     irTrimGainSmoothed_ = irTrimGain_;  // snap follower to current target
     modelBass_.reset(); modelMid_.reset(); modelTreble_.reset();
     modelVolLin_   = db2lin(modelVolDB_);
     lastModelPeak_ = 0.f;
+    lastIr1Peak_   = 0.f;
+    lastIr2Peak_   = 0.f;
 }
 
 void NAMPipeline::updateCachedDsp()
@@ -262,16 +267,38 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // --- 5-band EQ ---
     for (int i = 0; i < n; ++i) out[i] = eq_.processSample(0, out[i]);
 
-    // --- IR convolver (dry/wet) ---
-    if (ir_ && ir_->isReady() && !irBypass_.load()) {
+    // --- IR convolver (due IR incrociati, poi dry/wet) ---
+    // Entrambi i convolutori ricevono lo stesso ingresso, quindi `out` non va
+    // sovrascritto finche' non hanno elaborato: si usano due buffer separati.
+    // Quando il secondo e' abilitato viene elaborato anche a peso zero, cosi'
+    // la sua coda resta viva e ruotare il bilanciamento non produce scalini.
+    lastIr1Peak_ = lastIr2Peak_ = 0.f;   // in bypass i meter devono scendere
+    if (!irBypass_.load()) {
+        const bool have1 = ir_  != nullptr && ir_ ->isReady();
+        const bool have2 = ir2Enable_.load() && ir2_ != nullptr && ir2_->isReady();
         const float mix = std::clamp(irMix_.load(), 0.f, 1.f);
-        if (mix >= 0.9999f) {
-            ir_->process(out, out, static_cast<size_t>(n));
-        } else if (mix > 0.f) {
-            if ((int)tmp_.size() < n) tmp_.assign(n, 0.f);
-            ir_->process(out, tmp_.data(), static_cast<size_t>(n));
+        if ((have1 || have2) && mix > 0.f) {
+            if ((int)tmp_.size()  < n) tmp_ .assign(n, 0.f);
+            if ((int)tmp2_.size() < n) tmp2_.assign(n, 0.f);
+            if (have1) ir_ ->process(out, tmp_ .data(), static_cast<size_t>(n));
+            if (have2) ir2_->process(out, tmp2_.data(), static_cast<size_t>(n));
+            // Con un solo IR presente il bilanciamento non deve attenuarlo.
+            const float bal = (have1 && have2) ? std::clamp(irBalance_.load(), 0.f, 1.f)
+                                               : (have2 ? 1.f : 0.f);
+            // Il volume di ciascun IR entra come fattore lineare nel peso.
+            const float w1 = (1.f - bal) * db2lin(ir1VolDB_.load());
+            const float w2 =         bal  * db2lin(ir2VolDB_.load());
             const float dry = 1.f - mix;
-            for (int i = 0; i < n; ++i) out[i] = out[i] * dry + tmp_[i] * mix;
+            float pk1 = 0.f, pk2 = 0.f;
+            for (int i = 0; i < n; ++i) {
+                const float a = have1 ? tmp_ [i] * w1 : 0.f;
+                const float b = have2 ? tmp2_[i] * w2 : 0.f;
+                const float fa = std::fabs(a); if (fa > pk1) pk1 = fa;
+                const float fb = std::fabs(b); if (fb > pk2) pk2 = fb;
+                out[i] = out[i] * dry + (a + b) * mix;
+            }
+            lastIr1Peak_ = pk1 * mix;
+            lastIr2Peak_ = pk2 * mix;
         }
     }
 
@@ -393,6 +420,21 @@ void NAMPipeline::clearModel() {
     hasOutputLevelCached_.store(false);
 }
 void NAMPipeline::clearIR()    { ir_.reset(); }
+void NAMPipeline::clearIR2()   { ir2_.reset(); }
+
+bool NAMPipeline::loadIR2(const std::string& path)
+{
+    if (path.empty()) { clearIR2(); return false; }
+    auto next = std::make_unique<nam_dsp::IRConvolver>();
+    try {
+        if (!next->loadFromFile(path, sampleRate_)) return false;
+    } catch (...) {
+        return false;
+    }
+    next->prepare(128, 1024);
+    ir2_ = std::move(next);
+    return true;
+}
 
 float NAMPipeline::modelInputDBAdjustment()  const { return model_ ? model_->GetRecommendedInputDBAdjustment()  : 0.f; }
 float NAMPipeline::modelOutputDBAdjustment() const { return model_ ? model_->GetRecommendedOutputDBAdjustment() : 0.f; }

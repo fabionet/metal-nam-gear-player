@@ -173,12 +173,32 @@ private:
     juce::TextButton irNextBtn      { ">" };
     juce::TextButton irBrowseBtn    { "Browse" };
     juce::ComboBox   irCombo;
-    juce::Label      irTitleLabel   { {}, "IR" };
+    juce::Label      irTitleLabel   { {}, "IR 1" };
+
+    // Secondo caricatore IR: stessa struttura del primo, piu' un interruttore
+    // di abilitazione. Volume e meter sono indipendenti per ciascun IR.
+    juce::TextButton ir2PrevBtn     { "<" };
+    juce::TextButton ir2NextBtn     { ">" };
+    juce::TextButton ir2BrowseBtn   { "Browse" };
+    juce::TextButton ir2EnableBtn   { "ON" };
+    juce::ComboBox   ir2Combo;
+    juce::Label      ir2TitleLabel  { {}, "IR 2" };
+    std::unique_ptr<BAtt> ir2EnableAtt_;
+
+    juce::Slider irVol1Slider_, irVol2Slider_;
+    juce::Label  irVol1Label_ { {}, "VOL" }, irVol2Label_ { {}, "VOL" };
+    std::unique_ptr<SAtt> irVol1Att_, irVol2Att_;
+    std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
+
+    void browseIR2();
+    void rescanIR2Dir (const juce::File& sel);
 
     juce::File       modelDir_;
     juce::File       irDir_;
+    juce::File       ir2Dir_;
     juce::StringArray modelFiles_;
     juce::StringArray irFiles_;
+    juce::StringArray ir2Files_;
 
     // Preset panel + toggle.
     juce::TextButton    presetsToggleBtn { "PRESETS" };

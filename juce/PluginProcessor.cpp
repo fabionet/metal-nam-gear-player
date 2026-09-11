@@ -20,6 +20,10 @@ namespace ids {
     constexpr auto qualityScale  = "quality_scale";
     constexpr auto irMix         = "ir_mix";
     constexpr auto irBypass      = "ir_bypass";
+    constexpr auto ir2Enable     = "ir2_enable";
+    constexpr auto irBalance     = "ir_balance";
+    constexpr auto ir1Volume     = "ir1_volume";
+    constexpr auto ir2Volume     = "ir2_volume";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
     constexpr auto gateThresh    = "gate_threshold";
@@ -154,6 +158,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
+    add (std::make_unique<B>(juce::ParameterID{ids::ir2Enable,1},     "IR 2 Enable",  false));
+    add (std::make_unique<P>(juce::ParameterID{ids::irBalance,1},     "IR Balance", juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.5f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ir1Volume,1},     "IR 1 Volume", juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
+    add (std::make_unique<P>(juce::ParameterID{ids::ir2Volume,1},     "IR 2 Volume", juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
 
     // Pre-FX
@@ -300,10 +308,12 @@ NAMAudioProcessor::NAMAudioProcessor()
     pipelineL_ = std::make_unique<NAMPipeline>();
     pipelineR_ = std::make_unique<NAMPipeline>();
     presetManager_ = std::make_unique<PresetManager>(*this, apvts);
+    apvts.addParameterListener (ids::channelMode, this);
 }
 
 NAMAudioProcessor::~NAMAudioProcessor()
 {
+    apvts.removeParameterListener (ids::channelMode, this);
     // H2 fix (2026-07-15 audit): raise the shutdown latch BEFORE draining
     // the pool. Loader jobs sample shuttingDown_ before publishing into
     // pendingL_/R_, so a job that outlives our previous finite 2000 ms
@@ -380,6 +390,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float qual = apvts.getRawParameterValue (ids::qualityScale)->load();
     const float mix  = apvts.getRawParameterValue (ids::irMix)->load();
     const bool  irBp = apvts.getRawParameterValue (ids::irBypass)->load() > 0.5f;
+    const bool  ir2En= apvts.getRawParameterValue (ids::ir2Enable)->load() > 0.5f;
+    const float irBal= apvts.getRawParameterValue (ids::irBalance)->load();
+    const float ir1V = apvts.getRawParameterValue (ids::ir1Volume)->load();
+    const float ir2V = apvts.getRawParameterValue (ids::ir2Volume)->load();
     const bool  mdBp = apvts.getRawParameterValue (ids::modelBypass)->load() > 0.5f;
 
     const float gT  = apvts.getRawParameterValue (ids::gateThresh)->load();
@@ -485,6 +499,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setQualityScaleRuntime (qual);
         p.setIrMix (mix);
         p.setIrBypass (irBp);
+        p.setIr2Enable (ir2En);
+        p.setIrBalance (irBal);
+        p.setIr1VolumeDB (ir1V);
+        p.setIr2VolumeDB (ir2V);
         p.setModelBypass (mdBp);
         p.setGate (gT, gR, gBp);
         p.setOverdrive (odD, odT, odL, odBp);
@@ -645,6 +663,15 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         const bool  dual = (numCh > 1 && mode != 0);
         accum (meterModelL_, pkL);
         accum (meterModelR_, dual ? pipelineR_->lastModelStagePeak() : pkL);
+
+        // Un meter per caricatore IR, con la stessa regola: in mono il canale
+        // destro rispecchia il sinistro, altrimenti legge la pipeline R.
+        const float i1 = pipelineL_->lastIR1Peak();
+        const float i2 = pipelineL_->lastIR2Peak();
+        accum (meterIr1L_, i1);
+        accum (meterIr1R_, dual ? pipelineR_->lastIR1Peak() : i1);
+        accum (meterIr2L_, i2);
+        accum (meterIr2R_, dual ? pipelineR_->lastIR2Peak() : i2);
     }
 
     // Compressor gain-reduction meter tap (L pipeline is representative).
@@ -681,14 +708,16 @@ void NAMAudioProcessor::loadModelAsync (const juce::File& f)
     const auto path = currentModelPath_.toStdString();
     const double sr = sampleRate_;
     const int    bs = blockSize_;
-    const std::string irPath = currentIRPath_.toStdString();
+    const std::string irPath  = currentIRPath_.toStdString();
+    const std::string ir2Path = currentIR2Path_.toStdString();
 
-    loaderPool_.addJob ([this, path, sr, bs, irPath]() {
+    loaderPool_.addJob ([this, path, sr, bs, irPath, ir2Path]() {
         auto buildOne = [&]() -> NAMPipeline* {
             auto pl = std::make_unique<NAMPipeline>();
             pl->prepare (sr, bs);
             if (! pl->loadModel (path)) return nullptr;
-            if (! irPath.empty()) pl->loadIR (irPath);
+            if (! irPath .empty()) pl->loadIR  (irPath);
+            if (! ir2Path.empty()) pl->loadIR2 (ir2Path);
             return pl.release();
         };
         // H2 fix: never publish to pendingL_/R_ after the processor has
@@ -720,13 +749,15 @@ void NAMAudioProcessor::loadIRAsync (const juce::File& f)
     const double sr = sampleRate_;
     const int    bs = blockSize_;
     const std::string modelPath = currentModelPath_.toStdString();
+    const std::string ir2Path   = currentIR2Path_.toStdString();
 
-    loaderPool_.addJob ([this, path, sr, bs, modelPath]() {
+    loaderPool_.addJob ([this, path, sr, bs, modelPath, ir2Path]() {
         auto buildOne = [&]() -> NAMPipeline* {
             auto pl = std::make_unique<NAMPipeline>();
             pl->prepare (sr, bs);
             if (! modelPath.empty()) pl->loadModel (modelPath);
             if (! pl->loadIR (path)) return nullptr;
+            if (! ir2Path.empty()) pl->loadIR2 (ir2Path);
             return pl.release();
         };
         auto* a = buildOne();
@@ -762,6 +793,67 @@ void NAMAudioProcessor::clearIR()
     suspendProcessing (false);
 }
 
+void NAMAudioProcessor::clearIR2()
+{
+    currentIR2Path_ = {};
+    suspendProcessing (true);
+    pipelineL_->clearIR2();
+    pipelineR_->clearIR2();
+    suspendProcessing (false);
+}
+
+void NAMAudioProcessor::loadIR2Async (const juce::File& f)
+{
+    lastIR2Name_ = f.getFileName();
+    if (! f.existsAsFile()) {
+        ir2Status_.store (LoadStatus::FileMissing);
+        clearIR2();
+        return;
+    }
+    currentIR2Path_ = f.getFullPathName();
+    const auto path = currentIR2Path_.toStdString();
+    const double sr = sampleRate_;
+    const int    bs = blockSize_;
+    const std::string modelPath = currentModelPath_.toStdString();
+    const std::string irPath    = currentIRPath_.toStdString();
+
+    loaderPool_.addJob ([this, path, sr, bs, modelPath, irPath]() {
+        auto buildOne = [&]() -> NAMPipeline* {
+            auto pl = std::make_unique<NAMPipeline>();
+            pl->prepare (sr, bs);
+            if (! modelPath.empty()) pl->loadModel (modelPath);
+            if (! irPath  .empty()) pl->loadIR (irPath);
+            if (! pl->loadIR2 (path)) return nullptr;
+            return pl.release();
+        };
+        auto* a = buildOne();
+        ir2Status_.store (a != nullptr ? LoadStatus::Ok : LoadStatus::LoadFailed);
+        if (a) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete a; return; }
+            if (auto* old = pendingL_.exchange (a)) delete old;
+        }
+        if (auto* b = buildOne()) {
+            if (shuttingDown_.load (std::memory_order_acquire)) { delete b; return; }
+            if (auto* old = pendingR_.exchange (b)) delete old;
+        }
+    });
+}
+
+// Passando a Dual-Mono o Stereo il secondo IR si accende da solo: e' il caso in
+// cui serve davvero. Tornando in Mono non lo si spegne, perche' li' resta una
+// scelta dell'utente (il pomello di bilanciamento continua a miscelare i due).
+void NAMAudioProcessor::parameterChanged (const juce::String& id, float value)
+{
+    if (id != ids::channelMode) return;
+    if (value < 0.5f) return;                       // 0 = Mono: non tocca nulla
+    if (auto* p = apvts.getParameter (ids::ir2Enable))
+        if (p->getValue() < 0.5f) {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (1.0f);
+            p->endChangeGesture();
+        }
+}
+
 // --- State ------------------------------------------------------------------
 
 // Returns true only for non-empty paths that refer to a regular local file
@@ -793,6 +885,7 @@ void NAMAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     auto state = apvts.copyState();
     state.setProperty ("modelPath", currentModelPath_, nullptr);
     state.setProperty ("irPath",    currentIRPath_,    nullptr);
+    state.setProperty ("ir2Path",   currentIR2Path_,   nullptr);
     if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
@@ -805,12 +898,15 @@ void NAMAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (! state.isValid()) return;
     apvts.replaceState (state);
     const auto mp = state.getProperty ("modelPath").toString();
-    const auto ip = state.getProperty ("irPath").toString();
+    const auto ip  = state.getProperty ("irPath").toString();
+    const auto ip2 = state.getProperty ("ir2Path").toString();
     if (isLocalSafePath (mp)) loadModelAsync (juce::File (mp));
     // isNotEmpty() guards the warning: an absent path is expected and not a security event.
     else if (mp.isNotEmpty()) DBG ("setStateInformation: modelPath rejected (non-local path)");
     if (isLocalSafePath (ip)) loadIRAsync    (juce::File (ip));
     else if (ip.isNotEmpty()) DBG ("setStateInformation: irPath rejected (non-local path)");
+    if (isLocalSafePath (ip2)) loadIR2Async  (juce::File (ip2));
+    else if (ip2.isNotEmpty()) DBG ("setStateInformation: ir2Path rejected (non-local path)");
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

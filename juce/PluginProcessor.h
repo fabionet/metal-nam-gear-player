@@ -10,7 +10,8 @@
 
 class PresetManager;
 
-class NAMAudioProcessor : public juce::AudioProcessor
+class NAMAudioProcessor : public juce::AudioProcessor,
+                          private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     NAMAudioProcessor();
@@ -41,11 +42,14 @@ public:
     // --- File loading (called from UI thread, runs on ThreadPool) ---
     void loadModelAsync (const juce::File& f);
     void loadIRAsync    (const juce::File& f);
+    void loadIR2Async   (const juce::File& f);
     void clearModel();
     void clearIR();
+    void clearIR2();
 
     juce::String getCurrentModelPath() const { return currentModelPath_; }
     juce::String getCurrentIRPath()    const { return currentIRPath_;    }
+    juce::String getCurrentIR2Path()   const { return currentIR2Path_;   }
 
     // True iff the currently active pipeline holds a NAM model that exposes
     // A2 quality scaling (aka "slimmable"). Editor polls this to enable/disable
@@ -73,6 +77,10 @@ public:
     std::atomic<float>& getMeterOutR() noexcept { return meterOutR_; }
     std::atomic<float>& getMeterModelL() noexcept { return meterModelL_; }
     std::atomic<float>& getMeterModelR() noexcept { return meterModelR_; }
+    std::atomic<float>& getMeterIr1L() noexcept { return meterIr1L_; }
+    std::atomic<float>& getMeterIr1R() noexcept { return meterIr1R_; }
+    std::atomic<float>& getMeterIr2L() noexcept { return meterIr2L_; }
+    std::atomic<float>& getMeterIr2R() noexcept { return meterIr2R_; }
 
     // Esito dell'ultimo caricamento asincrono. Serve all'editor per dirlo
     // all'utente: prima un file mancante veniva scartato in silenzio e la UI
@@ -80,8 +88,10 @@ public:
     enum class LoadStatus { None, Ok, FileMissing, LoadFailed };
     LoadStatus modelLoadStatus() const noexcept { return modelStatus_.load(); }
     LoadStatus irLoadStatus()    const noexcept { return irStatus_.load(); }
+    LoadStatus ir2LoadStatus()   const noexcept { return ir2Status_.load(); }
     juce::String lastModelName() const { return lastModelName_; }
     juce::String lastIRName()    const { return lastIRName_; }
+    juce::String lastIR2Name()   const { return lastIR2Name_; }
 
     // CPU load %, updated at every processBlock (EMA).
     float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
@@ -100,9 +110,16 @@ private:
     std::atomic<float> meterOutR_ { 0.f };
     std::atomic<float> meterModelL_ { 0.f };
     std::atomic<float> meterModelR_ { 0.f };
+    std::atomic<float> meterIr1L_ { 0.f }, meterIr1R_ { 0.f };
+    std::atomic<float> meterIr2L_ { 0.f }, meterIr2R_ { 0.f };
     std::atomic<LoadStatus> modelStatus_ { LoadStatus::None };
     std::atomic<LoadStatus> irStatus_    { LoadStatus::None };
-    juce::String lastModelName_, lastIRName_;
+    std::atomic<LoadStatus> ir2Status_   { LoadStatus::None };
+    juce::String lastModelName_, lastIRName_, lastIR2Name_;
+
+    // Accende automaticamente il secondo IR passando a Dual-Mono o Stereo.
+    // Tornando in Mono non lo spegne: li' resta una scelta manuale.
+    void parameterChanged (const juce::String& id, float value) override;
     std::atomic<float> cpuLoad_   { 0.f };
     std::atomic<float> compGr_    { 0.f };
 
@@ -124,6 +141,7 @@ private:
 
     juce::String currentModelPath_;
     juce::String currentIRPath_;
+    juce::String currentIR2Path_;
 
     double sampleRate_  = 48000.0;
     int    blockSize_   = 512;
