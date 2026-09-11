@@ -1,5 +1,6 @@
 // Stage 7 — PresetManager implementation.
 #include "PresetManager.h"
+#include <map>
 #include "PluginProcessor.h"
 #include "NAMPresetData.h"
 
@@ -14,6 +15,7 @@ namespace
     constexpr const char* kAttrCategory = "category";
     constexpr const char* kChildModel = "ModelPath";
     constexpr const char* kChildIR    = "IRPath";
+    constexpr const char* kChildIR2   = "IR2Path";
     constexpr const char* kChildParams= "Parameters";
 
     static juce::String stem (const juce::File& f) { return f.getFileNameWithoutExtension(); }
@@ -153,6 +155,9 @@ juce::String PresetManager::serialize (const juce::String& name) const
     auto* ip = root.createNewChildElement (kChildIR);
     ip->addTextElement (processor_.getCurrentIRPath());
 
+    auto* ip2 = root.createNewChildElement (kChildIR2);
+    ip2->addTextElement (processor_.getCurrentIR2Path());
+
     auto* params = root.createNewChildElement (kChildParams);
     if (auto state = apvts_.copyState(); state.isValid())
     {
@@ -190,6 +195,8 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
         const auto ip = root.getChildByName (kChildIR);
         const juce::String mpath = mp ? mp->getAllSubText().trim() : juce::String();
         const juce::String ipath = ip ? ip->getAllSubText().trim() : juce::String();
+        const auto ip2 = root.getChildByName (kChildIR2);
+        const juce::String ipath2 = ip2 ? ip2->getAllSubText().trim() : juce::String();
 
         auto resolveBundled = [] (const juce::String& name) -> juce::File
         {
@@ -239,6 +246,12 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
             processor_.loadIRAsync (ifile);
         else
             processor_.clearIR();
+
+        const juce::File ifile2 (ipath2);
+        if (ipath2.isNotEmpty() && isPresetPathAllowed (ifile2) && ifile2.existsAsFile())
+            processor_.loadIR2Async (ifile2);
+        else
+            processor_.clearIR2();
     }
 
     loading_ = false;
@@ -264,6 +277,29 @@ int PresetManager::importFrom (const juce::File& f)
         for (auto* c : xml->getChildIterator())
             if (c->hasTagName (kRoot)) items.push_back (c);
 
+    // Un .prstl di backup porta con se' i file .nam e .wav in base64: si
+    // scrivono accanto ai preset e si tiene la mappa nome -> percorso, con cui
+    // i riferimenti dentro i preset vengono riscritti in percorsi validi qui.
+    std::map<juce::String, juce::String> restored;
+    if (auto* assets = xml->getChildByName ("Assets"))
+    {
+        auto dir = userPresetDir().getParentDirectory().getChildFile ("Assets");
+        dir.createDirectory();
+        for (auto* a : assets->getChildIterator())
+        {
+            const auto name = a->getStringAttribute ("name").trim();
+            // Solo nomi nudi: un separatore o un ".." permetterebbe a un file
+            // ostile di scrivere fuori dalla cartella degli asset.
+            if (name.isEmpty() || name.containsChar ('/') || name.containsChar ('\\')
+                || name.contains ("..")) continue;
+            juce::MemoryOutputStream raw;
+            if (! juce::Base64::convertFromBase64 (raw, a->getAllSubText().trim())) continue;
+            auto dest = dir.getChildFile (name);
+            if (dest.replaceWithData (raw.getData(), raw.getDataSize()))
+                restored[name] = dest.getFullPathName();
+        }
+    }
+
     int written = 0;
     for (auto* el : items)
     {
@@ -276,11 +312,93 @@ int PresetManager::importFrom (const juce::File& f)
         for (int i = 2; dest.existsAsFile() && i < 1000; ++i)
             dest = userPresetDir().getChildFile (safe + " (" + juce::String (i) + ")" + kExt);
 
-        if (dest.replaceWithText (el->toString())) ++written;
+        // Riscrive i riferimenti agli asset ripristinati prima di salvare.
+        juce::XmlElement copy (*el);
+        for (auto* tag : { kChildModel, kChildIR, kChildIR2 })
+            if (auto* pe = copy.getChildByName (tag)) {
+                auto it = restored.find (pe->getAllSubText().trim());
+                if (it != restored.end()) {
+                    pe->deleteAllTextElements();
+                    pe->addTextElement (it->second);
+                }
+            }
+
+        if (dest.replaceWithText (copy.toString())) ++written;
     }
 
     if (written > 0) refresh();
     return written;
+}
+
+bool PresetManager::exportCurrent (const juce::File& dest)
+{
+    if (currentIndex_ < 0) return false;
+    const auto& ref = presets_[(size_t) currentIndex_];
+    return dest.replaceWithText (serialize (ref.name));
+}
+
+// Gli asset vengono incorporati una sola volta ciascuno anche se piu' preset
+// puntano allo stesso file. Nel preset scritto dentro il backup il percorso
+// assoluto viene sostituito dal solo nome del file, che e' la chiave con cui
+// l'asset viene ritrovato in fase di ripristino.
+int PresetManager::exportAll (const juce::File& dest)
+{
+    juce::XmlElement root ("NAMPresetList");
+    root.setAttribute ("version", 1);
+
+    auto* assets = new juce::XmlElement ("Assets");
+    juce::StringArray embedded;
+
+    auto embed = [&] (const juce::String& path, const char* kind) -> juce::String
+    {
+        if (path.isEmpty()) return {};
+        juce::File f (path);
+        // Un percorso che non e' un file su disco (per esempio il nome di un
+        // asset gia' incorporato nel binario) si lascia com'e'.
+        if (! f.existsAsFile()) return path;
+        const auto name = f.getFileName();
+        if (! embedded.contains (name)) {
+            juce::MemoryBlock mb;
+            if (f.loadFileAsData (mb)) {
+                auto* a = assets->createNewChildElement ("Asset");
+                a->setAttribute ("name", name);
+                a->setAttribute ("kind", kind);
+                a->addTextElement (juce::Base64::toBase64 (mb.getData(), mb.getSize()));
+                embedded.add (name);
+            }
+        }
+        return name;
+    };
+
+    int count = 0;
+    for (const auto& ref : presets_)
+    {
+        std::unique_ptr<juce::XmlElement> xml;
+        if (ref.isFactory) {
+            int size = 0;
+            const char* data = NAMPresetData::getNamedResource (
+                NAMPresetData::namedResourceList[ref.factoryIndex], size);
+            if (data == nullptr || size <= 0) continue;
+            xml = juce::parseXML (juce::String::fromUTF8 (data, size));
+        } else {
+            xml = juce::parseXML (ref.userFile);
+        }
+        if (! xml || ! xml->hasTagName (kRoot)) continue;
+
+        for (auto* tag : { kChildModel, kChildIR, kChildIR2 })
+            if (auto* el = xml->getChildByName (tag)) {
+                const auto repl = embed (el->getAllSubText().trim(),
+                                         juce::String (tag) == kChildModel ? "nam" : "ir");
+                el->deleteAllTextElements();
+                if (repl.isNotEmpty()) el->addTextElement (repl);
+            }
+
+        root.addChildElement (new juce::XmlElement (*xml));
+        ++count;
+    }
+
+    root.addChildElement (assets);   // il contenitore passa a root, che lo libera
+    return dest.replaceWithText (root.toString()) ? count : 0;
 }
 
 bool PresetManager::save()

@@ -41,7 +41,9 @@ private:
     juce::TextButton   deleteBtn_  { "DELETE" };
     juce::TextButton   prevBtn_    { "<" };
     juce::TextButton   nextBtn_    { ">" };
-    juce::TextButton   getMoreBtn_ { "Importa preset..." };
+    juce::TextButton   getMoreBtn_  { "Importa preset..." };
+    juce::TextButton   exportBtn_   { "Esporta .prs" };
+    juce::TextButton   backupBtn_   { "Backup lista .prstl" };
     std::unique_ptr<juce::FileChooser> chooser_;
 
     std::vector<int>   visibleIndices_;

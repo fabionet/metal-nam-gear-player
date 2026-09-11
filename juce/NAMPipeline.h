@@ -167,6 +167,9 @@ public:
     bool hasModel() const { return model_ != nullptr; }
     bool hasIR()    const { return ir_  != nullptr && ir_ ->isReady(); }
     bool hasIR2()   const { return ir2_ != nullptr && ir2_->isReady(); }
+    // Vero quando il modello contiene gia' la cassa (gear_type amp_cab o
+    // full-rig): in quel caso convolvere un IR sopra raddoppierebbe il cabinet.
+    bool modelHasCab() const noexcept { return modelHasCab_.load(); }
 
     float modelInputDBAdjustment()  const;
     float modelOutputDBAdjustment() const;
@@ -233,6 +236,7 @@ private:
     std::atomic<float> irMix_         { 1.f };
     std::atomic<float> qualityScale_  { 1.f };
     std::atomic<bool>  irBypass_      { false };
+    std::atomic<bool>  modelHasCab_   { false };
     std::atomic<bool>  ir2Enable_     { false };
     std::atomic<float> irBalance_     { 0.5f };
     std::atomic<float> ir1VolDB_      { 0.f };

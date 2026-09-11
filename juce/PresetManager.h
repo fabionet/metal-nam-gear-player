@@ -48,6 +48,14 @@ public:
     // .prstl = elenco che ne contiene piu' di uno. Restituisce quanti ne
     // sono stati scritti nella cartella utente.
     int importFrom (const juce::File& f);
+
+    // Esporta il preset corrente come .prs (un solo <NAMPreset>).
+    bool exportCurrent (const juce::File& dest);
+
+    // Backup dell'intera libreria come .prstl. Oltre ai preset incorpora in
+    // base64 i file .nam e .wav che vi compaiono, cosi' il backup e' completo
+    // e si puo' ripristinare su un'altra macchina.
+    int exportAll (const juce::File& dest);
     bool deleteCurrent();                          // delete current user preset
     bool load   (int index);                       // load by index in presets_
     void next();

@@ -644,6 +644,55 @@ void NAMAudioProcessorEditor::timerCallback()
     updateSlimEnabled();
     updateTubeIndicator();
     updateLoadStatus();
+    updateCabAutoBypass();
+}
+
+// Un modello con la cassa gia' dentro (gear_type amp_cab o full-rig) non va
+// convoluto con un IR: si sentirebbero due casse in fila. Il primo caricatore
+// va quindi in bypass vero e i suoi comandi si spengono, mentre il secondo
+// resta a disposizione per stereo e dual-mono. Tornando a un modello senza
+// cassa si ripristina il bypass com'era prima dell'esclusione automatica.
+void NAMAudioProcessorEditor::updateCabAutoBypass()
+{
+    const bool hasCab = processorRef.currentModelHasCab();
+    if (hasCab == lastModelHadCab_) return;
+
+    auto* bp = processorRef.apvts.getParameter ("ir_bypass");
+    if (bp == nullptr) return;
+
+    if (hasCab) {
+        irBypassBeforeAuto_ = bp->getValue() >= 0.5f;
+        if (! irBypassBeforeAuto_) {
+            bp->beginChangeGesture();
+            bp->setValueNotifyingHost (1.0f);      // true bypass
+            bp->endChangeGesture();
+        }
+    } else {
+        bp->beginChangeGesture();
+        bp->setValueNotifyingHost (irBypassBeforeAuto_ ? 1.0f : 0.0f);
+        bp->endChangeGesture();
+    }
+    lastModelHadCab_ = hasCab;
+
+    // Spegnimento visivo della prima sezione IR: comandi disabilitati e
+    // attenuati, cosi' si vede a colpo d'occhio che e' fuori dalla catena.
+    const bool on = ! hasCab;
+    const float a = on ? 1.0f : 0.35f;
+    for (auto* c : { (juce::Component*) &irCombo, (juce::Component*) &irPrevBtn,
+                     (juce::Component*) &irNextBtn, (juce::Component*) &irBrowseBtn,
+                     (juce::Component*) &irVol1Slider_ }) {
+        c->setEnabled (on);
+        c->setAlpha (a);
+    }
+    irTitleLabel.setAlpha (a);
+    irVol1Label_.setAlpha (a);
+    if (ir1Meter_) ir1Meter_->setAlpha (a);
+    irBypass.setEnabled (on);
+    irBypass.setAlpha (a);
+    if (kIrMix < (int) knobs_.size() && knobs_[kIrMix]) {
+        knobs_[kIrMix]->slider.setEnabled (on);
+        knobs_[kIrMix]->label .setAlpha  (a);
+    }
 }
 
 // Un file mancante o illeggibile veniva scartato in silenzio: la UI restava
@@ -1275,18 +1324,20 @@ void NAMAudioProcessorEditor::resized()
         // il proprio meter. Le altezze sommano ai 124 px utili della striscia.
         auto irRow = irStrip.removeFromTop (28);
 
+        // Le due freccette stanno affiancate accanto a Browse, non piu' una per
+        // lato della combo: si passa da un file all'altro senza spostare la mano.
         auto layoutOne = [] (juce::Rectangle<int> area,
                              juce::Label& title,
                              juce::TextButton& prev, juce::ComboBox& combo,
                              juce::TextButton& next, juce::TextButton& browse) {
             title.setBounds  (area.removeFromLeft (60));
             area.removeFromLeft (4);
-            prev .setBounds  (area.removeFromLeft (28));
-            area.removeFromLeft (2);
             browse.setBounds (area.removeFromRight (80));
             area.removeFromRight (2);
             next .setBounds  (area.removeFromRight (28));
             area.removeFromRight (2);
+            prev .setBounds  (area.removeFromRight (28));
+            area.removeFromRight (4);
             combo.setBounds  (area);
         };
         layoutOne (modelStrip, modelTitleLabel, modelPrevBtn, modelCombo, modelNextBtn, modelBrowseBtn);
@@ -1310,13 +1361,13 @@ void NAMAudioProcessorEditor::resized()
             ir2TitleLabel.setBounds (row.removeFromLeft (28));
             row.removeFromLeft (2);
             ir2EnableBtn .setBounds (row.removeFromLeft (38));
-            row.removeFromLeft (2);
-            ir2PrevBtn   .setBounds (row.removeFromLeft (28));
-            row.removeFromLeft (2);
+            row.removeFromLeft (4);
             ir2BrowseBtn .setBounds (row.removeFromRight (80));
             row.removeFromRight (2);
             ir2NextBtn   .setBounds (row.removeFromRight (28));
             row.removeFromRight (2);
+            ir2PrevBtn   .setBounds (row.removeFromRight (28));
+            row.removeFromRight (4);
             ir2Combo     .setBounds (row);
         }
         irStrip.removeFromTop (2);

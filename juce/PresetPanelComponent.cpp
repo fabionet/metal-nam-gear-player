@@ -25,7 +25,8 @@ PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
     list_.setOutlineThickness (1);
     addAndMakeVisible (list_);
 
-    for (auto* b : { &saveBtn_, &saveAsBtn_, &deleteBtn_, &prevBtn_, &nextBtn_, &getMoreBtn_ })
+    for (auto* b : { &saveBtn_, &saveAsBtn_, &deleteBtn_, &prevBtn_, &nextBtn_, &getMoreBtn_,
+                     &exportBtn_, &backupBtn_ })
         addAndMakeVisible (b);
 
     categoryFilter_.addItem ("All",           1);
@@ -64,6 +65,51 @@ PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
                     total > 0 ? (juce::String (total) + (total == 1 ? " preset importato."
                                                                    : " preset importati."))
                               : "Nessun preset importato: il file non contiene preset leggibili.");
+            });
+    };
+
+    // Esportazione del preset corrente come .prs: un solo <NAMPreset>, senza
+    // asset, pensato per passare una singola regolazione a qualcun altro.
+    exportBtn_.onClick = [this] {
+        const auto name = mgr_.getCurrentName().isNotEmpty() ? mgr_.getCurrentName()
+                                                             : juce::String ("preset");
+        chooser_ = std::make_unique<juce::FileChooser> (
+            "Esporta il preset corrente",
+            PresetManager::userPresetDir().getChildFile (name + ".prs"), "*.prs");
+        chooser_->launchAsync (juce::FileBrowserComponent::saveMode
+                                 | juce::FileBrowserComponent::warnAboutOverwriting,
+            [this] (const juce::FileChooser& fc) {
+                auto f = fc.getResult();
+                if (f == juce::File()) return;
+                if (! f.hasFileExtension ("prs")) f = f.withFileExtension ("prs");
+                const bool ok = mgr_.exportCurrent (f);
+                juce::NativeMessageBox::showMessageBoxAsync (
+                    ok ? juce::MessageBoxIconType::InfoIcon : juce::MessageBoxIconType::WarningIcon,
+                    "Esporta preset",
+                    ok ? ("Preset esportato in " + f.getFullPathName())
+                       : juce::String ("Esportazione non riuscita: nessun preset selezionato."));
+            });
+    };
+
+    // Backup completo come .prstl: tutti i preset piu' i file .nam e .wav che
+    // vi compaiono, incorporati in base64. Un solo file da conservare.
+    backupBtn_.onClick = [this] {
+        chooser_ = std::make_unique<juce::FileChooser> (
+            "Backup della lista preset",
+            PresetManager::userPresetDir().getChildFile ("backup-preset.prstl"), "*.prstl");
+        chooser_->launchAsync (juce::FileBrowserComponent::saveMode
+                                 | juce::FileBrowserComponent::warnAboutOverwriting,
+            [this] (const juce::FileChooser& fc) {
+                auto f = fc.getResult();
+                if (f == juce::File()) return;
+                if (! f.hasFileExtension ("prstl")) f = f.withFileExtension ("prstl");
+                const int n = mgr_.exportAll (f);
+                juce::NativeMessageBox::showMessageBoxAsync (
+                    n > 0 ? juce::MessageBoxIconType::InfoIcon : juce::MessageBoxIconType::WarningIcon,
+                    "Backup lista preset",
+                    n > 0 ? (juce::String (n) + " preset salvati in " + f.getFileName()
+                             + ", con i file NAM e IR inclusi.")
+                          : juce::String ("Backup non riuscito."));
             });
     };
 
@@ -107,6 +153,10 @@ void PresetPanelComponent::resized()
     r.removeFromTop (6);
 
     getMoreBtn_.setBounds (r.removeFromBottom (26));
+    r.removeFromBottom (4);
+    backupBtn_ .setBounds (r.removeFromBottom (26));
+    r.removeFromBottom (4);
+    exportBtn_ .setBounds (r.removeFromBottom (26));
     r.removeFromBottom (6);
 
     auto btnRow = r.removeFromBottom (30);

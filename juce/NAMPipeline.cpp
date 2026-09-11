@@ -1,6 +1,7 @@
 #include "NAMPipeline.h"
 #include <cmath>
 #include <algorithm>
+#include <cctype>
 
 namespace {
     constexpr float kSmoothEpsilon = 1e-5f;
@@ -364,6 +365,17 @@ bool NAMPipeline::loadModel(const std::string& path)
         return false;
     }
     model_.reset(m);
+    // gear_type arriva da GetMetadata come valore JSON grezzo, quindi fra
+    // virgolette. I valori osservati sul campo sono amp, pedal, amp_cab e
+    // full-rig; si cercano le radici "cab" e "rig" per coprire anche le
+    // varianti di scrittura (full_rig, amp+cab).
+    {
+        std::string gt = model_->GetMetadata("gear_type");
+        for (auto& ch : gt) ch = (char) std::tolower((unsigned char) ch);
+        const bool hasCab = gt.find("cab") != std::string::npos
+                         || gt.find("rig") != std::string::npos;
+        modelHasCab_.store(hasCab);
+    }
     isSlimmable_.store(model_->HasQualityScaling());
     // Snapshot metadata for the audio thread (avoid virtual calls in process()).
     hasLoudnessCached_.store(model_->HasLoudness());
@@ -414,6 +426,7 @@ bool NAMPipeline::loadIR(const std::string& path)
 
 void NAMPipeline::clearModel() {
     model_.reset();
+    modelHasCab_.store(false);
     isSlimmable_.store(false);
     hasLoudnessCached_.store(false);
     hasInputLevelCached_.store(false);
