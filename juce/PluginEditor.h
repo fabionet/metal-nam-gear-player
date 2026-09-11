@@ -197,6 +197,7 @@ private:
     std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
     std::unique_ptr<EQAnalyserComponent> eqAnalyser_;
     std::unique_ptr<LCDDisplayComponent> lcd_;
+    bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
     void rescanIR2Dir (const juce::File& sel);
