@@ -268,6 +268,17 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // --- 5-band EQ ---
     for (int i = 0; i < n; ++i) out[i] = eq_.processSample(0, out[i]);
 
+    // Presa per l'analizzatore: il segnale viene campionato qui, subito dopo
+    // l'equalizzatore, cosi' nello spettro si vede l'effetto della curva.
+    {
+        int w = scopeWrite_.load(std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i) {
+            scope_[(size_t) w] = out[i];
+            w = (w + 1) & (kScopeSize - 1);
+        }
+        scopeWrite_.store(w, std::memory_order_release);
+    }
+
     // --- IR convolver (due IR incrociati, poi dry/wet) ---
     // Entrambi i convolutori ricevono lo stesso ingresso, quindi `out` non va
     // sovrascritto finche' non hanno elaborato: si usano due buffer separati.
@@ -432,6 +443,18 @@ void NAMPipeline::clearModel() {
     hasInputLevelCached_.store(false);
     hasOutputLevelCached_.store(false);
 }
+// Copia gli ultimi n campioni in ordine cronologico.
+void NAMPipeline::readScope (float* dst, int n) const
+{
+    if (n > kScopeSize) n = kScopeSize;
+    const int w = scopeWrite_.load(std::memory_order_acquire);
+    int r = (w - n) & (kScopeSize - 1);
+    for (int i = 0; i < n; ++i) {
+        dst[i] = scope_[(size_t) r];
+        r = (r + 1) & (kScopeSize - 1);
+    }
+}
+
 void NAMPipeline::clearIR()    { ir_.reset(); }
 void NAMPipeline::clearIR2()   { ir2_.reset(); }
 

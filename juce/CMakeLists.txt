@@ -40,6 +40,7 @@ target_sources(NAMCustom PRIVATE
     PresetManager.cpp
     PresetManager.h
     PresetPanelComponent.cpp
+    EQAnalyserComponent.cpp
     PresetPanelComponent.h
     GlobalSettings.cpp
     GlobalSettings.h
