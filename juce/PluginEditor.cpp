@@ -1305,8 +1305,13 @@ void NAMAudioProcessorEditor::resized()
         calBtn.setBounds (calCell);
 
         auto tabs = h.removeFromLeft (304).reduced (2, 4);
-        // Quel che resta in mezzo e' il display LCD.
-        if (lcd_) lcd_->setBounds (h.reduced (10, 1));
+        // Quel che resta in mezzo e' il display LCD, ma solo se ci sta davvero:
+        // i suoi comandi occupano circa 670 px e sotto i 930 al nome non
+        // resterebbe spazio utile. Le larghezze di schede e tasti sono fisse,
+        // quindi e' lo zoom a decidere: al 150% e 200% ci sta in linea, al 100%
+        // e al 75% no, e allora il display scende su una riga propria.
+        lcdInline_ = h.getWidth() >= 930;
+        if (lcdInline_ && lcd_) lcd_->setBounds (h.reduced (10, 1));
         mainTabBtn .setBounds (tabs.removeFromLeft (56));
         tabs.removeFromLeft (4);
         fxTabBtn   .setBounds (tabs.removeFromLeft (48));
@@ -1324,6 +1329,12 @@ void NAMAudioProcessorEditor::resized()
         presetPanel.setBounds (px, 0, pw, ph);
         presetPanel.toFront (false);
         presetsToggleBtn.toFront (false);
+    }
+
+    // Display LCD su riga propria quando in intestazione non ci sta.
+    if (! lcdInline_ && lcd_) {
+        r.removeFromTop (4);
+        lcd_->setBounds (r.removeFromTop (44).reduced (2, 1));
     }
 
     r.removeFromTop (6);
