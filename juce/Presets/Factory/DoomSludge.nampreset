@@ -21,6 +21,10 @@
       <PARAM id="quality_scale" value="1"/>
       <PARAM id="ir_mix" value="1"/>
       <PARAM id="ir_bypass" value="0"/>
+      <PARAM id="ir2_enable" value="0"/>
+      <PARAM id="ir_balance" value="0.5"/>
+      <PARAM id="ir1_volume" value="0"/>
+      <PARAM id="ir2_volume" value="0"/>
       <PARAM id="model_bypass" value="0"/>
       <PARAM id="gate_threshold" value="-50"/>
       <PARAM id="gate_release" value="120"/>

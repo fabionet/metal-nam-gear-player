@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<NAMPreset name="Clean" version="1" lockModel="1" category="Clean">
+<NAMPreset name="Default" version="1" lockModel="1" category="Default">
   <ModelPath></ModelPath>
   <IRPath></IRPath>
   <Parameters>
     <PARAMS>
-      <PARAM id="input_level" value="-2"/>
-      <PARAM id="output_level" value="-3.1"/>
-      <PARAM id="eq_bass" value="1"/>
+      <PARAM id="input_level" value="0"/>
+      <PARAM id="output_level" value="0"/>
+      <PARAM id="eq_bass" value="0"/>
       <PARAM id="eq_mid_freq" value="700"/>
       <PARAM id="eq_mid_q" value="0.707"/>
       <PARAM id="eq_mid_gain" value="0"/>
-      <PARAM id="eq_presence" value="1.5"/>
-      <PARAM id="eq_treble" value="1"/>
+      <PARAM id="eq_presence" value="0"/>
+      <PARAM id="eq_treble" value="0"/>
       <PARAM id="eq_air" value="0"/>
       <PARAM id="eq_bypass" value="0"/>
       <PARAM id="depth" value="0"/>
@@ -37,7 +37,7 @@
       <PARAM id="dist_tone" value="0"/>
       <PARAM id="dist_level" value="0"/>
       <PARAM id="dist_bypass" value="1"/>
-      <PARAM id="hp_freq" value="40"/>
+      <PARAM id="hp_freq" value="30"/>
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="0"/>
       <PARAM id="ln_target_db" value="-18"/>
