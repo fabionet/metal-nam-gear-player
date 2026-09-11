@@ -2,9 +2,9 @@
 
 [![wakatime](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player.svg)](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player) [![wakatime](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826.svg)](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826)
 
-> ## ✅ Avviso di Sicurezza — risolto in v0.2.0
+> ## ✅ Avviso di Sicurezza — risolto in v0.2.0 attensione alle versioni antecedenti per la versione windows
 >
-> La vulnerabilità **UNC path bypass** (furto credenziali NetNTLM su Windows via SMB) segnalata per la v0.1.3 è **corretta anche nei binari** a partire dalla **v0.2.0**.
+> La vulnerabilità **UNC path bypass** (sul rischio di Leack di credenziali NetNTLM su sistema operativo Windows via SMB) segnalata per la v0.1.3 è **corretta anche nei binari** a partire dalla **v0.2.0**.
 >
 > `isLocalSafePath` in `PluginProcessor.cpp` ora rifiuta i percorsi UNC in entrambe le forme (`//server/share` e `\\server\share`), i percorsi device NT (`\\?\`, `\\.\`) e gli schemi di rete `smb:` `nfs:` `afp:` `ftp:` `http:` `https:` `cifs:` `dav:` `davs:` `file:`. Il controllo si applica al percorso del modello, dell'IR e del **secondo IR**.
 >
