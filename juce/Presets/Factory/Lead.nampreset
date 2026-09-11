@@ -53,6 +53,10 @@
       <PARAM id="flanger_feedback" value="0.4"/>
       <PARAM id="flanger_mix" value="0.25"/>
       <PARAM id="flanger_bypass" value="1"/>
+      <PARAM id="reverb_room" value="0.5"/>
+      <PARAM id="reverb_damping" value="0.5"/>
+      <PARAM id="reverb_mix" value="0.25"/>
+      <PARAM id="reverb_bypass" value="1"/>
       <PARAM id="tremolo_rate_hz" value="4"/>
       <PARAM id="tremolo_depth" value="0.5"/>
       <PARAM id="tremolo_shape" value="0"/>
@@ -66,6 +70,51 @@
       <PARAM id="output_mode" value="1"/>
       <PARAM id="calibrate_input" value="0"/>
       <PARAM id="input_cal_level" value="12"/>
+      <PARAM id="amp_enable" value="0"/>
+      <PARAM id="amp_channel" value="0"/>
+      <PARAM id="amp_thump" value="0"/>
+      <PARAM id="amp_presence" value="0"/>
+      <PARAM id="amp_bass1" value="0"/>
+      <PARAM id="amp_mid1" value="0"/>
+      <PARAM id="amp_treble1" value="0"/>
+      <PARAM id="amp_gain1" value="0.5"/>
+      <PARAM id="amp_master1" value="-12"/>
+      <PARAM id="amp_gain2" value="0.5"/>
+      <PARAM id="amp_master2" value="-12"/>
+      <PARAM id="amp_bass3" value="0"/>
+      <PARAM id="amp_mid3" value="0"/>
+      <PARAM id="amp_treble3" value="0"/>
+      <PARAM id="amp_gain3" value="0.6"/>
+      <PARAM id="amp_master3" value="-12"/>
+      <PARAM id="amp_model" value="0"/>
+      <PARAM id="amp_enable2" value="0"/>
+      <PARAM id="mar_preamp" value="0.6"/>
+      <PARAM id="mar_master" value="-12"/>
+      <PARAM id="mar_bass" value="0"/>
+      <PARAM id="mar_mid" value="0"/>
+      <PARAM id="mar_treble" value="0"/>
+      <PARAM id="mar_presence" value="0"/>
+      <PARAM id="mar_valves" value="0"/>
+      <PARAM id="mar_sens" value="1"/>
+      <PARAM id="mar_fx_send" value="0.5"/>
+      <PARAM id="mar_fx_return" value="0.5"/>
+      <PARAM id="comp_bypass" value="1"/>
+      <PARAM id="comp_sustain" value="0.4"/>
+      <PARAM id="comp_attack" value="15"/>
+      <PARAM id="comp_tone" value="0"/>
+      <PARAM id="comp_level" value="0"/>
+      <PARAM id="comp_pos" value="0"/>
+      <PARAM id="model_volume" value="0"/>
+      <PARAM id="model_bass" value="0"/>
+      <PARAM id="model_mid" value="0"/>
+      <PARAM id="model_treble" value="0"/>
+      <PARAM id="power_bypass" value="0"/>
+      <PARAM id="split_bypass" value="1"/>
+      <PARAM id="split_left" value="0"/>
+      <PARAM id="split_right" value="0"/>
+      <PARAM id="split_balance" value="0"/>
+      <PARAM id="width_amount" value="1"/>
+      <PARAM id="width_enable" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>
