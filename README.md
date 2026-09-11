@@ -12,13 +12,27 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ## Screenshots
 
-**MAIN tab** — Noise Gate, Overdrive/Distortion, Amp (NAM model), 5-band EQ, Power (Depth/Resonance), Cab (IR mix), IR Tools (HP/LP/Trim), Master (Loudness Normalization):
+**MAIN tab** — catena completa con l'**analizzatore di spettro** nell'EQ, il **display LCD** in alto e i **due caricatori IR** in basso.
+
+> Nello scatto il modello è un ENGL `amp_cab`, che contiene già la cassa: la sezione **CAB** e il **primo caricatore IR** sono spenti dall'esclusione automatica, non da un difetto.
 
 ![MAIN tab](docs/screenshots/main-tab.png)
 
 **FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
 
 ![FX tab](docs/screenshots/fx-tab.png)
+
+**AMP SIM (GEAR SX)** — sezione di voicing dell'amplificatore GEAR SX, tre canali:
+
+![AMP SIM GEAR SX](docs/screenshots/ampsim-tab.png)
+
+**AMP SIM (MARCHELLOW)** — MARCHELLOW (JCM 800 2203, 1981) con selettore valvole EU/US e FX loop:
+
+![AMP SIM MARCHELLOW](docs/screenshots/ampsim2-tab.png)
+
+**CATENA** — mappa del percorso del segnale; il nodo **CAB 2** compare quando il secondo IR è attivo:
+
+![CATENA](docs/screenshots/catena-tab.png)
 
 ## Features
 
