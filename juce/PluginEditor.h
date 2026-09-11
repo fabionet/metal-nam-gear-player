@@ -12,6 +12,7 @@
 #include "PresetPanelComponent.h"
 #include "MeterStripComponent.h"
 #include "EQAnalyserComponent.h"
+#include "LCDDisplayComponent.h"
 
 class NAMAudioProcessorEditor : public juce::AudioProcessorEditor,
                                 private juce::Timer
@@ -196,6 +197,7 @@ private:
     std::unique_ptr<SAtt> irVol1Att_, irVol2Att_;
     std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
     std::unique_ptr<EQAnalyserComponent> eqAnalyser_;
+    std::unique_ptr<LCDDisplayComponent> lcd_;
 
     void browseIR2();
     void rescanIR2Dir (const juce::File& sel);

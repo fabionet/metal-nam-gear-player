@@ -72,14 +72,19 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
 {
     auto box = std::make_unique<KnobBox>();
     box->slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    box->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 68, 14);
+    // Il riquadro del valore era alto 14 px e il font vi si adattava sotto i
+    // 10: numeri come -55.0 risultavano illeggibili. Portato a 18, con il
+    // testo in crema pieno invece del grigio predefinito di JUCE.
+    box->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 18);
     box->slider.setLookAndFeel (&lnf_);
+    box->slider.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xfff5efdc));
+    box->slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (box->slider);
 
     box->label.setText (name, juce::dontSendNotification);
     box->label.setJustificationType (juce::Justification::centredTop);
-    box->label.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
-    box->label.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+    box->label.setFont (juce::Font (juce::FontOptions (11.5f).withStyle ("Bold")));
+    box->label.setColour (juce::Label::textColourId, juce::Colour (0xfff5efdc));
     addAndMakeVisible (box->label);
 
     box->att = std::make_unique<SAtt> (processorRef.apvts, paramId, box->slider);
@@ -166,8 +171,8 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     for (auto* l : { &modelTitleLabel, &irTitleLabel, &ir2TitleLabel }) {
         addAndMakeVisible (*l);
         l->setJustificationType (juce::Justification::centredRight);
-        l->setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
-        l->setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+        l->setFont (juce::Font (juce::FontOptions (11.5f).withStyle ("Bold")));
+        l->setColour (juce::Label::textColourId, juce::Colour (0xfff5efdc));
     }
     refreshLabels();
 
@@ -218,13 +223,15 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     for (auto* s : { &irVol1Slider_, &irVol2Slider_ }) {
         addAndMakeVisible (*s);
         s->setSliderStyle (juce::Slider::LinearHorizontal);
-        s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 16);
+        s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 18);
+        s->setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xfff5efdc));
+        s->setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     }
     for (auto* l : { &irVol1Label_, &irVol2Label_ }) {
         addAndMakeVisible (*l);
         l->setJustificationType (juce::Justification::centredRight);
-        l->setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
-        l->setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+        l->setFont (juce::Font (juce::FontOptions (11.5f).withStyle ("Bold")));
+        l->setColour (juce::Label::textColourId, juce::Colour (0xfff5efdc));
     }
     irVol1Att_ = std::make_unique<SAtt> (processorRef.apvts, "ir1_volume", irVol1Slider_);
     irVol2Att_ = std::make_unique<SAtt> (processorRef.apvts, "ir2_volume", irVol2Slider_);
@@ -498,7 +505,8 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     slimLabel_.setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
     slimLabel_.setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
     slimSlider_.setSliderStyle (juce::Slider::LinearHorizontal);
-    slimSlider_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 16);
+    slimSlider_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 18);
+    slimSlider_.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xfff5efdc));
     slimSlider_.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (slimSlider_);
     slimAtt_ = std::make_unique<SAtt> (processorRef.apvts, "quality_scale", slimSlider_);
@@ -518,8 +526,15 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     eqAnalyser_ = std::make_unique<EQAnalyserComponent> (processorRef, processorRef.apvts);
     addChildComponent (*eqAnalyser_);
 
+    lcd_ = std::make_unique<LCDDisplayComponent> (processorRef, processorRef.apvts,
+                                                  processorRef.getPresetManager());
+    // Su "Default" o senza preset corrente il salvataggio dal display deve
+    // chiedere un nome: il pannello preset ha gia' quella finestrella.
+    lcd_->onSaveRequested = [this] { if (! panelOpen_) togglePresetPanel(); };
+    addAndMakeVisible (*lcd_);
+
     loadStatusLabel_.setJustificationType (juce::Justification::centredLeft);
-    loadStatusLabel_.setFont (juce::Font (juce::FontOptions (10.5f).withStyle ("Bold")));
+    loadStatusLabel_.setFont (juce::Font (juce::FontOptions (12.0f).withStyle ("Bold")));
     loadStatusLabel_.setColour (juce::Label::textColourId, juce::Colour (0xffff5555));
     loadStatusLabel_.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (loadStatusLabel_);
@@ -1271,7 +1286,9 @@ void NAMAudioProcessorEditor::resized()
     r.removeFromTop (4);
 
     // Header (tabs left + presets toggle on far right). Load NAM / IR moved to loader strip.
-    headerArea_ = r.removeFromTop (38);
+    // 38 px stavano stretti al display LCD: nome del preset e riga del banco
+    // finivano schiacciati. 48 li fa respirare senza togliere spazio utile.
+    headerArea_ = r.removeFromTop (48);
     {
         auto h = headerArea_.reduced (2);
         auto zoomCell    = h.removeFromRight (70).reduced (4, 4);
@@ -1288,6 +1305,8 @@ void NAMAudioProcessorEditor::resized()
         calBtn.setBounds (calCell);
 
         auto tabs = h.removeFromLeft (304).reduced (2, 4);
+        // Quel che resta in mezzo e' il display LCD.
+        if (lcd_) lcd_->setBounds (h.reduced (10, 1));
         mainTabBtn .setBounds (tabs.removeFromLeft (56));
         tabs.removeFromLeft (4);
         fxTabBtn   .setBounds (tabs.removeFromLeft (48));
@@ -1326,6 +1345,10 @@ void NAMAudioProcessorEditor::resized()
         // Colonna IR: due caricatori impilati, ciascuno con il proprio volume e
         // il proprio meter. Le altezze sommano ai 124 px utili della striscia.
         auto irRow = irStrip.removeFromTop (28);
+        // Il primo caricatore lascia libero lo spazio del pulsante ON del
+        // secondo, cosi' le due combo partono dalla stessa x e le etichette
+        // restano incolonnate.
+        constexpr int kIrLabelW = 34, kIrOnW = 38, kIrGap = 4;
 
         // Le due freccette stanno affiancate accanto a Browse, non piu' una per
         // lato della combo: si passa da un file all'altro senza spostare la mano.
@@ -1344,7 +1367,18 @@ void NAMAudioProcessorEditor::resized()
             combo.setBounds  (area);
         };
         layoutOne (modelStrip, modelTitleLabel, modelPrevBtn, modelCombo, modelNextBtn, modelBrowseBtn);
-        layoutOne (irRow,      irTitleLabel,    irPrevBtn,    irCombo,    irNextBtn,    irBrowseBtn);
+        {
+            auto row = irRow;
+            irTitleLabel.setBounds (row.removeFromLeft (kIrLabelW));
+            row.removeFromLeft (kIrGap + kIrOnW + 2);      // allineamento con IR 2
+            irBrowseBtn.setBounds (row.removeFromRight (80));
+            row.removeFromRight (2);
+            irNextBtn  .setBounds (row.removeFromRight (28));
+            row.removeFromRight (2);
+            irPrevBtn  .setBounds (row.removeFromRight (28));
+            row.removeFromRight (4);
+            irCombo    .setBounds (row);
+        }
 
         // IR 1: volume e meter.
         irStrip.removeFromTop (2);
@@ -1361,10 +1395,10 @@ void NAMAudioProcessorEditor::resized()
         irStrip.removeFromTop (4);
         {
             auto row = irStrip.removeFromTop (28);
-            ir2TitleLabel.setBounds (row.removeFromLeft (28));
+            ir2TitleLabel.setBounds (row.removeFromLeft (kIrLabelW));
+            row.removeFromLeft (kIrGap);
+            ir2EnableBtn .setBounds (row.removeFromLeft (kIrOnW));
             row.removeFromLeft (2);
-            ir2EnableBtn .setBounds (row.removeFromLeft (38));
-            row.removeFromLeft (4);
             ir2BrowseBtn .setBounds (row.removeFromRight (80));
             row.removeFromRight (2);
             ir2NextBtn   .setBounds (row.removeFromRight (28));
@@ -1944,6 +1978,11 @@ void NAMAudioProcessorEditor::togglePresetPanel()
     panelOpen_ = ! panelOpen_;
     const int pw = presetPanel.getWidth() > 0 ? presetPanel.getWidth() : 320;
     const int targetX = panelOpen_ ? (getWidth() - pw) : getWidth();
+    // In apertura il pannello parte dal bordo del meter di destra, non da
+    // fuori schermo: cosi' si vede nascere da li' e scorrere verso sinistra
+    // fino alla posizione finale.
+    if (panelOpen_)
+        presetPanel.setBounds (getWidth() - 28, 0, pw, getHeight());
     presetPanel.setVisible (true); // keep visible during slide
     presetPanel.toFront (false);
     presetsToggleBtn.toFront (false);

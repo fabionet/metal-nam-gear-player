@@ -24,6 +24,11 @@ namespace ids {
     constexpr auto irBalance     = "ir_balance";
     constexpr auto ir1Volume     = "ir1_volume";
     constexpr auto ir2Volume     = "ir2_volume";
+    constexpr auto tempoBpm      = "tempo_bpm";
+    constexpr auto metroEnable   = "metro_enable";
+    constexpr auto metroVolume   = "metro_volume";
+    constexpr auto metroSig      = "metro_sig";
+    constexpr auto presetBank    = "preset_bank";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
     constexpr auto gateThresh    = "gate_threshold";
@@ -155,13 +160,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::resonance,1},     "Resonance",juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::resonanceFreq,1}, "Res Freq", juce::NormalisableRange<float>(60.f, 250.f, 1.f, 0.5f), 100.f));
     add (std::make_unique<C>(juce::ParameterID{ids::channelMode,1},   "Mode",     juce::StringArray{"Mono","Dual-Mono","Stereo"}, 0));
-    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
+    // SLIM parte dal sottomodello piu' leggero: quality_scale sceglie il
+    // submodel per soglia, e 0 seleziona il primo della lista.
+    add (std::make_unique<P>(juce::ParameterID{ids::qualityScale,1},  "Quality",  juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::irMix,1},         "IR Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 1.f));
     add (std::make_unique<B>(juce::ParameterID{ids::irBypass,1},      "IR Bypass",    false));
     add (std::make_unique<B>(juce::ParameterID{ids::ir2Enable,1},     "IR 2 Enable",  false));
     add (std::make_unique<P>(juce::ParameterID{ids::irBalance,1},     "IR Balance", juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.5f));
     add (std::make_unique<P>(juce::ParameterID{ids::ir1Volume,1},     "IR 1 Volume", juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
     add (std::make_unique<P>(juce::ParameterID{ids::ir2Volume,1},     "IR 2 Volume", juce::NormalisableRange<float>(-24.f, 24.f, 0.1f), 0.f));
+    // Metronomo e banchi del display LCD.
+    add (std::make_unique<P>(juce::ParameterID{ids::tempoBpm,1},      "Tempo", juce::NormalisableRange<float>(40.f, 300.f, 0.1f), 120.f));
+    add (std::make_unique<B>(juce::ParameterID{ids::metroEnable,1},   "Metronome", false));
+    add (std::make_unique<P>(juce::ParameterID{ids::metroVolume,1},   "Metronome Vol", juce::NormalisableRange<float>(-48.f, 0.f, 0.1f), -14.f));
+    add (std::make_unique<C>(juce::ParameterID{ids::metroSig,1},      "Time Sig", juce::StringArray{"4/4","3/4","2/4","6/8","5/4","7/8"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::presetBank,1},    "Bank", juce::StringArray{"A","B","C","D"}, 0));
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
 
     // Pre-FX
@@ -305,6 +318,7 @@ NAMAudioProcessor::NAMAudioProcessor()
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMS", createParameterLayout())
 {
+    metronome_.prepare (sampleRate_);
     pipelineL_ = std::make_unique<NAMPipeline>();
     pipelineR_ = std::make_unique<NAMPipeline>();
     presetManager_ = std::make_unique<PresetManager>(*this, apvts);
@@ -332,6 +346,9 @@ void NAMAudioProcessor::prepareToPlay (double sr, int samplesPerBlock)
 {
     baseSampleRate_ = sr;
     baseBlockSize_  = samplesPerBlock;
+    // Il metronomo si mescola dopo il downsampling, quindi gira alla frequenza
+    // base e non a quella sovracampionata.
+    metronome_.prepare (sr);
     const bool os = oversamplingOn_.load();
     const double effSr = os ? sr * 2.0 : sr;
     const int    effBs = os ? samplesPerBlock * 2 : samplesPerBlock;
@@ -645,6 +662,22 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             const float s = (L[i] - R[i]) * 0.5f * w;
             L[i] = m + s;
             R[i] = m - s;
+        }
+    }
+
+    // --- Metronomo, ultimo della catena ---------------------------------
+    // Sta dopo i meter di uscita? No: entra prima, cosi' il click e' incluso in
+    // cio' che si ascolta ma il suo livello e' indipendente dal resto.
+    {
+        const bool  on  = apvts.getRawParameterValue (ids::metroEnable)->load() > 0.5f;
+        if (on) {
+            const float bpm = apvts.getRawParameterValue (ids::tempoBpm)->load();
+            const float vol = apvts.getRawParameterValue (ids::metroVolume)->load();
+            const int   sig = (int) apvts.getRawParameterValue (ids::metroSig)->load();
+            static constexpr int kBeats[] = { 4, 3, 2, 6, 5, 7 };
+            const int beats = kBeats[juce::jlimit (0, 5, sig)];
+            metronome_.process (L, R, n, (double) bpm, beats,
+                                juce::Decibels::decibelsToGain (vol));
         }
     }
 

@@ -199,11 +199,14 @@ void PresetPanelComponent::paintListBoxItem (int row, juce::Graphics& g, int w, 
     g.drawText (prefix + ref.name, 6, 0, w - 8, h, juce::Justification::centredLeft, true);
 }
 
+// Il clic singolo seleziona soltanto: serve a scegliere il bersaglio di
+// esporta, elimina e sovrascrivi senza cambiare il suono sotto le dita.
+// Il richiamo vero e' sul doppio clic.
 void PresetPanelComponent::listBoxItemClicked (int row, const juce::MouseEvent&)
 {
-    const int idx = presetIndexForRow (row);
-    if (idx >= 0)
-        mgr_.load (idx);
+    selectedRow_ = row;
+    list_.selectRow (row, true, true);
+    repaint();
 }
 
 void PresetPanelComponent::rebuildVisibleIndices()
@@ -219,9 +222,11 @@ void PresetPanelComponent::rebuildVisibleIndices()
     }
 }
 
-void PresetPanelComponent::listBoxItemDoubleClicked (int row, const juce::MouseEvent& e)
+void PresetPanelComponent::listBoxItemDoubleClicked (int row, const juce::MouseEvent&)
 {
-    listBoxItemClicked (row, e);
+    selectedRow_ = row;
+    const int idx = presetIndexForRow (row);
+    if (idx >= 0) mgr_.load (idx);
 }
 
 void PresetPanelComponent::doSaveAs()

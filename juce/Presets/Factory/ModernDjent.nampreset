@@ -26,6 +26,11 @@
       <PARAM id="ir_balance" value="0.5"/>
       <PARAM id="ir1_volume" value="0"/>
       <PARAM id="ir2_volume" value="0"/>
+      <PARAM id="tempo_bpm" value="120"/>
+      <PARAM id="metro_enable" value="0"/>
+      <PARAM id="metro_volume" value="-14"/>
+      <PARAM id="metro_sig" value="0"/>
+      <PARAM id="preset_bank" value="0"/>
       <PARAM id="model_bypass" value="0"/>
       <PARAM id="gate_threshold" value="-40"/>
       <PARAM id="gate_release" value="40"/>
