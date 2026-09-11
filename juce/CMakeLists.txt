@@ -66,6 +66,7 @@ juce_add_binary_data(NAMPresets
         Presets/Factory/DoomSludge.nampreset
         Presets/Factory/BlackMetal.nampreset
         Presets/Factory/DemoClean.nampreset
+        Presets/Factory/Default.nampreset
         Presets/Assets/nam/demo_wavenet_a1.nam
 )
 

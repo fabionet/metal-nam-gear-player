@@ -37,11 +37,12 @@ private:
     juce::ComboBox     categoryFilter_;
     juce::ListBox      list_;
     juce::TextButton   saveBtn_    { "SAVE" };
-    juce::TextButton   saveAsBtn_  { "SAVE AS\u2026" };
+    juce::TextButton   saveAsBtn_  { "SAVE AS..." };
     juce::TextButton   deleteBtn_  { "DELETE" };
-    juce::TextButton   prevBtn_    { "\u25c0" };
-    juce::TextButton   nextBtn_    { "\u25b6" };
-    juce::TextButton   getMoreBtn_ { "Get more presets" };
+    juce::TextButton   prevBtn_    { "<" };
+    juce::TextButton   nextBtn_    { ">" };
+    juce::TextButton   getMoreBtn_ { "Importa preset..." };
+    std::unique_ptr<juce::FileChooser> chooser_;
 
     std::vector<int>   visibleIndices_;
 
