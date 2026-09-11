@@ -13,7 +13,11 @@
 set -euo pipefail
 
 VERSION="${1:-0.2.0}"
-PKG="metal-nam-gear-player"
+# Nome distinto dalla linea "Full", che occupa gia' metal-nam-gear-player:
+# le due edizioni devono poter stare installate insieme.
+PKG="metal-nam-gear-players-neo"
+# Nome del prodotto come lo genera JUCE da PRODUCT_NAME.
+PRODUCT="Metal NAM Gear Players Neo"
 ARCH="amd64"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -24,9 +28,9 @@ DIST="$ROOT/dist"
 STAGE="$DIST/deb/${PKG}_${VERSION}_${ARCH}"
 DEB_OUT="$DIST/${PKG}_${VERSION}_${ARCH}.deb"
 
-STANDALONE="$ART/Standalone/NAM Custom"
-VST3="$ART/VST3/NAM Custom.vst3"
-LV2="$ART/LV2/NAM Custom.lv2"
+STANDALONE="$ART/Standalone/$PRODUCT"
+VST3="$ART/VST3/$PRODUCT.vst3"
+LV2="$ART/LV2/$PRODUCT.lv2"
 
 # --- controlli ---
 for f in "$STANDALONE" "$VST3" "$LV2"; do
@@ -46,9 +50,9 @@ mkdir -p "$STAGE/DEBIAN" \
          "$STAGE/usr/share/doc/$PKG"
 
 # --- binari ---
-cp    "$STANDALONE" "$STAGE/usr/lib/$PKG/metal-nam-gear-player"
-chmod 755           "$STAGE/usr/lib/$PKG/metal-nam-gear-player"
-ln -sf "/usr/lib/$PKG/metal-nam-gear-player" "$STAGE/usr/bin/metal-nam-gear-player"
+cp    "$STANDALONE" "$STAGE/usr/lib/$PKG/$PKG"
+chmod 755           "$STAGE/usr/lib/$PKG/$PKG"
+ln -sf "/usr/lib/$PKG/$PKG" "$STAGE/usr/bin/$PKG"
 cp -r "$VST3" "$STAGE/usr/lib/vst3/"
 cp -r "$LV2"  "$STAGE/usr/lib/lv2/"
 
@@ -64,10 +68,10 @@ done
 cat > "$STAGE/usr/share/applications/${PKG}.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Metal NAM Gear Players
+Name=Metal NAM Gear Players Neo
 GenericName=Amp modeller
 Comment=Neural Amp Modeler player con doppio IR, equalizzatore e metronomo
-Exec=metal-nam-gear-player
+Exec=metal-nam-gear-players-neo
 Terminal=false
 Categories=AudioVideo;Audio;
 Keywords=guitar;amp;NAM;IR;
@@ -84,13 +88,16 @@ Architecture: $ARCH
 Maintainer: FabioNET <19152770+fabionet@users.noreply.github.com>
 Installed-Size: $INSTALLED_KB
 Depends: libc6 (>= 2.31), libstdc++6 (>= 10), libfreetype6, libx11-6, libxext6, libxrandr2, libxcursor1, libxinerama1, libasound2 | libasound2t64, libcurl4 | libcurl4t64
-Description: Metal NAM Gear Players - Neo Edition
+Description: Metal NAM Gear Players Neo Edition
  Player per modelli Neural Amp Modeler con catena completa: gate, compressore,
  overdrive e distorsione, due caricatori di risposte all'impulso con
  bilanciamento, equalizzatore a cinque bande con analizzatore di spettro,
  sezione di potenza, effetti e metronomo.
  .
  Il pacchetto installa il programma autonomo, il plugin VST3 e il plugin LV2.
+ .
+ Identita' distinta dall'edizione Full: nomi, codice VST3 e URI LV2 diversi,
+ quindi le due possono convivere nella stessa DAW e sullo stesso sistema.
 EOF
 
 # --- costruzione ---

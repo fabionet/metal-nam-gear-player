@@ -14,13 +14,17 @@ endif()
 
 juce_add_plugin(NAMCustom
     VERSION               0.2.0
-    PRODUCT_NAME          "NAM Custom"
+    # Identita' distinta dalla linea "Full" (urn:fabionet:metalnamgearplayer,
+    # bundle "Metal NAM Gear Player"): nome del prodotto, BUNDLE_ID, codice a
+    # quattro lettere e URI LV2 sono tutti diversi, cosi' le due edizioni
+    # convivono nella stessa DAW senza sovrascriversi ne' confondersi.
+    PRODUCT_NAME          "Metal NAM Gear Players Neo"
     COMPANY_NAME          "fabionet"
-    BUNDLE_ID             "com.fabionet.namcustom"
+    BUNDLE_ID             "com.fabionet.metalnamgearplayers.neo"
     PLUGIN_MANUFACTURER_CODE Fbnt
-    PLUGIN_CODE              Nmcu
+    PLUGIN_CODE              NgpN
     FORMATS                  ${NAMCUSTOM_FORMATS}
-    LV2URI                   "https://github.com/mikeoliphant/neural-amp-modeler-lv2#namcustom-juce"
+    LV2URI                   "urn:fabionet:metalnamgearplayers-neo"
     IS_SYNTH                 FALSE
     NEEDS_MIDI_INPUT         FALSE
     NEEDS_MIDI_OUTPUT        FALSE
