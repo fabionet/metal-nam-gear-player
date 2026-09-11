@@ -9,7 +9,7 @@
 # Docs source: sibling checkout of neural-amp-modeler-lv2 (juce-rewrite branch).
 set -euo pipefail
 
-VERSION="${1:-0.1.5}"
+VERSION="${1:-0.2.0}"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="$ROOT/build-win"
@@ -23,9 +23,10 @@ NSI_OUT="$DIST/${BASENAME}-setup.exe"
 
 STANDALONE="$BUILD/juce/NAMCustom_artefacts/Release/Standalone/NAM Custom.exe"
 VST3_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3"
+LV2_BUNDLE="$BUILD/juce/NAMCustom_artefacts/Release/LV2/NAM Custom.lv2"
 
 # --- checks ---
-for f in "$STANDALONE" "$VST3_BUNDLE"; do
+for f in "$STANDALONE" "$VST3_BUNDLE" "$LV2_BUNDLE"; do
     [[ -e "$f" ]] || { echo "Missing artefact: $f" >&2; exit 1; }
 done
 for d in guida-rapida.pdf guida-tecnica.pdf; do
@@ -41,6 +42,7 @@ mkdir -p "$STAGE/docs"
 # --- populate ---
 cp "$STANDALONE"            "$STAGE/"
 cp -r "$VST3_BUNDLE"        "$STAGE/"
+cp -r "$LV2_BUNDLE"         "$STAGE/"
 cp "$ROOT/LICENSE"          "$STAGE/"
 cp "$ROOT/juce/fonts/LICENSE-fonts.txt" "$STAGE/"
 cp "$DOCS_SRC/guida-rapida.pdf"  "$STAGE/docs/"
@@ -48,12 +50,13 @@ cp "$DOCS_SRC/guida-tecnica.pdf" "$STAGE/docs/"
 cp -r "$ROOT/extras"        "$STAGE/"
 
 cat > "$STAGE/README.txt" <<EOF
-METAL NAM GEAR PLAYER v${VERSION} - Windows x64 portable
+Metal NAM Gear Players - Neo Edition v${VERSION} - Windows x64 portable
 
 Contents
 --------
 NAM Custom.exe        Standalone application (ASIO / MME / DirectSound)
 NAM Custom.vst3/      VST3 plugin bundle
+NAM Custom.lv2/       LV2 plugin bundle
 docs/                 Italian user guides (Guida Rapida + Guida Tecnica)
 LICENSE               AGPL-3.0-or-later
 LICENSE-fonts.txt     SIL OFL 1.1 for the three embedded UI fonts
@@ -67,9 +70,13 @@ Installation
      Per-user:     %APPDATA%\\VST3\\
    Then rescan the folder in your DAW.
 
-2. Double-click "NAM Custom.exe" for standalone use.
+2. Copy the whole "NAM Custom.lv2" folder to your LV2 directory:
+     Per-user:     %APPDATA%\\LV2\\
+   Then rescan in a host that supports LV2 (Reaper, Ardour, Carla).
 
-3. Load a .nam model (from https://tone3000.com) and optionally an IR .wav
+3. Double-click "NAM Custom.exe" for standalone use.
+
+4. Load a .nam model (from https://tone3000.com) and optionally an IR .wav
    through the plugin UI. See docs\\guida-rapida.pdf for a quick start.
 
 Support

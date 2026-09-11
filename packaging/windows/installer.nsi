@@ -25,7 +25,7 @@ SetCompressor /SOLID lzma
   !define OUTFILE "MetalNAMGearPlayer-windows-x64-setup.exe"
 !endif
 
-!define APPNAME       "METAL NAM GEAR PLAYER"
+!define APPNAME       "Metal NAM Gear Players - Neo Edition"
 !define VENDOR        "fabionet"
 !define REGKEY        "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalNAMGearPlayer"
 !define URL_HOMEPAGE  "https://github.com/fabionet/metal-nam-gear-player"
@@ -40,7 +40,9 @@ RequestExecutionLevel admin
 ShowInstDetails show
 ShowUnInstDetails show
 
-VIProductVersion  "0.1.5.0"
+; Segue il -DVERSION passato da build-package.sh: NSIS pretende quattro
+; numeri, quindi si aggiunge la quarta cifra.
+VIProductVersion  "${VERSION}.0"
 VIAddVersionKey   "ProductName"     "${APPNAME}"
 VIAddVersionKey   "CompanyName"     "${VENDOR}"
 VIAddVersionKey   "LegalCopyright"  "AGPL-3.0-or-later"
@@ -98,12 +100,12 @@ Section "Standalone application" SEC_STANDALONE
   File /r "${STAGING}\extras\reaper\*.*"
 
   ; Start Menu shortcut for the standalone
-  CreateDirectory "$SMPROGRAMS\METAL NAM GEAR PLAYER"
-  CreateShortCut  "$SMPROGRAMS\METAL NAM GEAR PLAYER\NAM Custom (Standalone).lnk" \
+  CreateDirectory "$SMPROGRAMS\Metal NAM Gear Players"
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\NAM Custom (Standalone).lnk" \
                   "$INSTDIR\NAM Custom.exe"
-  CreateShortCut  "$SMPROGRAMS\METAL NAM GEAR PLAYER\User guide (Italian).lnk" \
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\User guide (Italian).lnk" \
                   "$INSTDIR\docs\guida-rapida.pdf"
-  CreateShortCut  "$SMPROGRAMS\METAL NAM GEAR PLAYER\Uninstall.lnk" \
+  CreateShortCut  "$SMPROGRAMS\Metal NAM Gear Players\Uninstall.lnk" \
                   "$INSTDIR\uninstall.exe"
 
   ; Uninstaller + Add/Remove Programs entry
@@ -128,15 +130,25 @@ Section "VST3 plugin (system-wide)" SEC_VST3
   File /r "${STAGING}\NAM Custom.vst3"
 SectionEnd
 
+Section "LV2 plugin (per-user)" SEC_LV2
+  ; Su Windows i bundle LV2 stanno in %APPDATA%\LV2, che e' per utente:
+  ; non esiste un percorso di sistema convenzionale come per il VST3.
+  SetOutPath "$APPDATA\LV2"
+  File /r "${STAGING}\NAM Custom.lv2"
+SectionEnd
+
 ; Section descriptions
 LangString DESC_STANDALONE ${LANG_ENGLISH} "Standalone JACK/ASIO application, documentation and uninstaller (required)."
 LangString DESC_VST3       ${LANG_ENGLISH} "VST3 plugin installed to the system-wide VST3 folder (Common Files\VST3)."
+LangString DESC_LV2        ${LANG_ENGLISH} "LV2 plugin installed to the per-user LV2 folder (%APPDATA%\LV2)."
 LangString DESC_STANDALONE ${LANG_ITALIAN} "Applicazione Standalone, documentazione e disinstallatore (obbligatorio)."
 LangString DESC_VST3       ${LANG_ITALIAN} "Plugin VST3 nella cartella di sistema (Common Files\VST3)."
+LangString DESC_LV2        ${LANG_ITALIAN} "Plugin LV2 nella cartella dell'utente (%APPDATA%\LV2)."
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STANDALONE} $(DESC_STANDALONE)
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_VST3}       $(DESC_VST3)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_LV2}        $(DESC_LV2)
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
@@ -155,11 +167,14 @@ Section "Uninstall"
   ; VST3 bundle
   RMDir /r "$COMMONFILES64\VST3\NAM Custom.vst3"
 
+  ; LV2 bundle
+  RMDir /r "$APPDATA\LV2\NAM Custom.lv2"
+
   ; Start Menu
-  Delete   "$SMPROGRAMS\METAL NAM GEAR PLAYER\NAM Custom (Standalone).lnk"
-  Delete   "$SMPROGRAMS\METAL NAM GEAR PLAYER\User guide (Italian).lnk"
-  Delete   "$SMPROGRAMS\METAL NAM GEAR PLAYER\Uninstall.lnk"
-  RMDir    "$SMPROGRAMS\METAL NAM GEAR PLAYER"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players\NAM Custom (Standalone).lnk"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players\User guide (Italian).lnk"
+  Delete   "$SMPROGRAMS\Metal NAM Gear Players\Uninstall.lnk"
+  RMDir    "$SMPROGRAMS\Metal NAM Gear Players"
 
   DeleteRegKey HKLM "${REGKEY}"
 SectionEnd

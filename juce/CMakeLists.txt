@@ -11,18 +11,19 @@ juce_set_vst3_sdk_path(${CMAKE_SOURCE_DIR}/deps/vst3sdk)
 # both formats on by default and let the user drop VST3 via -DNAM_ENABLE_VST3=OFF.
 option(NAM_ENABLE_VST3 "Build the VST3 target" ON)
 if(NAM_ENABLE_VST3)
-    set(NAMCUSTOM_FORMATS VST3 Standalone)
+    set(NAMCUSTOM_FORMATS VST3 LV2 Standalone)
 else()
     set(NAMCUSTOM_FORMATS Standalone)
 endif()
 
 juce_add_plugin(NAMCustom
-    VERSION               0.1.5
+    VERSION               0.2.0
     PRODUCT_NAME          "NAM Custom"
     COMPANY_NAME          "fabionet"
     BUNDLE_ID             "com.fabionet.namcustom"
     PLUGIN_MANUFACTURER_CODE Fbnt
     PLUGIN_CODE              Nmcu
+    LV2URI                   "https://github.com/mikeoliphant/neural-amp-modeler-lv2#namcustom-juce"
     FORMATS                  ${NAMCUSTOM_FORMATS}
     IS_SYNTH                 FALSE
     NEEDS_MIDI_INPUT         FALSE

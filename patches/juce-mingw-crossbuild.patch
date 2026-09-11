@@ -1,0 +1,54 @@
+diff --git a/extras/Build/CMake/JUCEUtils.cmake b/extras/Build/CMake/JUCEUtils.cmake
+index ac995f0e0c..3660a88829 100644
+--- a/extras/Build/CMake/JUCEUtils.cmake
++++ b/extras/Build/CMake/JUCEUtils.cmake
+@@ -1062,10 +1062,16 @@ function(juce_enable_vst3_manifest_step shared_code_target)
+ 
+     get_target_property(target_version_string ${shared_code_target} JUCE_VERSION)
+ 
+-    # Use the helper tool to write out the moduleinfo.json
++    # Use the helper tool to write out the moduleinfo.json.
++    # Under MinGW cross-compilation the helper is a Windows PE, so launch it via wine.
++    if(MINGW)
++        set(_juce_vst3_helper_launcher wine)
++    else()
++        set(_juce_vst3_helper_launcher "")
++    endif()
+     add_custom_command(TARGET ${target_name} POST_BUILD
+         COMMAND ${CMAKE_COMMAND} -E make_directory "${product}/Contents/Resources"
+-        COMMAND juce_vst3_helper
++        COMMAND ${_juce_vst3_helper_launcher} $<TARGET_FILE:juce_vst3_helper>
+             -create
+             -version "${target_version_string}"
+             -path "${product}"
+@@ -1232,8 +1238,15 @@ function(_juce_set_plugin_target_properties shared_code_target kind)
+ 
+         _juce_add_lv2_manifest_helper_target()
+ 
++        # Nella cross-build MinGW l'helper e' un eseguibile Windows: va lanciato
++        # via wine, come gia' si fa per juce_vst3_helper.
++        if(MINGW)
++            set(_juce_lv2_helper_launcher wine)
++        else()
++            set(_juce_lv2_helper_launcher "")
++        endif()
+         add_custom_command(TARGET ${target_name} POST_BUILD
+-            COMMAND juce_lv2_helper "$<TARGET_FILE:${target_name}>"
++            COMMAND ${_juce_lv2_helper_launcher} $<TARGET_FILE:juce_lv2_helper> "$<TARGET_FILE:${target_name}>"
+             VERBATIM)
+ 
+         _juce_set_copy_properties(${shared_code_target} ${target_name} "${output_path}" JUCE_LV2_COPY_DIR)
+diff --git a/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp b/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp
+index 9d018f7549..24b4a2cf52 100644
+--- a/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp
++++ b/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp
+@@ -37,6 +37,9 @@
+ 
+  #include <windows.h>
+  #include <tchar.h>
++ // MinGW non tira dentro shellapi.h da windows.h come fa MSVC, e senza
++ // di esso CommandLineToArgvW non e' dichiarata: l'helper non compila.
++ #include <shellapi.h>
+  HMODULE dlopen (const TCHAR* filename, int) { return LoadLibrary (filename); }
+  FARPROC dlsym (HMODULE handle, const char* name) { return GetProcAddress (handle, name); }
+  static void printError()

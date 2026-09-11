@@ -61,7 +61,7 @@ git clone https://github.com/fabionet/metal-nam-gear-player.git -b windows-mingw
 cd metal-nam-gear-player
 git submodule update --init
 git submodule update --init --recursive deps/NeuralAudio
-(cd deps/JUCE && git apply ../../patches/juce-vst3-helper-wine.patch)
+(cd deps/JUCE && git apply ../../patches/juce-mingw-crossbuild.patch)
 cmake -B build-win -S . -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
 cmake --build build-win -j 1
@@ -76,6 +76,7 @@ Artefacts:
 
 - Standalone: `build-win/juce/NAMCustom_artefacts/Release/Standalone/NAM Custom.exe`
 - VST3: `build-win/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3/Contents/x86_64-win/NAM Custom.vst3`
+- LV2: `build-win/juce/NAMCustom_artefacts/Release/LV2/NAM Custom.lv2/`
 
 ### Packaging (portable zip + NSIS installer)
 

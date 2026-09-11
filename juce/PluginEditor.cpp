@@ -824,7 +824,7 @@ void NAMAudioProcessorEditor::paintTitle (juce::Graphics& g, juce::Rectangle<int
     juce::Font titleFont (juce::FontOptions().withTypeface (pirataTypeface()).withHeight (62.0f));
     g.setFont (titleFont);
     auto txtBounds = a.toNearestInt();
-    const juce::String txt ("..::METAL NAM GEAR PLAYER::..");
+    const juce::String txt ("..:: Metal NAM Gear Players :: ^Neo Edition^ ::..");
     // Shadow.
     g.setColour (juce::Colour (0xff000000).withAlpha (0.8f));
     g.drawText (txt, txtBounds.translated (1, 2), juce::Justification::centred);
@@ -2123,10 +2123,12 @@ void NAMAudioProcessorEditor::showInfoPopup()
         juce::TextEditor credits;
         juce::TextButton quickBtn, techBtn, donateBtn;
         InfoContent() {
-            title.setText ("..::METAL NAM GEAR PLAYER::..", juce::dontSendNotification);
+            title.setText ("..:: Metal NAM Gear Players :: ^Neo Edition^ ::..", juce::dontSendNotification);
             title.setJustificationType (juce::Justification::centred);
             title.setFont (juce::Font (juce::FontOptions().withHeight (22.f).withStyle ("Bold")));
-            version.setText ("Version 1.0.0-dev", juce::dontSendNotification);
+            // La versione arriva da JucePlugin_VersionString, che JUCE ricava dal
+            // VERSION del CMake: cosi' non puo' piu' divergere dal pacchetto.
+            version.setText ("Version " JucePlugin_VersionString, juce::dontSendNotification);
             version.setJustificationType (juce::Justification::centred);
             credits.setMultiLine (true);
             credits.setReadOnly (true);
