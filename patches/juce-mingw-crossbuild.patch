@@ -1,5 +1,5 @@
 diff --git a/extras/Build/CMake/JUCEUtils.cmake b/extras/Build/CMake/JUCEUtils.cmake
-index ac995f0e0c..3660a88829 100644
+index ac995f0e0c..7c940e957f 100644
 --- a/extras/Build/CMake/JUCEUtils.cmake
 +++ b/extras/Build/CMake/JUCEUtils.cmake
 @@ -1062,10 +1062,16 @@ function(juce_enable_vst3_manifest_step shared_code_target)
@@ -21,23 +21,32 @@ index ac995f0e0c..3660a88829 100644
              -create
              -version "${target_version_string}"
              -path "${product}"
-@@ -1232,8 +1238,15 @@ function(_juce_set_plugin_target_properties shared_code_target kind)
+@@ -1232,9 +1238,22 @@ function(_juce_set_plugin_target_properties shared_code_target kind)
  
          _juce_add_lv2_manifest_helper_target()
  
-+        # Nella cross-build MinGW l'helper e' un eseguibile Windows: va lanciato
-+        # via wine, come gia' si fa per juce_vst3_helper.
-+        if(MINGW)
-+            set(_juce_lv2_helper_launcher wine)
-+        else()
-+            set(_juce_lv2_helper_launcher "")
-+        endif()
-         add_custom_command(TARGET ${target_name} POST_BUILD
+-        add_custom_command(TARGET ${target_name} POST_BUILD
 -            COMMAND juce_lv2_helper "$<TARGET_FILE:${target_name}>"
-+            COMMAND ${_juce_lv2_helper_launcher} $<TARGET_FILE:juce_lv2_helper> "$<TARGET_FILE:${target_name}>"
-             VERBATIM)
+-            VERBATIM)
++        # Nella cross-build MinGW l'helper e' un eseguibile Windows: va lanciato
++        # via wine, come gia' si fa per juce_vst3_helper. Sotto wine capita
++        # pero' che non esca dopo aver scritto i manifest e resti appeso a
++        # tempo indefinito, bloccando la build: si mette un limite di tempo e
++        # si giudica dall'esistenza di manifest.ttl, non dal codice d'uscita.
++        # I manifest vengono scritti in pochi secondi: 90 s bastano con
++        # abbondanza, e -k 5 assicura che il processo venga terminato davvero.
++        if(MINGW)
++            add_custom_command(TARGET ${target_name} POST_BUILD
++                COMMAND sh -c "timeout -k 5 90 wine '$<TARGET_FILE:juce_lv2_helper>' '$<TARGET_FILE:${target_name}>' >/dev/null 2>&1 || true; test -f '${output_path}/manifest.ttl'"
++                VERBATIM)
++        else()
++            add_custom_command(TARGET ${target_name} POST_BUILD
++                COMMAND juce_lv2_helper "$<TARGET_FILE:${target_name}>"
++                VERBATIM)
++        endif()
  
          _juce_set_copy_properties(${shared_code_target} ${target_name} "${output_path}" JUCE_LV2_COPY_DIR)
+     endif()
 diff --git a/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp b/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp
 index 9d018f7549..24b4a2cf52 100644
 --- a/modules/juce_audio_plugin_client/LV2/juce_LV2ManifestHelper.cpp
