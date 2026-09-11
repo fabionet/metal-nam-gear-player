@@ -1,4 +1,4 @@
-# Metal NAM Gear Players — Neo Edition
+# Metal NAM Gear Players — Neo Edition for GNU/LINUX - Debian e derivate compatibili
 
 [![wakatime](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player.svg)](https://wakatime.com/badge/github/fabionet/metal-nam-gear-player) [![wakatime](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826.svg)](https://wakatime.com/badge/user/018e231a-2b44-44e5-9016-e7803e9b68da/project/b9698415-e371-4069-8859-a465436d0826)
 
