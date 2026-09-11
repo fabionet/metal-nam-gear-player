@@ -644,16 +644,27 @@ NAMAudioProcessorEditor::~NAMAudioProcessorEditor()
     for (auto& k : knobs_) k->slider.setLookAndFeel (nullptr);
 }
 
+// Lo SLIM ha senso solo sui modelli che portano piu' sottomodelli: su un A1
+// non c'e' niente da scegliere. setEnabled() da solo rende il cursore inerte
+// ma JUCE continua a disegnarlo acceso, e sembrava abilitato lo stesso: va
+// attenuato anche il cursore, non la sola etichetta.
 void NAMAudioProcessorEditor::updateSlimEnabled()
 {
     const bool slim = processorRef.isCurrentModelSlimmable();
     if (slim == lastSlimmable_) return;
     lastSlimmable_ = slim;
+    const float a = slim ? 1.0f : 0.35f;
+
     slimSlider_.setEnabled (slim);
-    slimLabel_ .setAlpha   (slim ? 1.0f : 0.4f);
+    slimSlider_.setAlpha   (a);
+    slimLabel_ .setAlpha   (a);
+    slimSlider_.setTooltip (slim ? "Sceglie il sottomodello: 0 il piu' leggero, 1 il piu' completo"
+                                 : "Il modello caricato non ha sottomodelli: nulla da scegliere");
+
     if (kQuality < (int) knobs_.size() && knobs_[kQuality]) {
         knobs_[kQuality]->slider.setEnabled (slim);
-        knobs_[kQuality]->label .setAlpha  (slim ? 1.0f : 0.4f);
+        knobs_[kQuality]->slider.setAlpha  (a);
+        knobs_[kQuality]->label .setAlpha  (a);
     }
 }
 
