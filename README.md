@@ -1,8 +1,10 @@
-# METAL NAM GEAR PLAYER — Windows (MinGW cross-build)
+# Metal NAM Gear Players — Neo Edition — Windows (MinGW cross-build)
 
-A full-featured guitar amp-sim plugin (VST3 + Standalone `.exe`) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
+A full-featured guitar amp-sim plugin (VST3 + LV2 + Standalone `.exe`) built with [JUCE](https://juce.com), based on a fork of [mikeoliphant/neural-amp-modeler-lv2](https://github.com/mikeoliphant/neural-amp-modeler-lv2) and powered by the [NeuralAudio](https://github.com/mikeoliphant/NeuralAudio) engine for [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) model playback.
 
-The plugin is exposed to hosts as **"NAM Custom"**.
+Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
+
+> **Convivenza con l'edizione Full.** Identità propria su ogni fronte: codice VST3 `NgpN`, URI LV2 `urn:fabionet:metalnamgearplayers-neo`, chiave di disinstallazione `MetalNAMGearPlayersNeo`, voce del menu Avvio separata. Nessuna collisione con l'edizione **Full**, quindi le due convivono nella stessa DAW e sullo stesso sistema.
 
 > This branch (`windows-mingw`) is the **Windows x64** port of the Linux [`juce-rewrite`](../../tree/juce-rewrite) branch, cross-compiled with **MinGW-w64** from a Linux host. Sources are kept in sync with Linux; the only per-branch delta is JUCE 7.0.12 (JUCE 8 does not build under MinGW) plus a tiny `JuceFontCompat.h` shim.
 
@@ -18,15 +20,19 @@ The plugin is exposed to hosts as **"NAM Custom"**.
 
 ## Features
 
-- **NAM model playback** — supports both V1 (WaveNet/LSTM) and A2 (SlimmableContainer) models, with a **Slim** slider for real-time quality scaling on A2 models
-- **IR loader** with quality tools: high-pass / low-pass filters, trim, phase invert
+- **NAM model playback** — V1 (WaveNet/LSTM) and A2 (SlimmableContainer), with a **Slim** slider that is enabled only on models actually carrying sub-models; on a V1 it greys out, because there is nothing to choose
+- **Two IR loaders** — each with its own volume and meter, crossfaded by an **IR BAL** knob; the second switches on by itself in Dual-Mono and Stereo
+- **Automatic cab bypass** — a model that already contains the cabinet (`gear_type` `amp_cab` / `full-rig`) puts the first IR loader into true bypass and greys it out, so two cabinets never stack
+- **IR quality tools**: high-pass / low-pass filters, trim, phase invert
 - **Full FX chain**:
   - Pre-model: Smart Gate, Overdrive, Distortion
   - Post-model: 5-band EQ + Depth + Resonance, Noise Gate, High-Pass, Loudness Normalization
   - Post-cab: Delay, Chorus, Flanger, Reverb, Tremolo
 - **Gain-staging / calibration** (ported from the reference [NeuralAmpModelerPlugin](https://github.com/sdatkinson/NeuralAmpModelerPlugin)): Output Mode (Raw / Normalized / Calibrated) and Calibrate Input with dBu level — with automatic fallback when a model lacks calibration metadata
-- **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal), user presets, direct link to [Tone3000](https://www.tone3000.com/) for more models
+- **Preset system** — factory presets by genre plus a neutral **Default**, user presets, import of `.prs` / `.prstl`, export and full library backup with the `.nam` and IR files embedded
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
+- **EQ spectrum analyser** with the response curve drawn on top and draggable band handles
+- **LCD display** — preset name and bank on a lit dot-matrix panel, four banks A/B/C/D, blinking TAP tempo and a cowbell metronome with its own volume
 - CPU meter, level meters, Info popup with credits
 - **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click VST3 insertion (`nam_insert.lua`) and `.nam` + IR autoload with clipboard fallback (`nam_autoload_vst3.lua`)
 
@@ -75,18 +81,19 @@ cmake --build build-win -j 1
 Artefacts:
 
 - Standalone: `build-win/juce/NAMCustom_artefacts/Release/Standalone/NAM Custom.exe`
-- VST3: `build-win/juce/NAMCustom_artefacts/Release/VST3/NAM Custom.vst3/Contents/x86_64-win/NAM Custom.vst3`
-- LV2: `build-win/juce/NAMCustom_artefacts/Release/LV2/NAM Custom.lv2/`
+- Standalone: `build-win/juce/NAMCustom_artefacts/Release/Standalone/Metal NAM Gear Players Neo.exe`
+- VST3: `build-win/juce/NAMCustom_artefacts/Release/VST3/Metal NAM Gear Players Neo.vst3/`
+- LV2: `build-win/juce/NAMCustom_artefacts/Release/LV2/Metal NAM Gear Players Neo.lv2/`
 
 ### Packaging (portable zip + NSIS installer)
 
 Requires `zip` and `nsis` (`apt install zip nsis`). A sibling checkout of the Linux repo is needed for the bundled Italian PDF guides:
 
 ```bash
-DOCS_SRC=../neural-amp-modeler-lv2/docs packaging/windows/build-package.sh 0.1.1
+DOCS_SRC=../neural-amp-modeler-lv2/docs packaging/windows/build-package.sh 0.2.0
 ```
 
-Produces `dist/MetalNAMGearPlayer-windows-x64-portable.zip` and `dist/MetalNAMGearPlayer-windows-x64-setup.exe`.
+Produces `dist/MetalNAMGearPlayersNeo-windows-x64-portable.zip` and `dist/MetalNAMGearPlayersNeo-windows-x64-setup.exe`. The installer offers three components: standalone, VST3 (system-wide, `Common Files\VST3`) and LV2 (per-user, `%APPDATA%\LV2` — on Windows there is no conventional system-wide LV2 folder).
 
 ### Submodule note
 
@@ -98,7 +105,9 @@ Not tested. In principle possible with MSYS2's `mingw-w64-x86_64-*` toolchain (e
 
 ### Testing under wine
 
-Wine 9 misses the WinRT `Windows.UI.ViewManagement.UIViewSettings` API that JUCE 7 polls in a loop; scale factor and hit-testing get corrupted → buttons appear dead. **Wine ≥ 10 or a native Windows tester is required for actual functional testing** — this project uses wine only for cross-build glue (VST3 manifest helper), not as a runtime target.
+Wine 9 misses the WinRT `Windows.UI.ViewManagement.UIViewSettings` API that JUCE 7 polls in a loop; scale factor and hit-testing get corrupted → buttons appear dead. **Wine ≥ 10 or a native Windows tester is required for actual functional testing** — this project uses wine only for cross-build glue, not as a runtime target.
+
+Two helpers run under wine during the build: `juce_vst3_helper` and, since v0.2.0, `juce_lv2_helper`. The LV2 one writes its three `.ttl` manifests in a few seconds and then **never exits** under wine, so the build step is capped at 90 seconds with a forced kill and judged by the presence of `manifest.ttl` rather than by the helper's exit code. Without that cap the build hangs indefinitely.
 
 ## Why JUCE 7.0.12 (not JUCE 8)
 
