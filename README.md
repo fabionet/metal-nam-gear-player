@@ -20,7 +20,9 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ## Screenshots
 
-**MAIN tab** — Noise Gate, Overdrive/Distortion, Amp (NAM model), 5-band EQ, Power (Depth/Resonance), Cab (IR mix), IR Tools (HP/LP/Trim), Master (Loudness Normalization):
+**MAIN tab** — Noise Gate, Comp, Overdrive/Distortion, Splitter, Amp, 5-band EQ **con analizzatore di spettro e bande trascinabili**, Power, Cab, IR Tools **con IR BAL**, Master. In alto il **display LCD** con banchi, TAP e metronomo; in basso i **due caricatori IR** con volumi e meter separati.
+
+> Nello scatto il modello caricato è un ENGL `amp_cab`, che contiene già la cassa: per questo la sezione **CAB** e il **primo caricatore IR** sono spenti e attenuati: è l'esclusione automatica, non un difetto. Il secondo caricatore resta attivo con la sua IR.
 
 ![MAIN tab](docs/screenshots/main_tab.png)
 
@@ -28,15 +30,15 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ![FX tab](docs/screenshots/fx_tab.png)
 
-**AMP SIM (GEAR SX) tab** - Amplificator Simulation Voicing section (GEAR SX) -----
+**AMP SIM (GEAR SX) tab** — sezione di voicing dell'amplificatore GEAR SX, tre canali:
 
 ![AMP SIM (GEAR SX) tab](docs/screenshots/ampsim_tab.png)
 
-**AMP SIM (MARCHELLOW) tab** - Amplificator Simulation Voicing section (MARCHELLOW JCM 800 2203 1981) model EU/US tone -----
+**AMP SIM (MARCHELLOW) tab** — MARCHELLOW (JCM 800 2203, 1981) con selettore valvole EU/US e FX loop:
 
 ![AMP SIM (MARCHELLOW) tab](docs/screenshots/ampsim2_tab.png)
 
-**CATENA tab** - Signal direction section -----
+**CATENA tab** — mappa del percorso del segnale; il nodo **CAB 2** compare quando il secondo IR è attivo:
 
 ![CATENA tab](docs/screenshots/catena_tab.png)
 
