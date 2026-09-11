@@ -94,3 +94,19 @@ target_include_directories(NAMCustom PRIVATE
     ${CMAKE_SOURCE_DIR}/deps/NeuralAudio
     ${CMAKE_SOURCE_DIR}/deps/denormal
 )
+
+# Le architetture del core NAM (WaveNet, LSTM, Linear, ConvNet,
+# SlimmableContainer) si registrano nel ConfigParserRegistry tramite oggetti
+# statici definiti nei rispettivi .cpp. NeuralAudio e' una OBJECT library: i
+# suoi oggetti confluiscono nell'archivio SharedCode di JUCE e, quando i target
+# finali linkano quell'archivio, il linker scarta i membri di cui nessuno
+# referenzia un simbolo. I registratori non girano mai e il caricamento muore
+# con "No config parser registered for architecture: WaveNet".
+# Aggiungere gli oggetti direttamente ai target finali li rende non scartabili;
+# i membri dell'archivio restano inutilizzati perche' i simboli sono gia'
+# definiti, quindi non si creano duplicati.
+foreach(_fmt ${NAMCUSTOM_FORMATS})
+    if(TARGET NAMCustom_${_fmt})
+        target_sources(NAMCustom_${_fmt} PRIVATE $<TARGET_OBJECTS:NeuralAudio>)
+    endif()
+endforeach()
