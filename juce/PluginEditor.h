@@ -168,6 +168,10 @@ private:
     // modello o un IR non si carica.
     juce::Label loadStatusLabel_;
     void updateLoadStatus();
+    // Esclude il primo IR quando il modello contiene gia' la cassa.
+    void updateCabAutoBypass();
+    bool lastModelHadCab_ = false;
+    bool irBypassBeforeAuto_ = false;
     juce::Label namToneTitle_ { {}, "NAM TONE" };
 
     juce::TextButton irPrevBtn      { "<" };

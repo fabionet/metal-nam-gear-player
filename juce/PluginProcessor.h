@@ -54,6 +54,13 @@ public:
     // True iff the currently active pipeline holds a NAM model that exposes
     // A2 quality scaling (aka "slimmable"). Editor polls this to enable/disable
     // the Quality knob and the new Slim slider under the loader.
+    // Il modello caricato contiene gia' la cassa? L'editor lo usa per
+    // escludere automaticamente il primo IR.
+    bool currentModelHasCab() const noexcept
+    {
+        return pipelineL_ && pipelineL_->modelHasCab();
+    }
+
     bool isCurrentModelSlimmable() const noexcept
     {
         return pipelineL_ && pipelineL_->isSlimmable();

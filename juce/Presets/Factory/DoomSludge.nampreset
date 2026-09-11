@@ -2,6 +2,7 @@
 <NAMPreset name="DoomSludge" version="1" lockModel="1" category="Extreme Metal">
   <ModelPath></ModelPath>
   <IRPath></IRPath>
+  <IR2Path></IR2Path>
   <Parameters>
     <PARAMS>
       <PARAM id="input_level" value="1"/>
