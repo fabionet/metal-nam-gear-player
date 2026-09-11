@@ -246,6 +246,43 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
     return true;
 }
 
+// .prs e .prstl condividono il formato XML dei preset nativi: il primo
+// contiene un solo <NAMPreset>, il secondo un contenitore con piu' di uno.
+// Si accetta anche .nampreset, che e' lo stesso contenuto con altro nome.
+// I nomi gia' presenti vengono resi univoci con un suffisso numerico, cosi'
+// un'importazione non sovrascrive mai il lavoro dell'utente.
+int PresetManager::importFrom (const juce::File& f)
+{
+    if (! f.existsAsFile()) return 0;
+    auto xml = juce::parseXML (f);
+    if (! xml) return 0;
+
+    std::vector<const juce::XmlElement*> items;
+    if (xml->hasTagName (kRoot))
+        items.push_back (xml.get());
+    else
+        for (auto* c : xml->getChildIterator())
+            if (c->hasTagName (kRoot)) items.push_back (c);
+
+    int written = 0;
+    for (auto* el : items)
+    {
+        auto name = el->getStringAttribute (kAttrName, "Imported").trim();
+        if (name.isEmpty()) name = "Imported";
+        if (isReservedName (name)) name += " (importato)";
+
+        auto safe = juce::File::createLegalFileName (name);
+        auto dest = userPresetDir().getChildFile (safe + kExt);
+        for (int i = 2; dest.existsAsFile() && i < 1000; ++i)
+            dest = userPresetDir().getChildFile (safe + " (" + juce::String (i) + ")" + kExt);
+
+        if (dest.replaceWithText (el->toString())) ++written;
+    }
+
+    if (written > 0) refresh();
+    return written;
+}
+
 bool PresetManager::save()
 {
     if (currentIndex_ < 0) return false;
@@ -260,6 +297,10 @@ bool PresetManager::save()
 bool PresetManager::saveAs (const juce::String& name)
 {
     if (name.trim().isEmpty()) return false;
+    // "Default" e' il preset neutro di fabbrica: modificando i parametri si e'
+    // obbligati a salvare sotto un altro nome, cosi' il punto di partenza
+    // resta intatto.
+    if (isReservedName (name)) return false;
     auto safe = juce::File::createLegalFileName (name.trim());
     auto file = userPresetDir().getChildFile (safe + kExt);
     if (! file.replaceWithText (serialize (safe))) return false;

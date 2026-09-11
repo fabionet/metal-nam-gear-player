@@ -44,8 +44,28 @@ PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
     deleteBtn_.onClick = [this] { mgr_.deleteCurrent(); };
     prevBtn_  .onClick = [this] { mgr_.prev();   };
     nextBtn_  .onClick = [this] { mgr_.next();   };
-    getMoreBtn_.onClick = [] {
-        juce::URL ("https://www.tone3000.com/tones?architecture=V1").launchInDefaultBrowser();
+    // Prima apriva soltanto un sito nel browser, cosa che in molti ambienti non
+    // produce alcun effetto visibile. Ora importa davvero: .prs per un preset
+    // singolo, .prstl per un elenco che ne contiene piu' di uno.
+    getMoreBtn_.onClick = [this] {
+        chooser_ = std::make_unique<juce::FileChooser> (
+            "Importa preset (.prs, .prstl)",
+            PresetManager::userPresetDir(),
+            "*.prs;*.prstl;*.nampreset");
+        chooser_->launchAsync (juce::FileBrowserComponent::openMode
+                                 | juce::FileBrowserComponent::canSelectFiles
+                                 | juce::FileBrowserComponent::canSelectMultipleItems,
+            [this] (const juce::FileChooser& fc) {
+                int total = 0;
+                for (auto& f : fc.getResults()) total += mgr_.importFrom (f);
+                refreshFromManager();
+                juce::NativeMessageBox::showMessageBoxAsync (
+                    juce::MessageBoxIconType::InfoIcon,
+                    "Importazione preset",
+                    total > 0 ? (juce::String (total) + (total == 1 ? " preset importato."
+                                                                   : " preset importati."))
+                              : "Nessun preset importato: il file non contiene preset leggibili.");
+            });
     };
 
     mgr_.onChanged = [this] { refreshFromManager(); };

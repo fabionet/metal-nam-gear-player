@@ -37,6 +37,17 @@ public:
     // Operations
     bool save();                                   // save over current user preset
     bool saveAs (const juce::String& name);        // create new user preset
+
+    // Nome riservato al preset neutro di fabbrica: non si puo' sovrascrivere
+    // ne' duplicare, cosi' resta sempre un punto di partenza pulito.
+    static const char* reservedDefaultName() { return "Default"; }
+    static bool isReservedName (const juce::String& n)
+        { return n.trim().equalsIgnoreCase (reservedDefaultName()); }
+
+    // Importa preset da file esterni: .prs = preset singolo,
+    // .prstl = elenco che ne contiene piu' di uno. Restituisce quanti ne
+    // sono stati scritti nella cartella utente.
+    int importFrom (const juce::File& f);
     bool deleteCurrent();                          // delete current user preset
     bool load   (int index);                       // load by index in presets_
     void next();
