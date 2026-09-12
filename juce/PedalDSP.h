@@ -121,7 +121,7 @@ public:
         toneHP_.reset(); colorLo_.reset(); colorHi_.reset(); boostHP_.reset();
         low_.reset(); mid_.reset(); high_.reset();
         for (auto& b : band_) b.reset();
-        dc_ = 0.f; env_ = 0.f; gain_ = 1.f;
+        dc_ = 0.f; env_ = 0.f; gain_ = 1.f; cEnv_ = 0.f; cGain_ = 1.f; grDb_ = 0.f;
     }
 
     void setBypass (bool b) { bypass_ = b; }
@@ -141,11 +141,16 @@ public:
         updateEq();
         if (at (model_).topo == Topology::Boost)
             boostHP_.setCutoff (k_[1], sr_, true);
+        updateComp();
     }
+
+    // Riduzione di guadagno in corso, in dB negativi. Zero quando il pedale
+    // scelto non e' un compressore o e' in bypass.
+    float gainReductionDB() const { return grDb_; }
 
     float process (float x)
     {
-        if (bypass_) return x;
+        if (bypass_) { grDb_ = 0.f; return x; }
         const Model& m = at (model_);
 
         switch (m.topo)
@@ -177,9 +182,17 @@ public:
             case Topology::GateHard:
                 return gate (x, m);
 
+            case Topology::EqNative:
+                return x;       // ci pensa la torre di tono nativa
+
             case Topology::EqGraphic7:
             case Topology::EqParametric:
                 return equaliser (x, m);
+
+            case Topology::CompSustain:
+            case Topology::CompSimple:
+            case Topology::CompLimiter:
+                return compressor (x, m);
         }
         return x;
     }
@@ -314,6 +327,76 @@ private:
         return x * gain_;
     }
 
+    // Gli esponenziali stanno qui e non nel ciclo dei campioni.
+    void updateComp()
+    {
+        const Model& m = at (model_);
+        if (m.cat != Category::Compressor) { grDb_ = 0.f; return; }
+        const bool limiter = (m.topo == Topology::CompLimiter);
+        const float atkMs  = limiter ? 5.f  : std::max (0.1f, k_[1]);
+        const float relMs  = limiter ? std::max (1.f, k_[2]) : 200.f;
+        cAtk_  = std::exp (-1.0f / (float) (sr_ * atkMs * 0.001));
+        cRel_  = std::exp (-1.0f / (float) (sr_ * relMs * 0.001));
+        cDetA_ = std::exp (-1.0f / (float) (sr_ * 0.001));      // 1 ms
+        cDetR_ = std::exp (-1.0f / (float) (sr_ * 0.120));      // 120 ms
+    }
+
+    // --- compressori ------------------------------------------------------
+    // Inseguitore di picco con attacco regolabile e rilascio fisso per i due
+    // sustainer, esplicito per il limitatore. Il rapporto dei sustainer cresce
+    // col sustain: e' quello che allunga la coda invece di limitare soltanto.
+    // Rilevatore di picco veloce (attacco 1 ms) separato dal livellatore del
+    // guadagno, che invece segue l'attacco impostato: e' quello che lascia
+    // passare il transiente della pennata prima di stringere. Ginocchio morbido
+    // di 6 dB, come nei sustainer a OTA.
+    float compressor (float x, const Model& m)
+    {
+        const bool limiter = (m.topo == Topology::CompLimiter);
+
+        float thDB, ratio, outDB;
+        if (limiter) {
+            thDB = k_[0]; ratio = std::max (1.01f, k_[1]); outDB = k_[3];
+        } else {
+            const float sustain = std::min (std::max (k_[0], 0.f), 1.f);
+            thDB  = -6.f - sustain * 30.f;          // piu' sustain, soglia piu' bassa
+            ratio =  2.f + sustain * 6.f;
+            outDB = (m.topo == Topology::CompSustain) ? k_[3] : k_[2];
+        }
+
+        const float a = std::fabs (x);
+        const float d = (a > cEnv_) ? cDetA_ : cDetR_;
+        cEnv_ = d * cEnv_ + (1.f - d) * a;
+
+        const float envDB = 20.f * std::log10 (std::max (cEnv_, 1.0e-6f));
+
+        const float knee = 6.f;
+        const float over = envDB - thDB;
+        float targetGrDB = 0.f;
+        if (over >= knee * 0.5f) {
+            targetGrDB = (thDB + over / ratio) - envDB;
+        } else if (over > -knee * 0.5f) {
+            const float t = (over + knee * 0.5f) / knee;   // 0..1 dentro il ginocchio
+            targetGrDB = ((thDB + over / ratio) - envDB) * t * t;
+        }
+
+        const float targetGain = std::pow (10.f, targetGrDB / 20.f);
+        const float c = (targetGain < cGain_) ? cAtk_ : cRel_;
+        cGain_ = c * cGain_ + (1.f - c) * targetGain;
+        grDb_  = 20.f * std::log10 (std::max (cGain_, 1.0e-6f));   // <= 0
+
+        float v = x * cGain_;
+
+        // Il tono del sustainer e' una bilancia: quanto alza gli acuti tanto
+        // toglie ai bassi, cosi' il livello percepito non cambia.
+        if (m.topo == Topology::CompSustain) {
+            const float hi = toneHP_.process (v);
+            const float lo = v - hi;
+            const float g  = std::pow (10.f, k_[2] / 40.f);
+            v = lo / g + hi * g;
+        }
+        return v * std::pow (10.f, outDB / 20.f);
+    }
+
     // --- equalizzatori ----------------------------------------------------
     float equaliser (float x, const Model& m)
     {
@@ -376,6 +459,10 @@ private:
     Peak    band_[7];               // bande dell'equalizzatore grafico
     float   dc_   = 0.f;
     float   env_  = 0.f;            // inviluppo del gate
+    float   cEnv_ = 0.f;            // inviluppo del compressore
+    float   cGain_ = 1.f;           // guadagno del compressore, livellato
+    float   grDb_  = 0.f;           // riduzione in corso, per il misuratore
+    float   cAtk_ = 0.f, cRel_ = 0.f, cDetA_ = 0.f, cDetR_ = 0.f;
     float   gain_ = 1.f;            // guadagno del gate, con rampa
 };
 

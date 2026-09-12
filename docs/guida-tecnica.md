@@ -97,13 +97,32 @@ Dettagli che contano:
 
 Quando `modelHasCab()` è vero, l'editor forza `ir_bypass` a 1 e disabilita i comandi del primo loader. Tornando a un modello senza cassa il bypass viene riportato **com'era prima** dell'esclusione automatica, non forzato a zero.
 
+## Pedali selezionabili
+
+Sei sezioni — NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ — non hanno effetti fissi: sono **posti** nella catena, e cosa ci suona lo decide la tendina della sezione. Tre file soli:
+
+- **`PedalRegistry.h`** — l'elenco, uno e condiviso. Ogni `Model` dichiara id, nome, categoria, **topologia**, una descrizione e la sua tabella di pomelli (`label`, `min`, `max`, `def`, suffisso) e interruttori. Le due costanti `kMaxKnobs = 8` e `kMaxSwitch = 2` dimensionano la riserva: otto perché il grafico a sette bande più il livello è il modello con più controlli.
+- **`PedalDSP.h`** — gli algoritmi, senza dipendenze da JUCE, un'istanza per canale. `process()` smista sulla topologia, non sull'id: un primo tentativo distingueva i modelli dal quarto carattere dell'id e `od_screamer` e `od_super` finivano nello stesso ramo.
+- Nell'editor, `pedalSlotFor()` mappa il nome della sezione sullo slot e `refreshPedalSection()` rietichetta la riserva quando cambia il modello.
+
+**Perché una riserva di parametri.** I parametri di un `AudioProcessorValueTreeState` si creano nel costruttore e non si possono aggiungere a runtime, mentre il pedale si sceglie mentre il plugin suona. Ogni sezione ha quindi `<prefisso>_p1..p8` normalizzati 0..1 e `<prefisso>_sw1..sw2`, e il modello scelto dice come leggerli: il processore riporta ogni pomello nell'intervallo reale dichiarato (`k.min + norm * (k.max - k.min)`) prima di passarlo al DSP, e l'interfaccia fa la strada inversa in `textFromValueFunction`, altrimenti sui pomelli comparirebbe `0.313` invece di `120 ms`.
+
+Costo: dieci parametri per sezione, occupati o no. I preset di fabbrica sono passati da 120 a 186 parametri.
+
+**Topologie.** Seguono gli schemi pubblici dei circuiti: clipping morbido **nell'anello** di reazione (famiglia overdrive, guadagno `(Rf/Rg)+1`), clipping duro **verso massa** dopo lo stadio di guadagno (famiglia distorsore), condensatore in serie a Rg da cui il passa-alto interno all'anello intorno ai 720 Hz. Sui distorsori è la **soglia** a decidere il timbro, non il guadagno: passato il ginocchio la forma d'onda è già piatta, e alzare solo il guadagno non cambia niente di udibile.
+
+**Compressori.** Rilevatore di picco veloce (attacco 1 ms, rilascio 120 ms) separato dal livellatore del guadagno, che invece segue l'attacco impostato: è quello che lascia passare il transiente della pennata prima di stringere. Ginocchio morbido di 6 dB. Nei due sustainer il sustain muove insieme soglia (`-6 … -36 dB`) e rapporto (`2 … 8 : 1`); il limitatore espone soglia, rapporto e rilascio direttamente. `PedalFX::gainReductionDB()` alimenta il misuratore della sezione, e vale 0 quando il modello scelto non è un compressore.
+
+**L'equalizzatore.** Il primo modello della categoria, `eq_tonestack`, è un passante: la torre di tono nativa è già nella catena e continua a fare il suo lavoro. Scegliendo un altro modello il processore **azzera** le bande native, altrimenti le due curve si sommerebbero.
+
 ## Analizzatore EQ
 
 `EQAnalyserComponent` disegna spettro e curva sovrapposti.
 
 - **Spettro**: FFT a 2048 punti, finestra di Hann, 24 fotogrammi al secondo. Il segnale viene prelevato da una coda circolare riempita in `NAMPipeline::process` **subito dopo** lo stadio EQ, quindi si vede l'effetto della curva. Picco per bin con salita immediata e discesa lenta. Finestra utile −100…−20 dBFS: il livello del singolo bin è molto più basso di quello complessivo, e con 0 in cima lo spettro resta schiacciato sul fondo.
-- **Curva**: `FiveBandEQ::responseDB` costruisce biquad temporanei con **gli stessi setter della catena audio** e ne valuta la risposta. La funzione è statica e riceve i valori dei parametri: nessuno stato condiviso col thread audio, e la curva disegnata non può divergere da quella che si sente.
-- **Maniglie**: guadagno in verticale per tutte e cinque; frequenza in orizzontale e Q sulla rotellina solo per la banda MID, che è l'unica parametrica. I gesti sono racchiusi fra `beginChangeGesture` e `endChangeGesture`, così l'automazione dell'host registra un tratto unico.
+- **Curva**: dipende dal modello scelto nella sezione EQ. Per la torre di tono nativa è `FiveBandEQ::responseDB`, che costruisce biquad temporanei con **gli stessi setter della catena audio** e ne valuta la risposta; per i modelli a bande è la somma dei moduli delle campane RBJ, calcolati con gli stessi centri e Q che usa `PedalDSP`. In entrambi i casi la funzione è statica o pura e riceve i valori dei parametri: nessuno stato condiviso col thread audio, e la curva disegnata non può divergere da quella che si sente.
+- **Maniglie**: la tabella delle bande non è fissa, la ricostruisce `rebuildBands()` quando cambia `eq_model`. Cinque bande per la torre nativa (frequenza in orizzontale e Q sulla rotellina solo per la MID, l'unica parametrica), sette a frequenza fissa per il grafico, due spazzolabili per il parametrico. Quando la banda è comandata da un pomello della riserva, la maniglia converte fra dB e valore normalizzato in `bandParam`/`setBandParam`, così trascinare la maniglia muove il cursore della sezione e viceversa. I gesti sono racchiusi fra `beginChangeGesture` e `endChangeGesture`, così l'automazione dell'host registra un tratto unico.
+- **L'analizzatore non sparisce mai**: è legato alla sezione EQ, non al modello. Con un pedale che non è un equalizzatore resta lo spettro e la curva è piatta.
 
 > Con guadagno MID a 0 dB la risposta è esattamente 0.00 dB a ogni frequenza per qualunque Q: un filtro a campana senza guadagno è un passa-tutto. Non è un difetto del disegno.
 

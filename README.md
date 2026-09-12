@@ -20,7 +20,7 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ## Screenshots
 
-**MAIN tab** — Noise Gate, Comp, Overdrive/Distortion, Splitter, Amp, 5-band EQ **con analizzatore di spettro e bande trascinabili**, Power, Cab, IR Tools **con IR BAL**, Master. In alto il **display LCD** con banchi, TAP e metronomo; in basso i **due caricatori IR** con volumi e meter separati.
+**MAIN tab** — Noise Gate, Comp, Overdrive/Distortion, Splitter, Amp, EQ **con analizzatore di spettro e bande trascinabili**, Power, Cab, IR Tools **con IR BAL**, Master. Sei sezioni hanno sotto al titolo la **tendina dei pedali**, con un elenco unico diviso per categoria. In alto il **display LCD** con banchi, TAP e metronomo; in basso i **due caricatori IR** con volumi e meter separati.
 
 > Nello scatto il modello caricato è un ENGL `amp_cab`, che contiene già la cassa: per questo la sezione **CAB** e il **primo caricatore IR** sono spenti e attenuati: è l'esclusione automatica, non un difetto. Il secondo caricatore resta attivo con la sua IR.
 
@@ -48,14 +48,15 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 - **Two IR loaders** — each with its own volume and level meter, crossfaded by an **IR BAL** knob in the IR Tools section. The second one switches on automatically in Dual-Mono and Stereo, and can be enabled by hand in Mono.
 - **Automatic cab bypass** — when the loaded model already contains the cabinet (`gear_type` `amp_cab` or `full-rig`), the first IR loader goes into true bypass and greys out, so you never stack two cabinets. The second stays available.
 - **IR quality tools**: high-pass / low-pass filters, trim, phase invert
+- **Selectable pedals** — six sections (NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ) are *slots* rather than fixed effects: a dropdown under each section title picks the pedal that runs there, from one shared list grouped by category (Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor). The section repopulates with exactly the knobs and switches that pedal has, with its own names, units and factory values, and the panel resizes to fit. The topologies follow published circuit schematics — soft clipping inside the feedback loop for the overdrive family, hard clipping to ground for the distortion family, peak detector split from the gain smoother for the compressors.
 - **Full FX chain**:
-  - Pre-model: Smart Gate, Overdrive, Distortion
-  - Post-model: 5-band EQ + Depth + Resonance, Noise Gate, High-Pass, Loudness Normalization
+  - Pre-model: Noise Gate, Gate, Compressor, Overdrive, Distortion — each one a pedal slot
+  - Post-model: EQ (amp tone stack or a pedal EQ) + Depth + Resonance, High-Pass, Loudness Normalization
   - Post-cab: Delay, Chorus, Flanger, Reverb, Tremolo
 - **Gain-staging / calibration** (ported from the reference [NeuralAmpModelerPlugin](https://github.com/sdatkinson/NeuralAmpModelerPlugin)): Output Mode (Raw / Normalized / Calibrated) and Calibrate Input with dBu level — with automatic fallback when a model lacks calibration metadata
 - **Preset system** — factory presets by genre (Clean / Rock / Metal / Extreme Metal) plus a neutral **Default**, user presets, **import** of `.prs` (single) and `.prstl` (list), **export** of the current preset and a **full library backup** that embeds the `.nam` and IR files it references. Only our own formats are accepted; anything else is rejected without being opened.
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
-- **EQ spectrum analyser** — real-time FFT with the EQ response curve drawn on top and one draggable handle per band; the MID band also takes frequency on the horizontal axis and Q on the mouse wheel. The curve is computed with the same filter coefficients as the audio path, so it cannot drift from what you hear.
+- **EQ spectrum analyser** — real-time FFT with the EQ response curve drawn on top and one draggable handle per band. The handles follow the EQ model chosen in the section: five for the amp tone stack (the MID band also takes frequency on the horizontal axis and Q on the mouse wheel), seven fixed frequencies for the graphic EQ — dragging one moves the matching band fader and vice versa — two sweepable ones for the parametric. **The analyser is never removed**, whatever the section is set to. The curve is computed with the same filter coefficients as the audio path, so it cannot drift from what you hear.
 - **LCD display** — preset name and bank on a lit dot-matrix panel that scrolls when the text does not fit, four banks A/B/C/D for variants of the same preset, blinking **TAP** tempo, and a cowbell **metronome** with its own volume and time signatures (4/4, 3/4, 2/4, 6/8, 5/4, 7/8)
 - CPU meter, level meters, Info popup with credits
 - **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click LV2/VST3 track insertion and `.nam` / IR autoload (see [Reaper quick-start helpers](#reaper-quick-start-helpers) below)

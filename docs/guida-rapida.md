@@ -55,11 +55,25 @@ Il secondo si accende da solo passando a **Dual-Mono** o **Stereo**, dove serve 
 
 **Esclusione automatica.** Se carichi un modello che contiene già la cassa — i metadati dicono `gear_type` `amp_cab` oppure `full-rig` — il **primo** loader va in bypass vero e si spegne graficamente, così non senti due casse in fila. Il secondo resta disponibile per stereo e dual-mono.
 
-## 4-ter. Analizzatore dell'equalizzatore
+## 4-ter. Il menu dei pedali
 
-Nella sezione **EQ**, fra i pomelli e il tasto di attivazione, c'è un analizzatore di spettro con sopra la curva dell'equalizzatore. Il segnale è prelevato **dopo** l'EQ, quindi vedi l'effetto della curva.
+Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DISTORTION** ed **EQ** c'è una tendina con l'elenco dei pedali emulabili. L'elenco è **lo stesso in tutte**, raggruppato per categoria: Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor.
 
-Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e compare la lettura del valore. La banda **MID** ha anche la frequenza sull'asse orizzontale e il **Q sulla rotellina** del mouse.
+Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.
+
+Niente vieta di mettere un distorsore nella sezione EQ o un equalizzatore in quella dell'overdrive: l'elenco è unico e ogni sezione è un posto nella catena, non un vincolo sul tipo di pedale.
+
+Le sezioni che gestiscono **IR**, **AMP** e **MASTER** non hanno la tendina: non sono posti da pedale.
+
+## 4-quater. Analizzatore dell'equalizzatore
+
+Nella sezione **EQ**, fra i comandi e il tasto di attivazione, c'è un analizzatore di spettro con sopra la curva dell'equalizzatore. Il segnale è prelevato **dopo** l'EQ, quindi vedi l'effetto della curva. **L'analizzatore resta al suo posto qualunque pedale scegli nella tendina**, e resta modificabile.
+
+Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e compare la lettura del valore. Quali maniglie vedi dipende dall'equalizzatore scelto:
+
+- **AMP Tone Stack** — la torre di tono dell'amplificatore, quella di sempre: cinque maniglie, e la sola **MID** ha anche la frequenza sull'asse orizzontale e il **Q sulla rotellina** del mouse.
+- **GE-SEVEN Graphic** — sette maniglie a frequenza fissa (100, 200, 400, 800 Hz, 1.6, 3.2, 6.4 kHz). Trascinandone una si muove anche il cursore corrispondente della sezione, e viceversa: sono lo stesso comando visto da due parti.
+- **EQ-TWENTY Parametric** — due maniglie spazzolabili in frequenza.
 
 > Con il guadagno MID a zero il Q non cambia nulla, né nel disegno né nel suono: un filtro a campana senza guadagno è un passa-tutto. Alza il MID di qualche dB e vedrai la campana stringersi.
 
@@ -68,14 +82,16 @@ Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e 
 Ordine di segnale:
 
 ```
-IN → Smart Gate → Compressore → OverDrive → Distortion
+IN → NGATE → GATE → Compressore → OverDrive → Distortion
    → NAM Model (con volume e tone stack propri)
    → Amp Sim (GEAR SX oppure MARCHELLOW, opzionale)
-   → 5-band EQ + Depth + Resonance → Noise Gate → HP → Loudness Normalization
+   → EQ (torre di tono nativa oppure pedale) + Depth + Resonance → HP → Loudness Normalization
    → IR 1 <-> IR 2  (bilanciamento, poi HP/LP + trim + phase invert)
    → Delay → Chorus → Flanger → Reverb → Tremolo
    → Widener → Metronomo → OUT
 ```
+
+Sei di questi stadi — NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ — sono **posti** occupati dal pedale scelto nella tendina della sezione, non effetti fissi. Il compressore si può spostare nella catena con il selettore sotto alla sua tendina (Front, Post-Gate, Post-IR).
 
 I toggle di bypass sono nel footer (checked = **attivo**, unchecked = bypass).
 

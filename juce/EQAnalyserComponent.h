@@ -30,21 +30,35 @@ public:
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
 private:
-    // Le cinque bande nell'ordine della catena. Solo MID ha frequenza e Q
-    // regolabili; le altre stanno a frequenza fissa e si muovono in verticale.
-    enum Band { BandBass, BandMid, BandPres, BandTreble, BandAir, kNumBands };
-
+    // Le bande non sono piu' fisse: dipendono dall'equalizzatore scelto nel
+    // menu della sezione. La torre di tono nativa ne espone cinque, con la sola
+    // MID spazzolabile; il grafico ne espone sette a frequenza fissa; il
+    // parametrico due, entrambe spazzolabili.
     struct BandInfo
     {
-        const char*  gainParam;
-        const char*  freqParam;   // nullptr = frequenza fissa
-        const char*  qParam;      // nullptr = Q fisso
-        double       fixedFreq;
-        const char*  label;
+        juce::String gainParam;
+        juce::String freqParam;   // vuoto = frequenza fissa
+        juce::String qParam;      // vuoto = Q fisso
+        double       fixedFreq = 1000.0;
+        double       fixedQ    = 1.4;
+        juce::String label;
         juce::Colour colour;
+        // I pomelli della riserva sono normalizzati 0..1 sull'intervallo reale
+        // dichiarato dal modello: la maniglia deve leggere e scrivere in dB.
+        bool         normalised = false;
     };
 
-    static const std::array<BandInfo, kNumBands>& bands();
+    void rebuildBands();
+    int  numBands() const { return (int) bands_.size(); }
+
+    // Guadagno della banda in dB, qualunque sia la forma del parametro.
+    float bandGainDB (int b) const;
+    void  setBandGainDB (int b, float dB);
+    float bandParam (const BandInfo&, const juce::String& id) const;
+    void  setBandParam (const BandInfo&, const juce::String& id, float real);
+
+    // Risposta in dB della curva scelta, a una data frequenza.
+    double curveDB (double hz, double sr) const;
 
     void timerCallback() override;
 
@@ -57,6 +71,7 @@ private:
     double yToDb   (double y)   const;
 
     double bandFreq (int b) const;
+    double bandQ    (int b) const;
     int    hitTestHandle (juce::Point<float> p) const;
 
     NAMAudioProcessor&                   proc_;
@@ -74,6 +89,9 @@ private:
 
     // Curva EQ precalcolata a ogni ridisegno
     juce::Path curvePath_;
+
+    std::vector<BandInfo> bands_;
+    int   modelIdx_ = -1;        // modello attualmente rispecchiato in bands_
 
     int  dragBand_  = -1;
     int  hoverBand_ = -1;

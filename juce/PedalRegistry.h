@@ -29,7 +29,7 @@ namespace pedal {
 constexpr int kMaxKnobs  = 8;   // riserva di parametri continui per sezione
 constexpr int kMaxSwitch = 2;   // riserva di parametri a scatti per sezione
 
-enum class Category { Overdrive, Distortion, HighGain, Fuzz, Booster, Gate, Equalizer };
+enum class Category { Overdrive, Distortion, HighGain, Fuzz, Booster, Gate, Equalizer, Compressor };
 
 // Quale algoritmo usa il modello. Dichiarata esplicitamente invece di dedurla
 // dall'id: dedurla dai caratteri faceva collidere od_screamer con od_super, e
@@ -49,7 +49,11 @@ enum class Topology {
     GateSuppress,   // soppressore con soglia e decadimento, modi Reduction/Mute
     GateHard,       // cancello secco: sopra soglia passa, sotto chiude
     EqGraphic7,     // sette bande fisse a 100/200/400/800/1.6k/3.2k/6.4k piu' livello
-    EqParametric    // due campane spazzolabili piu' livello
+    EqNative,       // la torre di tono dell'amplificatore, gia' nella catena
+    EqParametric,   // due campane spazzolabili piu' livello
+    CompSustain,    // compressore con sustain, attacco e tono
+    CompSimple,     // il predecessore, senza controllo di tono
+    CompLimiter     // limitatore con rapporto e soglia espliciti
 };
 
 inline const char* categoryName (Category c)
@@ -62,6 +66,7 @@ inline const char* categoryName (Category c)
         case Category::Booster:    return "Booster";
         case Category::Gate:       return "Gate / Noise";
         case Category::Equalizer:  return "Equalizer";
+        case Category::Compressor: return "Compressor";
     }
     return "?";
 }
@@ -212,6 +217,12 @@ inline const std::vector<Model>& models()
       { none(), none() }, 0 },
 
     // --- Equalizer ---------------------------------------------------------
+    { "eq_tonestack", "AMP Tone Stack", Category::Equalizer, Topology::EqNative,
+      "La torre di tono dell'amplificatore: bassi, medio spazzolabile con Q, "
+      "presenza, acuti e aria. E' quella gia' presente nella catena.",
+      { { "", 0.f, 1.f, 0.f, "" } }, 0,
+      { none(), none() }, 0 },
+
     { "eq_graphic", "GE-SEVEN Graphic", Category::Equalizer, Topology::EqGraphic7,
       "Sette bande fisse a 100, 200, 400 e 800 Hz, 1.6, 3.2 e 6.4 kHz, piu' il "
       "livello: l'equalizzatore grafico classico da pedaliera.",
@@ -228,6 +239,29 @@ inline const std::vector<Model>& models()
         { "HI GAIN", -15.f, 15.f, 0.f, " dB" },  { "HI FREQ", 500.f, 8000.f, 2500.f, " Hz" },
         { "LEVEL", -15.f, 15.f, 0.f, " dB" } }, 5,
       { none(), none() }, 0 },
+
+    // --- Compressor --------------------------------------------------------
+    { "cp_sustain", "CS-THREE Sustainer", Category::Compressor, Topology::CompSustain,
+      "Comprime i picchi e solleva il debole, con il tono che apre il click della "
+      "pennata. L'attacco in senso orario lascia passare il transiente.",
+      { { "SUSTAIN", 0.f, 1.f, 0.4f, "" }, { "ATTACK", 1.f, 100.f, 15.f, " ms" },
+        { "TONE", -12.f, 12.f, 0.f, " dB" }, { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 4,
+      { none(), none() }, 0 },
+
+    { "cp_simple", "CS-TWO Compressor", Category::Compressor, Topology::CompSimple,
+      "Il predecessore senza controllo di tono: solo sustain, attacco e livello. "
+      "Piu' schietto e meno colorato.",
+      { { "SUSTAIN", 0.f, 1.f, 0.4f, "" }, { "ATTACK", 1.f, 100.f, 20.f, " ms" },
+        { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 3,
+      { none(), none() }, 0 },
+
+    { "cp_limit", "LM-THREE Limiter", Category::Compressor, Topology::CompLimiter,
+      "Limitatore con rapporto e soglia espliciti: tiene il livello sotto controllo "
+      "invece di dare sustain, utile in coda alla catena.",
+      { { "THRESHOLD", -40.f, 0.f, -18.f, " dB" }, { "RATIO", 1.5f, 20.f, 4.f, ":1" },
+        { "RELEASE", 10.f, 800.f, 150.f, " ms" }, { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 4,
+      { none(), none() }, 0 },
+
     };
     return list;
 }

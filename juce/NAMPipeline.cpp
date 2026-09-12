@@ -33,7 +33,6 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
 
     eq_.prepare(sampleRate, 1);
     depth_.prepare(sampleRate, 1);
-    comp_.prepare(sampleRate);
     gate_.prepare(sampleRate);
     for (auto& p : pedals_) p.prepare(sampleRate);
     hp_.prepare(sampleRate);
@@ -76,7 +75,6 @@ void NAMPipeline::reset()
 {
     eq_.reset();
     depth_.reset();
-    comp_.reset();
     gate_.reset();
     for (auto& p : pedals_) p.reset();
     hp_.reset();
@@ -194,14 +192,14 @@ void NAMPipeline::process(const float* in, float* out, int n)
 
     // --- Pre-FX: (Compressor@Front) → NoiseGate → Gate → (Compressor@Post-Gate) → Overdrive → Distortion ---
     // compPos_: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR. Only one position is
-    // active per block; the GR meter reads comp_ regardless of where it sits.
+    // active per block; the GR meter reads the pedal regardless of where it sits.
     const int cpos = compPos_.load();
     for (int i = 0; i < n; ++i) {
         float s = out[i];
-        if (cpos == 0) s = comp_.process (s);
+        if (cpos == 0) s = pedals_[4].process (s);
         s = pedals_[2].process (s);   // NGATE
         s = pedals_[3].process (s);   // GATE
-        if (cpos == 1) s = comp_.process (s);
+        if (cpos == 1) s = pedals_[4].process (s);
         s = pedals_[0].process (s);   // OVERDRIVE
         s = pedals_[1].process (s);   // DISTORTION
         out[i] = s;
@@ -263,8 +261,10 @@ void NAMPipeline::process(const float* in, float* out, int n)
     if (!depthBypass_.load())
         for (int i = 0; i < n; ++i) out[i] = depth_.processSample(0, out[i]);
 
-    // --- 5-band EQ ---
-    for (int i = 0; i < n; ++i) out[i] = eq_.processSample(0, out[i]);
+    // --- equalizzatore: torre di tono nativa, poi il pedale scelto ---------
+    // Quando nella sezione EQ e' scelto un modello diverso dalla torre nativa,
+    // il processore azzera le bande di quest'ultima e lavora solo il pedale.
+    for (int i = 0; i < n; ++i) out[i] = pedals_[5].process (eq_.processSample (0, out[i]));
 
     // Presa per l'analizzatore: il segnale viene campionato qui, subito dopo
     // l'equalizzatore, cosi' nello spettro si vede l'effetto della curva.
@@ -324,7 +324,7 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = irHp_.process (s);
         s = irLp_.process (s);
         s *= irTrimGainSmoothed_;
-        if (cpos == 2) s = comp_.process (s);
+        if (cpos == 2) s = pedals_[4].process (s);
         s = hp_.process   (s);
         s = loud_.process (s);
         s = delay_.process   (s);

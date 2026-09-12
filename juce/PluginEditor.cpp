@@ -712,12 +712,14 @@ int NAMAudioProcessorEditor::pedalSlotFor (const juce::String& n)
     if (n == "DISTORTION") return 1;
     if (n == "NGATE")      return 2;
     if (n == "GATE")       return 3;
+    if (n == "COMP")       return 4;
+    if (n == "EQ")         return 5;
     return -1;
 }
 
 const char* NAMAudioProcessorEditor::pedalPrefix (int slot)
 {
-    static const char* kP[kPedalSlots] = { "od", "dist", "ng", "gate" };
+    static const char* kP[kPedalSlots] = { "od", "dist", "ng", "gate", "comp", "eq" };
     return kP[slot < 0 ? 0 : (slot >= kPedalSlots ? kPedalSlots - 1 : slot)];
 }
 
@@ -749,12 +751,21 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
 
     const char* prefix = pedalPrefix (slot);
     const int base = pedalKnobBase_[slot];
+    const bool faders = (m.topo == pedal::Topology::EqGraphic7);
 
     for (int i = 0; i < pedal::kMaxKnobs; ++i) {
         auto* kb = (base >= 0 && base + i < (int) knobs_.size()) ? knobs_[(size_t)(base + i)].get() : nullptr;
         if (kb == nullptr) continue;
         const bool used = (i < m.numKnobs);
         kb->label.setText (used ? m.knobs[i].label : "", juce::dontSendNotification);
+
+        if (faders) {
+            kb->slider.setSliderStyle (juce::Slider::LinearVertical);
+            kb->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 46, 16);
+        } else {
+            kb->slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            kb->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 18);
+        }
 
         // Il parametro e' normalizzato 0..1, ma l'utente deve leggere il valore
         // reale con la sua unita': senza questo comparirebbe "0.313" al posto
@@ -801,6 +812,15 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
 }
 
 
+// L'equalizzatore grafico si comanda a cursori verticali, uno per banda: e'
+// la forma del pedale vero e si legge a colpo d'occhio quali bande sono alzate.
+bool NAMAudioProcessorEditor::pedalUsesFaders (int slot) const
+{
+    if (slot < 0 || slot >= kPedalSlots) return false;
+    const int idx = juce::jlimit (0, pedal::count() - 1, lastPedalModel_[slot]);
+    return pedal::at (idx).topo == pedal::Topology::EqGraphic7;
+}
+
 // Gli indici dei pomelli di riserva effettivamente usati dal pedale scelto.
 std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
 {
@@ -809,6 +829,10 @@ std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
     if (base < 0) return ids;
     const int idx = juce::jlimit (0, pedal::count() - 1, lastPedalModel_[slot]);
     const auto& m = pedal::at (idx);
+    // La torre di tono e' gia' nella catena e ha i suoi comandi: la sezione EQ
+    // mostra quelli, non la riserva.
+    if (m.topo == pedal::Topology::EqNative)
+        return { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ };
     for (int i = 0; i < m.numKnobs && base + i < (int) knobs_.size(); ++i)
         ids.push_back (base + i);
     return ids;
@@ -1654,7 +1678,7 @@ void NAMAudioProcessorEditor::resized()
         groups = {
             { "NGATE",      pedalKnobIds (2) },
             { "GATE",       pedalKnobIds (3) },
-            { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
+            { "COMP",       pedalKnobIds (4) },
             // Le due sezioni con il menu dei pedali elencano solo i controlli che
             // il modello scelto possiede davvero: la larghezza del pannello e'
             // proporzionale al numero di id, quindi si adatta da sola.
@@ -1662,7 +1686,7 @@ void NAMAudioProcessorEditor::resized()
             { "DISTORTION", pedalKnobIds (1) },
             { "SPLITTER",   { kSplitLeft, kSplitRight, kSplitBalance, kWidth } },
             { "AMP",        { kInput, kOutput } },
-            { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
+            { "EQ",         pedalKnobIds (5) },
             { "POWER",      { kDepth, kRes, kResFreq } },
             { "CAB",        { kIrMix, kQuality } },
             { "IR TOOLS",   { kIrHp, kIrLp, kIrTrim, kIrBalance } },
@@ -1688,12 +1712,19 @@ void NAMAudioProcessorEditor::resized()
     // Le sezioni col menu dei pedali non possono scendere sotto una larghezza
     // minima: con un modello da un solo pomello collasserebbero, e titolo e
     // menu diventerebbero illeggibili.
-    auto widthUnits = [] (const Group& g) {
-        const bool hasMenu = (pedalSlotFor (g.name) >= 0);
+    auto widthUnits = [this] (const Group& g) {
+        const int slot = pedalSlotFor (g.name);
         const int n = (int) g.ids.size();
-        return hasMenu ? std::max (n, 3) : n;
+        // Otto cursori affiancati in un pannello stretto sarebbero illeggibili:
+        // la sezione a bande si prende qualche unita' in piu'.
+        if (slot >= 0 && pedalUsesFaders (slot)) return n + 4;
+        return (slot >= 0) ? std::max (n, 3) : n;
     };
+    // Durante la costruzione dell'editor una tendina puo' far scattare resized()
+    // prima che le sezioni a pedale abbiano la loro riserva di pomelli: in quel
+    // momento i gruppi sono vuoti e le divisioni qui sotto andrebbero a zero.
     int totalKnobs = 0; for (auto& g : groups) totalKnobs += widthUnits (g);
+    if (totalKnobs <= 0) totalKnobs = 1;
 
     // Allocate widths proportionally.
     const int gap = 6;
@@ -1807,14 +1838,26 @@ void NAMAudioProcessorEditor::resized()
             knobs_[idx]->label .setVisible (true);
         }
 
+        // Equalizzatore a bande: i cursori stanno in fila, come sul pedale.
+        if (gr.ids.empty()) {
+            // niente da disporre
+        }
+        else if (pedalSlot >= 0 && pedalUsesFaders (pedalSlot)) {
+            const int cellW = inside.getWidth() / (int) gr.ids.size();
+            for (int idx : gr.ids) {
+                auto cell = inside.removeFromLeft (cellW).reduced (1, 2);
+                knobs_[idx]->label.setBounds (cell.removeFromTop (12));
+                knobs_[idx]->slider.setBounds (cell);
+            }
+        }
         // For groups with many knobs (EQ), wrap into 2 rows.
-        if ((int) gr.ids.size() > 4) {
+        else if ((int) gr.ids.size() > 4) {
             const int rowH = inside.getHeight() / 2;
             auto row1 = inside.removeFromTop (rowH);
             auto row2 = inside;
             const int half = ((int) gr.ids.size() + 1) / 2;
-            const int cellW1 = row1.getWidth() / half;
-            const int cellW2 = row2.getWidth() / ((int) gr.ids.size() - half);
+            const int cellW1 = row1.getWidth() / juce::jmax (1, half);
+            const int cellW2 = row2.getWidth() / juce::jmax (1, (int) gr.ids.size() - half);
             for (int i = 0; i < (int) gr.ids.size(); ++i) {
                 auto cell = (i < half) ? row1.removeFromLeft (cellW1)
                                        : row2.removeFromLeft (cellW2);

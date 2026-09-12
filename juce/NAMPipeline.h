@@ -82,10 +82,10 @@ public:
     { gate_.setThresholdDB(threshDB); gate_.setReleaseMs(releaseMs); gate_.setBypass(byp); }
     // I due stadi sono ora pedali selezionabili dal registro condiviso. I valori
     // arrivano gia' convertiti nell'intervallo reale del modello scelto.
-    // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE.
+    // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE, 4 COMP, 5 EQ.
     void setPedal (int slot, int model, const float* knobs, const int* switches, bool byp)
     {
-        pedal::PedalFX& p = pedals_[(std::size_t) (slot < 0 ? 0 : (slot > 3 ? 3 : slot))];
+        pedal::PedalFX& p = pedals_[(std::size_t) (slot < 0 ? 0 : (slot > 5 ? 5 : slot))];
         p.setModel (model);
         for (int i = 0; i < pedal::kMaxKnobs;  ++i) p.setKnob   (i, knobs[i]);
         for (int i = 0; i < pedal::kMaxSwitch; ++i) p.setSwitch (i, switches[i]);
@@ -99,12 +99,11 @@ public:
 
     void setNoiseGate(float threshDB, float releaseMs, bool byp)
     { ng_.setThresholdDB(threshDB); ng_.setReleaseMs(releaseMs); ng_.setBypass(byp); }
-    void setCompressor(float sustain, float attackMs, float toneDB, float levelDB, bool byp)
-    { comp_.setSustain(sustain); comp_.setAttackMs(attackMs); comp_.setToneDB(toneDB); comp_.setLevelDB(levelDB); comp_.setBypass(byp); }
     void setDepthBypass(bool byp) { depthBypass_.store(byp); }
     // Compressor routing position: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR.
     void setCompPos(int p) { compPos_.store(p); }
-    float compGainReductionDB() const noexcept { return comp_.gainReductionDB(); }
+    // Il misuratore legge il pedale nello slot del compressore.
+    float compGainReductionDB() const noexcept { return pedals_[4].gainReductionDB(); }
     void setDelay(float timeMs, float feedback, float mix, bool byp)
     { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
     void setChorus(float rateHz, float depth, float mix, bool byp)
@@ -202,10 +201,9 @@ private:
     nam_dsp::FiveBandEQ   eq_;
     nam_dsp::DepthFilter  depth_;
 
-    preamp_fx::CompressorFX  comp_;
     std::atomic<int>         compPos_ { 0 };
     preamp_fx::SmartGate     gate_;
-    pedal::PedalFX  pedals_[4];   // od, dist, ngate, gate
+    pedal::PedalFX  pedals_[6];   // od, dist, ngate, gate, comp, eq
     preamp_fx::HighPass      hp_;
     preamp_fx::LoudnessNorm  loud_;
     preamp_fx::NoiseGate     ng_;

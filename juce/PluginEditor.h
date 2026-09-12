@@ -201,19 +201,21 @@ private:
 
     // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
     // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE.
-    static constexpr int kPedalSlots = 4;
+    static constexpr int kPedalSlots = 6;
     juce::ComboBox pedalBox_[kPedalSlots];
     std::unique_ptr<CAtt> pedalAtt_[kPedalSlots];
     juce::ComboBox pedalSwitch_[kPedalSlots][pedal::kMaxSwitch];
     std::unique_ptr<CAtt> pedalSwitchAtt_[kPedalSlots][pedal::kMaxSwitch];
     juce::Label    pedalSwitchLabel_[kPedalSlots][pedal::kMaxSwitch];
-    int pedalKnobBase_[kPedalSlots] { -1, -1, -1, -1 };
-    int lastPedalModel_[kPedalSlots] { -1, -1, -1, -1 };
+    int pedalKnobBase_[kPedalSlots] { -1, -1, -1, -1, -1, -1 };
+    int lastPedalModel_[kPedalSlots] { -1, -1, -1, -1, -1, -1 };
     static int pedalSlotFor (const juce::String& sectionName);
     static const char* pedalPrefix (int slot);
     void buildPedalMenu (juce::ComboBox&);
     void refreshPedalSection (int slot);
     std::vector<int> pedalKnobIds (int slot) const;
+    // Vero quando il modello scelto si comanda a cursori verticali per banda.
+    bool pedalUsesFaders (int slot) const;
     bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
