@@ -61,7 +61,14 @@ Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DI
 
 Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.
 
-**Anche il nome della sezione segue il pedale**: titolo e tasto di attivazione diventano EQUALIZER, COMPRESSOR, HIGH GAIN e così via. Quello che non cambia è lo stato acceso/spento — se la sezione era spenta resta spenta — e la posizione nella catena, che si legge dall'ordine dei pannelli.
+**Anche il nome della sezione segue il pedale**: titolo e tasto di attivazione diventano EQUALIZER, COMPRESSOR, HIGH GAIN e così via. La posizione nella catena non cambia, e si legge dall'ordine dei pannelli.
+
+Sull'acceso/spento valgono due regole, e non si contraddicono:
+
+- scegli un pedale **mai usato finora**: la sezione tiene lo stato che aveva. Se era spenta resta spenta.
+- richiami un pedale **già presente o già usato** in un'altra sezione: arriva com'era. Se lì era acceso, si accende anche qui. È lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
+
+La sola **torre di tono dell'amplificatore** non si duplica: è una e sta nella sezione EQ. Sceglierla altrove lascia la sezione senza comandi, e te lo dice.
 
 Con l'equalizzatore viaggia il suo **analizzatore di spettro**, con il compressore il suo **misuratore di riduzione**: compaiono nella sezione dove li hai messi e spariscono da quella che hai svuotato.
 
