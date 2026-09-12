@@ -34,6 +34,7 @@ void EQAnalyserComponent::rebuildBands()
 
     if (m.topo == pedal::Topology::EqNative)
     {
+        if (! ownsNativeStack_) return;   // altrove e' un passante
         // Solo MID ha frequenza e Q regolabili; le altre stanno ferme in
         // frequenza e si muovono soltanto in verticale.
         bands_.push_back ({ "eq_bass",     "",            "",         EQ::kBassFreqHz,     0.9, "BASS",   kCol[0] });
@@ -50,7 +51,7 @@ void EQAnalyserComponent::rebuildBands()
         for (int i = 0; i < 7; ++i) {
             const auto& k = m.knobs[i];
             BandInfo b;
-            b.gainParam  = "eq_p" + juce::String (i + 1);
+            b.gainParam  = slotParam ("p") + juce::String (i + 1);
             b.fixedFreq  = kF[i];
             b.fixedQ     = 1.4;
             b.label      = k.label;
@@ -67,8 +68,8 @@ void EQAnalyserComponent::rebuildBands()
         for (int i = 0; i < 2; ++i) {
             const auto& kf = m.knobs[i * 2 + 1];
             BandInfo b;
-            b.gainParam  = "eq_p" + juce::String (i * 2 + 1);
-            b.freqParam  = "eq_p" + juce::String (i * 2 + 2);
+            b.gainParam  = slotParam ("p") + juce::String (i * 2 + 1);
+            b.freqParam  = slotParam ("p") + juce::String (i * 2 + 2);
             b.fixedQ     = 1.0;
             b.label      = (i == 0) ? "LOW" : "HIGH";
             b.colour     = kCol[i == 0 ? 0 : 3];
@@ -81,6 +82,18 @@ void EQAnalyserComponent::rebuildBands()
         bands_[1].fixedFreq = m.knobs[3].def;
         return;
     }
+}
+
+// Legge il parametro invece dell'indice memorizzato: e' questa funzione a
+// decidere se l'analizzatore si mostra, e quindi se il suo timer parte. Con un
+// valore memorizzato dal timer non partirebbe mai.
+bool EQAnalyserComponent::showsCurve() const
+{
+    const int mi = juce::jlimit (0, pedal::count() - 1,
+                                 (int) paramValue (slotParam ("model").toRawUTF8()));
+    const auto& m = pedal::at (mi);
+    if (m.cat != pedal::Category::Equalizer) return false;
+    return (m.topo != pedal::Topology::EqNative) || ownsNativeStack_;
 }
 
 // I parametri nativi sono gia' in unita' reali, quelli della riserva sono
@@ -121,19 +134,40 @@ void EQAnalyserComponent::setBandGainDB (int b, float dB)
 }
 
 EQAnalyserComponent::EQAnalyserComponent (NAMAudioProcessor& proc,
-                                          juce::AudioProcessorValueTreeState& state)
-    : proc_ (proc), apvts_ (state)
+                                          juce::AudioProcessorValueTreeState& state,
+                                          juce::String prefix, bool ownsNativeStack)
+    : proc_ (proc), apvts_ (state),
+      prefix_ (std::move (prefix)), ownsNativeStack_ (ownsNativeStack)
 {
     scratch_.assign (2 * kFftSize, 0.f);
     binDB_.fill ((float) kMinDb * 4.f);
-    modelIdx_ = juce::jlimit (0, pedal::count() - 1,
-                              (int) paramValue ("eq_model"));
+    modelIdx_ = juce::jlimit (0, pedal::count() - 1, (int) paramValue (slotParam ("model").toRawUTF8()));
     rebuildBands();
     setOpaque (false);
-    startTimerHz (24);
 }
 
 EQAnalyserComponent::~EQAnalyserComponent() { stopTimer(); }
+
+// Uno per slot, e solo quello visibile deve lavorare: la FFT gira 24 volte al
+// secondo e non ha senso pagarla per cinque analizzatori nascosti.
+void EQAnalyserComponent::visibilityChanged()
+{
+    if (isVisible()) {
+        // Le bande vanno allineate al modello prima del primo disegno: il timer
+        // non ha ancora battuto.
+        const int mi = juce::jlimit (0, pedal::count() - 1,
+                                     (int) paramValue (slotParam ("model").toRawUTF8()));
+        if (mi != modelIdx_) { modelIdx_ = mi; rebuildBands(); }
+        startTimerHz (24);
+    } else {
+        stopTimer();
+    }
+}
+
+juce::String EQAnalyserComponent::slotParam (const char* suffix) const
+{
+    return prefix_ + "_" + suffix;
+}
 
 float EQAnalyserComponent::paramValue (const char* id) const
 {
@@ -230,7 +264,7 @@ double EQAnalyserComponent::curveDB (double hz, double sr) const
     const int lvl = (m.topo == pedal::Topology::EqGraphic7) ? 8 : 5;
     if (m.numKnobs >= lvl) {
         const auto& k = m.knobs[lvl - 1];
-        dB += k.min + paramValue ((juce::String ("eq_p") + juce::String (lvl)).toRawUTF8())
+        dB += k.min + paramValue ((slotParam ("p") + juce::String (lvl)).toRawUTF8())
                       * (k.max - k.min);
     }
     return dB;
@@ -240,12 +274,13 @@ double EQAnalyserComponent::curveDB (double hz, double sr) const
 
 void EQAnalyserComponent::timerCallback()
 {
-    const bool nowActive = paramValue ("eq_bypass") < 0.5f;
+    const bool nowActive = paramValue (slotParam ("bypass").toRawUTF8()) < 0.5f;
     if (nowActive != active_) { active_ = nowActive; }
 
     // Cambiando equalizzatore nel menu della sezione cambiano le maniglie, ma
     // l'analizzatore resta: e' sempre lo stesso componente.
-    const int mi = juce::jlimit (0, pedal::count() - 1, (int) paramValue ("eq_model"));
+    const int mi = juce::jlimit (0, pedal::count() - 1,
+                                 (int) paramValue (slotParam ("model").toRawUTF8()));
     if (mi != modelIdx_) { modelIdx_ = mi; rebuildBands(); repaint(); }
 
     proc_.readScope (scratch_.data(), kFftSize);

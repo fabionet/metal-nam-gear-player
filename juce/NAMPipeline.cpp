@@ -35,6 +35,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     depth_.prepare(sampleRate, 1);
     gate_.prepare(sampleRate);
     for (auto& p : pedals_) p.prepare(sampleRate);
+    scopeTap_.assign((size_t) std::max(1, blockSize), 0.f);
     hp_.prepare(sampleRate);
     loud_.prepare(sampleRate);
     ng_.prepare(sampleRate);
@@ -194,16 +195,35 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // compPos_: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR. Only one position is
     // active per block; the GR meter reads the pedal regardless of where it sits.
     const int cpos = compPos_.load();
+    // La presa per l'analizzatore segue lo slot che ospita l'equalizzatore, per
+    // mostrare lo spettro subito dopo la sua curva. Lo slot 4 puo' trovarsi in
+    // tre punti diversi della catena, a seconda del selettore di posizione: se
+    // e' quello dopo l'IR, la presa non sta in questo ciclo.
+    const int  tapSlot = scopeSlot_.load();
+    // Se il blocco fosse piu' lungo del previsto la presa si salta: allocare
+    // qui non si puo', e uno spettro che perde un blocco non si nota.
+    const bool tapFits = (n <= (int) scopeTap_.size());
+    const bool tapPre  = tapFits && ((tapSlot >= 0 && tapSlot <= 3)
+                                  || (tapSlot == 4 && cpos != 2));
+    const bool tapPost = tapFits && (tapSlot == 4 && cpos == 2);
+    const int  tapIdx  = tapPre ? tapSlot : -1;
     for (int i = 0; i < n; ++i) {
         float s = out[i];
         if (cpos == 0) s = pedals_[4].process (s);
+        if (tapIdx == 4 && cpos == 0) scopeTap_[(size_t) i] = s;
         s = pedals_[2].process (s);   // NGATE
+        if (tapIdx == 2) scopeTap_[(size_t) i] = s;
         s = pedals_[3].process (s);   // GATE
+        if (tapIdx == 3) scopeTap_[(size_t) i] = s;
         if (cpos == 1) s = pedals_[4].process (s);
+        if (tapIdx == 4 && cpos == 1) scopeTap_[(size_t) i] = s;
         s = pedals_[0].process (s);   // OVERDRIVE
+        if (tapIdx == 0) scopeTap_[(size_t) i] = s;
         s = pedals_[1].process (s);   // DISTORTION
+        if (tapIdx == 1) scopeTap_[(size_t) i] = s;
         out[i] = s;
     }
+    if (tapPre) writeScope (scopeTap_.data(), n);
 
     // --- NAM model ---
     if (model_ && !modelBypass_.load()) {
@@ -266,16 +286,10 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // il processore azzera le bande di quest'ultima e lavora solo il pedale.
     for (int i = 0; i < n; ++i) out[i] = pedals_[5].process (eq_.processSample (0, out[i]));
 
-    // Presa per l'analizzatore: il segnale viene campionato qui, subito dopo
-    // l'equalizzatore, cosi' nello spettro si vede l'effetto della curva.
-    {
-        int w = scopeWrite_.load(std::memory_order_relaxed);
-        for (int i = 0; i < n; ++i) {
-            scope_[(size_t) w] = out[i];
-            w = (w + 1) & (kScopeSize - 1);
-        }
-        scopeWrite_.store(w, std::memory_order_release);
-    }
+    // Presa per l'analizzatore quando l'equalizzatore sta nel suo slot: il
+    // segnale viene campionato qui, subito dopo, cosi' nello spettro si vede
+    // l'effetto della curva.
+    if (! tapPre && ! tapPost) writeScope (out, n);
 
     // --- IR convolver (due IR incrociati, poi dry/wet) ---
     // Entrambi i convolutori ricevono lo stesso ingresso, quindi `out` non va
@@ -325,6 +339,7 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = irLp_.process (s);
         s *= irTrimGainSmoothed_;
         if (cpos == 2) s = pedals_[4].process (s);
+        if (tapPost) scopeTap_[(size_t) i] = s;
         s = hp_.process   (s);
         s = loud_.process (s);
         s = delay_.process   (s);
@@ -334,6 +349,8 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = tremolo_.process (s);
         out[i] = s;
     }
+
+    if (tapPost) writeScope (scopeTap_.data(), n);
 
     // --- Output gain (smoothed) --- (modelOutDB already applied post-model)
     const float desiredOut = db2lin(outputGainDB_.load());

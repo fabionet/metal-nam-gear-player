@@ -61,13 +61,17 @@ Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DI
 
 Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.
 
-Niente vieta di mettere un distorsore nella sezione EQ o un equalizzatore in quella dell'overdrive: l'elenco è unico e ogni sezione è un posto nella catena, non un vincolo sul tipo di pedale.
+**Anche il nome della sezione segue il pedale**: titolo e tasto di attivazione diventano EQUALIZER, COMPRESSOR, HIGH GAIN e così via. Quello che non cambia è lo stato acceso/spento — se la sezione era spenta resta spenta — e la posizione nella catena, che si legge dall'ordine dei pannelli.
+
+Con l'equalizzatore viaggia il suo **analizzatore di spettro**, con il compressore il suo **misuratore di riduzione**: compaiono nella sezione dove li hai messi e spariscono da quella che hai svuotato.
+
+Niente vieta di mettere un distorsore nella sezione dell'equalizzatore o un equalizzatore in quella dell'overdrive: l'elenco è unico e ogni sezione è un posto nella catena, non un vincolo sul tipo di pedale.
 
 Le sezioni che gestiscono **IR**, **AMP** e **MASTER** non hanno la tendina: non sono posti da pedale.
 
 ## 4-quater. Analizzatore dell'equalizzatore
 
-Nella sezione **EQ**, fra i comandi e il tasto di attivazione, c'è un analizzatore di spettro con sopra la curva dell'equalizzatore. Il segnale è prelevato **dopo** l'EQ, quindi vedi l'effetto della curva. **L'analizzatore resta al suo posto qualunque pedale scegli nella tendina**, e resta modificabile.
+Dove metti un equalizzatore, fra i comandi e il tasto di attivazione compare un analizzatore di spettro con sopra la sua curva. Il segnale è prelevato **subito dopo quella sezione**, quindi vedi l'effetto della curva anche se hai spostato l'equalizzatore all'inizio della catena. Sostituendo l'equalizzatore con un altro pedale l'analizzatore sparisce insieme a lui.
 
 Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e compare la lettura del valore. Quali maniglie vedi dipende dall'equalizzatore scelto:
 
