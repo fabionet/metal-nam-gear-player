@@ -87,6 +87,10 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
 NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     : AudioProcessorEditor (&p), processorRef (p), presetPanel (p.getPresetManager())
 {
+    // Nessun modello ha ancora una memoria di accensione: finche' e' cosi', una
+    // sezione che cambia pedale tiene lo stato che aveva.
+    for (auto& v : modelPower_) v = -1;
+
     setLookAndFeel (&lnf_);
 
     // Preset panel (added first so toggle in header sits above it; visibility via toFront).
@@ -555,6 +559,11 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         pedalGrMeter_[slot] = std::make_unique<GrMeterComponent> (
             [this, slot] { return processorRef.getPedalGrDb (slot); });
         addChildComponent (*pedalGrMeter_[slot]);
+
+        addChildComponent (pedalNote_[slot]);
+        pedalNote_[slot].setJustificationType (juce::Justification::centred);
+        pedalNote_[slot].setFont (juce::Font (juce::FontOptions (11.0f)));
+        pedalNote_[slot].setColour (juce::Label::textColourId, juce::Colour (0xff9a9289));
     }
 
     lcd_ = std::make_unique<LCDDisplayComponent> (processorRef, processorRef.apvts,
@@ -743,6 +752,7 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
     const auto& m = pedal::at (idx);
     const bool changed = (idx != lastPedalModel_[slot]);
     lastPedalModel_[slot] = idx;
+    if (changed) applyRememberedPower (slot, idx);
 
     const char* prefix = pedalPrefix (slot);
     const int base = pedalKnobBase_[slot];
@@ -830,6 +840,33 @@ juce::TextButton* NAMAudioProcessorEditor::pedalBypassButton (int slot)
     return nullptr;
 }
 
+// Un pedale acceso in una sezione, richiamato in un'altra, ci arriva acceso:
+// e' lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
+// La memoria e' per modello e non per slot, cosi' funziona anche quando il
+// pedale e' stato prima tolto di dove stava e poi ripreso altrove.
+void NAMAudioProcessorEditor::rememberPedalPower()
+{
+    for (int slot = 0; slot < kPedalSlots; ++slot) {
+        const int idx = lastPedalModel_[slot];
+        if (idx < 0 || idx >= pedal::count()) continue;
+        if (auto* v = processorRef.apvts.getRawParameterValue (
+                juce::String (pedalPrefix (slot)) + "_bypass"))
+            modelPower_[idx] = (v->load() > 0.5f) ? 0 : 1;
+    }
+}
+
+// Un modello mai visto non ha memoria: in quel caso la sezione tiene lo stato
+// che aveva, che e' la regola per un pedale qualunque.
+void NAMAudioProcessorEditor::applyRememberedPower (int slot, int modelIdx)
+{
+    if (modelIdx < 0 || modelIdx >= pedal::count()) return;
+    const int want = modelPower_[modelIdx];
+    if (want < 0) return;
+    if (auto* p = processorRef.apvts.getParameter (
+            juce::String (pedalPrefix (slot)) + "_bypass"))
+        p->setValueNotifyingHost (want == 1 ? 0.f : 1.f);   // bypass = non acceso
+}
+
 // La sezione prende il nome dal pedale che ci sta dentro: sostituendo
 // l'equalizzatore con un compressore, titolo e tasto diventano COMPRESSORE. La
 // posizione nella catena resta quella, ed e' leggibile dall'ordine dei pannelli.
@@ -868,10 +905,12 @@ std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
     if (base < 0) return ids;
     const int idx = juce::jlimit (0, pedal::count() - 1, lastPedalModel_[slot]);
     const auto& m = pedal::at (idx);
-    // La torre di tono e' gia' nella catena e ha i suoi comandi: la sezione EQ
-    // mostra quelli, non la riserva.
+    // La torre di tono e' gia' nella catena e ha i suoi comandi, che sono uno
+    // solo: la mostra la sezione EQ, altrove non c'e' niente da mostrare.
     if (m.topo == pedal::Topology::EqNative)
-        return { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ };
+        return (slot == 5) ? std::vector<int> { kBass, kMidGain, kTreble, kPres,
+                                                kAir, kMidFreq, kMidQ }
+                           : std::vector<int> {};
     for (int i = 0; i < m.numKnobs && base + i < (int) knobs_.size(); ++i)
         ids.push_back (base + i);
     return ids;
@@ -879,6 +918,7 @@ std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
 
 void NAMAudioProcessorEditor::timerCallback()
 {
+    rememberPedalPower();
     updateSlimEnabled();
     updateTubeIndicator();
     updateLoadStatus();
@@ -1700,6 +1740,7 @@ void NAMAudioProcessorEditor::resized()
         for (int sl = 0; sl < kPedalSlots; ++sl) {
             if (pedalAnalyser_[sl]) pedalAnalyser_[sl]->setVisible (false);
             if (pedalGrMeter_[sl])  pedalGrMeter_[sl] ->setVisible (false);
+            pedalNote_[sl].setVisible (false);
             pedalBox_[sl].setVisible (false);
             for (int i = 0; i < pedal::kMaxSwitch; ++i) {
                 pedalSwitch_[sl][i].setVisible (false);
@@ -1899,7 +1940,17 @@ void NAMAudioProcessorEditor::resized()
 
         // Equalizzatore a bande: i cursori stanno in fila, come sul pedale.
         if (gr.ids.empty()) {
-            // niente da disporre
+            // Una sezione senza comandi lascerebbe un pannello vuoto senza dire
+            // perche': la torre di tono e' una sola e sta nella sezione EQ.
+            if (pedalSlot >= 0
+                && pedal::at (juce::jlimit (0, pedal::count() - 1, lastPedalModel_[pedalSlot])).topo
+                       == pedal::Topology::EqNative) {
+                pedalNote_[pedalSlot].setText (
+                    "La torre di tono si regola nella sezione EQ.",
+                    juce::dontSendNotification);
+                pedalNote_[pedalSlot].setVisible (true);
+                pedalNote_[pedalSlot].setBounds (inside.reduced (4, 0));
+            }
         }
         else if (pedalSlot >= 0 && pedalUsesFaders (pedalSlot)) {
             const int cellW = inside.getWidth() / (int) gr.ids.size();

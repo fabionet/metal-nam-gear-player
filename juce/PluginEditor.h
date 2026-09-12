@@ -207,6 +207,8 @@ private:
     // quello dello slot in cui e' finito l'equalizzatore o il compressore.
     std::unique_ptr<EQAnalyserComponent> pedalAnalyser_[6];
     std::unique_ptr<GrMeterComponent>    pedalGrMeter_[6];
+    // Riga di spiegazione per una sezione che non ha comandi da mostrare.
+    juce::Label                          pedalNote_[6];
     std::unique_ptr<LCDDisplayComponent> lcd_;
 
     // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
@@ -232,6 +234,12 @@ private:
     // Come si chiama la sezione quando ospita quel pedale: il titolo dipinto e
     // il nome sul tasto sono la stessa cosa.
     juce::String pedalSectionTitle (int slot) const;
+
+    // Accensione ricordata per modello: -1 mai vista, 0 spento, 1 acceso.
+    // Serve a far ritrovare un pedale com'era quando lo si richiama altrove.
+    int  modelPower_[64];   // indicizzato per modello; il registro ne ha assai meno
+    void rememberPedalPower();
+    void applyRememberedPower (int slot, int modelIdx);
     bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
