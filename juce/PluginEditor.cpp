@@ -526,9 +526,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // --- pedali selezionabili: riserva di pomelli e interruttori -----------
     // I pomelli si aggiungono in coda a knobs_, cosi' gli indici dei k* gia'
     // esistenti non si spostano.
-    for (int slot = 0; slot < 2; ++slot)
+    for (int slot = 0; slot < kPedalSlots; ++slot)
     {
-        const char* prefix = (slot == 0) ? "od" : "dist";
+        const char* prefix = pedalPrefix (slot);
         pedalKnobBase_[slot] = (int) knobs_.size();
         for (int i = 1; i <= pedal::kMaxKnobs; ++i)
             addKnob (juce::String (prefix) + "_p" + juce::String (i), "");
@@ -705,6 +705,22 @@ void NAMAudioProcessorEditor::updateSlimEnabled()
 }
 
 
+// Quale slot serve una data sezione, -1 se quella sezione non ha il menu.
+int NAMAudioProcessorEditor::pedalSlotFor (const juce::String& n)
+{
+    if (n == "OVERDRIVE")  return 0;
+    if (n == "DISTORTION") return 1;
+    if (n == "NGATE")      return 2;
+    if (n == "GATE")       return 3;
+    return -1;
+}
+
+const char* NAMAudioProcessorEditor::pedalPrefix (int slot)
+{
+    static const char* kP[kPedalSlots] = { "od", "dist", "ng", "gate" };
+    return kP[slot < 0 ? 0 : (slot >= kPedalSlots ? kPedalSlots - 1 : slot)];
+}
+
 // Il menu e' lo stesso per ogni sezione che lo espone, raggruppato per
 // categoria di pedale mantenendo l'ordine del registro.
 void NAMAudioProcessorEditor::buildPedalMenu (juce::ComboBox& box)
@@ -731,7 +747,7 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
     const bool changed = (idx != lastPedalModel_[slot]);
     lastPedalModel_[slot] = idx;
 
-    const char* prefix = (slot == 0) ? "od" : "dist";
+    const char* prefix = pedalPrefix (slot);
     const int base = pedalKnobBase_[slot];
 
     for (int i = 0; i < pedal::kMaxKnobs; ++i) {
@@ -739,6 +755,24 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
         if (kb == nullptr) continue;
         const bool used = (i < m.numKnobs);
         kb->label.setText (used ? m.knobs[i].label : "", juce::dontSendNotification);
+
+        // Il parametro e' normalizzato 0..1, ma l'utente deve leggere il valore
+        // reale con la sua unita': senza questo comparirebbe "0.313" al posto
+        // di "120 ms".
+        if (used) {
+            const auto k = m.knobs[i];
+            kb->slider.textFromValueFunction = [k] (double norm) {
+                const double real = k.min + norm * (k.max - k.min);
+                const double span = k.max - k.min;
+                const int dec = (span > 100.0) ? 0 : (span > 4.0 ? 1 : 2);
+                return juce::String (real, dec) + k.suffix;
+            };
+            kb->slider.valueFromTextFunction = [k] (const juce::String& t) {
+                const double real = t.retainCharacters ("-0123456789.").getDoubleValue();
+                return (k.max > k.min) ? juce::jlimit (0.0, 1.0, (real - k.min) / (k.max - k.min)) : 0.0;
+            };
+            kb->slider.updateText();
+        }
         if (used && changed) {
             // Il parametro e' normalizzato: si riporta il predefinito reale.
             const auto& k = m.knobs[i];
@@ -960,12 +994,6 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
     // Inner highlight line.
     g.setColour (juce::Colour::fromFloatRGBA (1.f, 1.f, 1.f, 0.05f));
     g.drawHorizontalLine ((int) a.getY() + 1, a.getX() + 2, a.getRight() - 2);
-
-    // Le sezioni col menu dei pedali lo hanno SOPRA al titolo: qui si salta la
-    // striscia che il layout ha riservato alla tendina, altrimenti il titolo
-    // finirebbe disegnato sotto di essa e sparirebbe.
-    if (title == "OVERDRIVE" || title == "DISTORTION")
-        a.removeFromTop (24.f);
 
     // Title strip at top.
     auto titleStrip = a.removeFromTop (30.f);
@@ -1605,7 +1633,7 @@ void NAMAudioProcessorEditor::resized()
         splitModeBox_.setVisible (false);  // shown only inside the SPLITTER section below
         splitModeLabel_.setVisible (false);
         if (eqAnalyser_) eqAnalyser_->setVisible (false);  // solo dentro la sezione EQ
-        for (int sl = 0; sl < 2; ++sl) {
+        for (int sl = 0; sl < kPedalSlots; ++sl) {
             pedalBox_[sl].setVisible (false);
             for (int i = 0; i < pedal::kMaxSwitch; ++i) {
                 pedalSwitch_[sl][i].setVisible (false);
@@ -1624,8 +1652,8 @@ void NAMAudioProcessorEditor::resized()
     std::vector<Group> groups;
     if (activeTab_ == Tab::Main) {
         groups = {
-            { "NGATE",      { kNgThresh, kNgRelease } },
-            { "GATE",       { kGateThresh, kGateRelease } },
+            { "NGATE",      pedalKnobIds (2) },
+            { "GATE",       pedalKnobIds (3) },
             { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
             // Le due sezioni con il menu dei pedali elencano solo i controlli che
             // il modello scelto possiede davvero: la larghezza del pannello e'
@@ -1661,7 +1689,7 @@ void NAMAudioProcessorEditor::resized()
     // minima: con un modello da un solo pomello collasserebbero, e titolo e
     // menu diventerebbero illeggibili.
     auto widthUnits = [] (const Group& g) {
-        const bool hasMenu = (g.name == "OVERDRIVE" || g.name == "DISTORTION");
+        const bool hasMenu = (pedalSlotFor (g.name) >= 0);
         const int n = (int) g.ids.size();
         return hasMenu ? std::max (n, 3) : n;
     };
@@ -1703,16 +1731,15 @@ void NAMAudioProcessorEditor::resized()
         groupPanels_.push_back ({ panel, gr.name });
 
         auto inside = panel.reduced (6, 4);
+        inside.removeFromTop (30); // title strip
 
-        // Menu del pedale SOPRA al titolo, per le sezioni che lo espongono.
-        const int pedalSlot = (gr.name == "OVERDRIVE") ? 0 : (gr.name == "DISTORTION" ? 1 : -1);
+        // Menu del pedale SOTTO al titolo, per le sezioni che lo espongono.
+        const int pedalSlot = pedalSlotFor (gr.name);
         if (pedalSlot >= 0) {
             pedalBox_[pedalSlot].setVisible (true);
             pedalBox_[pedalSlot].setBounds (inside.removeFromTop (22).reduced (2, 1));
-            inside.removeFromTop (2);
+            inside.removeFromTop (3);
         }
-
-        inside.removeFromTop (30); // title strip
 
         // Gli interruttori del pedale stanno sotto al titolo, sopra ai pomelli.
         if (pedalSlot >= 0) {
