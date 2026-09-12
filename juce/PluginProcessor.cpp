@@ -39,24 +39,14 @@ namespace ids {
     constexpr auto eqModel       = "eq_model";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
-    constexpr auto gateThresh    = "gate_threshold";
-    constexpr auto gateRelease   = "gate_release";
     constexpr auto gateBypass    = "gate_bypass";
-    constexpr auto odDrive       = "od_drive";
-    constexpr auto odTone        = "od_tone";
-    constexpr auto odLevel       = "od_level";
     constexpr auto odBypass      = "od_bypass";
-    constexpr auto distDrive     = "dist_drive";
-    constexpr auto distTone      = "dist_tone";
-    constexpr auto distLevel     = "dist_level";
     constexpr auto distBypass    = "dist_bypass";
     constexpr auto hpFreq        = "hp_freq";
     constexpr auto hpBypass      = "hp_bypass";
     constexpr auto lnEnabled     = "ln_enabled";
     constexpr auto lnTargetDB    = "ln_target_db";
     // NoiseGate (pre-chain)
-    constexpr auto ngThresh      = "ng_threshold";
-    constexpr auto ngRelease     = "ng_release";
     constexpr auto ngBypass      = "ng_bypass";
     // Post-cab FX
     constexpr auto delTime       = "delay_time_ms";
@@ -124,10 +114,6 @@ namespace ids {
     constexpr auto marFxReturn   = "mar_fx_return"; // reserved (FX loop, no DSP)
     // Compressor (Boss CS-1 style, front of chain)
     constexpr auto compBypass    = "comp_bypass";
-    constexpr auto compSustain   = "comp_sustain";
-    constexpr auto compAttack    = "comp_attack";
-    constexpr auto compTone      = "comp_tone";
-    constexpr auto compLevel     = "comp_level";
     constexpr auto compPos       = "comp_pos";
     // Lettore NAM: volume + tonestack dedicato (post-modello, pre-ampli)
     constexpr auto modelVolume   = "model_volume";
@@ -186,16 +172,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<B>(juce::ParameterID{ids::modelBypass,1},   "Amp Bypass",   false));
 
     // Pre-FX
-    add (std::make_unique<P>(juce::ParameterID{ids::gateThresh,1},  "Gate Threshold", juce::NormalisableRange<float>(-80.f, 0.f, 0.1f), -60.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::gateRelease,1}, "Gate Release",   juce::NormalisableRange<float>(10.f, 500.f, 1.f), 80.f));
     add (std::make_unique<B>(juce::ParameterID{ids::gateBypass,1},  "Gate Bypass",    false));
-    add (std::make_unique<P>(juce::ParameterID{ids::odDrive,1},     "OD Drive",       juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.3f));
-    add (std::make_unique<P>(juce::ParameterID{ids::odTone,1},      "OD Tone",        juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::odLevel,1},     "OD Level",       juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<B>(juce::ParameterID{ids::odBypass,1},    "OD Bypass",      true));
-    add (std::make_unique<P>(juce::ParameterID{ids::distDrive,1},   "Dist Drive",     juce::NormalisableRange<float>(0.f, 1.f, 0.01f), 0.4f));
-    add (std::make_unique<P>(juce::ParameterID{ids::distTone,1},    "Dist Tone",      juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::distLevel,1},   "Dist Level",     juce::NormalisableRange<float>(-12.f, 12.f, 0.01f), 0.f));
     add (std::make_unique<B>(juce::ParameterID{ids::distBypass,1},  "Dist Bypass",    true));
 
     // --- riserva per i pedali selezionabili ---------------------------------
@@ -241,8 +219,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<P>(juce::ParameterID{ids::lnTargetDB,1},"LN Target", juce::NormalisableRange<float>(-30.f, -6.f, 0.1f), -18.f));
 
     // NoiseGate (pre-chain)
-    add (std::make_unique<P>(juce::ParameterID{ids::ngThresh,1},  "NG Threshold", juce::NormalisableRange<float>(-80.f, 0.f, 0.1f), -55.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::ngRelease,1}, "NG Release",   juce::NormalisableRange<float>(5.f, 500.f, 1.f), 80.f));
     add (std::make_unique<B>(juce::ParameterID{ids::ngBypass,1},  "NG Bypass",    false));
 
     // Delay
@@ -329,10 +305,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
 
     // Compressor (Boss CS-1 style, front of chain).
     add (std::make_unique<B>(juce::ParameterID{ids::compBypass,1},  "Comp Bypass",  true));
-    add (std::make_unique<P>(juce::ParameterID{ids::compSustain,1}, "Comp Sustain", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.4f));
-    add (std::make_unique<P>(juce::ParameterID{ids::compAttack,1},  "Comp Attack",  juce::NormalisableRange<float>(1.f, 100.f, 0.1f), 15.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::compTone,1},    "Comp Tone",    juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::compLevel,1},   "Comp Level",   juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
     add (std::make_unique<C>(juce::ParameterID{ids::compPos,1},     "Comp Position",
          juce::StringArray{ "Front", "Post-Gate", "Post-IR" }, 0));
 
