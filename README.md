@@ -12,7 +12,7 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ## Screenshots
 
-**MAIN tab** — catena completa con l'**analizzatore di spettro** nell'EQ, il **display LCD** in alto e i **due caricatori IR** in basso.
+**MAIN tab** — catena completa con l'**analizzatore di spettro** nell'EQ, il **display LCD** in alto e i **due caricatori IR** in basso. Sei sezioni hanno sotto al titolo la **tendina dei pedali**, con un elenco unico diviso per categoria.
 
 > Nello scatto il modello è un ENGL `amp_cab`, che contiene già la cassa: la sezione **CAB** e il **primo caricatore IR** sono spenti dall'esclusione automatica, non da un difetto.
 
@@ -40,14 +40,15 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 - **Two IR loaders** — each with its own volume and meter, crossfaded by an **IR BAL** knob; the second switches on by itself in Dual-Mono and Stereo
 - **Automatic cab bypass** — a model that already contains the cabinet (`gear_type` `amp_cab` / `full-rig`) puts the first IR loader into true bypass and greys it out, so two cabinets never stack
 - **IR quality tools**: high-pass / low-pass filters, trim, phase invert
+- **Selectable pedals** — six sections (NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ) are *slots* rather than fixed effects: a dropdown under each section title picks the pedal that runs there, from one shared list grouped by category (Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor). The section repopulates with exactly the knobs and switches that pedal has, and the panel resizes to fit.
 - **Full FX chain**:
-  - Pre-model: Smart Gate, Overdrive, Distortion
-  - Post-model: 5-band EQ + Depth + Resonance, Noise Gate, High-Pass, Loudness Normalization
+  - Pre-model: Noise Gate, Gate, Compressor, Overdrive, Distortion — each one a pedal slot
+  - Post-model: EQ (amp tone stack or a pedal EQ) + Depth + Resonance, High-Pass, Loudness Normalization
   - Post-cab: Delay, Chorus, Flanger, Reverb, Tremolo
 - **Gain-staging / calibration** (ported from the reference [NeuralAmpModelerPlugin](https://github.com/sdatkinson/NeuralAmpModelerPlugin)): Output Mode (Raw / Normalized / Calibrated) and Calibrate Input with dBu level — with automatic fallback when a model lacks calibration metadata
 - **Preset system** — factory presets by genre plus a neutral **Default**, user presets, import of `.prs` / `.prstl`, export and full library backup with the `.nam` and IR files embedded
 - **2x oversampling** (true `juce::dsp::Oversampling`, latency reported to the host)
-- **EQ spectrum analyser** with the response curve drawn on top and draggable band handles
+- **EQ spectrum analyser** with the response curve drawn on top and draggable band handles, which follow the EQ model chosen in the section — five for the amp tone stack, seven for the graphic EQ (dragging one moves the matching band fader), two sweepable for the parametric. **It is never removed**, whatever the section is set to.
 - **LCD display** — preset name and bank on a lit dot-matrix panel, four banks A/B/C/D, blinking TAP tempo and a cowbell metronome with its own volume
 - CPU meter, level meters, Info popup with credits
 - **Reaper helpers** — bundled ReaScripts in `extras/reaper/` for one-click VST3 insertion (`nam_insert.lua`) and `.nam` + IR autoload with clipboard fallback (`nam_autoload_vst3.lua`)

@@ -169,6 +169,28 @@
       <PARAM id="gate_p8" value="0.5"/>
       <PARAM id="gate_sw1" value="0"/>
       <PARAM id="gate_sw2" value="0"/>
+      <PARAM id="comp_model" value="19"/>
+      <PARAM id="comp_p1" value="0.4"/>
+      <PARAM id="comp_p2" value="0.1414"/>
+      <PARAM id="comp_p3" value="0.5"/>
+      <PARAM id="comp_p4" value="0.5"/>
+      <PARAM id="comp_p5" value="0.5"/>
+      <PARAM id="comp_p6" value="0.5"/>
+      <PARAM id="comp_p7" value="0.5"/>
+      <PARAM id="comp_p8" value="0.5"/>
+      <PARAM id="comp_sw1" value="0"/>
+      <PARAM id="comp_sw2" value="0"/>
+      <PARAM id="eq_model" value="16"/>
+      <PARAM id="eq_p1" value="0.5"/>
+      <PARAM id="eq_p2" value="0.5"/>
+      <PARAM id="eq_p3" value="0.5"/>
+      <PARAM id="eq_p4" value="0.5"/>
+      <PARAM id="eq_p5" value="0.5"/>
+      <PARAM id="eq_p6" value="0.5"/>
+      <PARAM id="eq_p7" value="0.5"/>
+      <PARAM id="eq_p8" value="0.5"/>
+      <PARAM id="eq_sw1" value="0"/>
+      <PARAM id="eq_sw2" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

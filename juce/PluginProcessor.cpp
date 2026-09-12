@@ -35,6 +35,8 @@ namespace ids {
     constexpr auto distModel     = "dist_model";
     constexpr auto ngModel       = "ng_model";
     constexpr auto gateModel     = "gate_model";
+    constexpr auto compModel     = "comp_model";
+    constexpr auto eqModel       = "eq_model";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
     constexpr auto gateThresh    = "gate_threshold";
@@ -215,8 +217,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
                                  pedal::indexOf ("ng_suppress")));
         add (std::make_unique<C>(juce::ParameterID{ids::gateModel,1}, "Gate Model", names,
                                  pedal::indexOf ("ng_hard")));
+        add (std::make_unique<C>(juce::ParameterID{ids::compModel,1}, "Comp Model", names,
+                                 pedal::indexOf ("cp_sustain")));
+        // La sezione EQ parte sulla torre di tono nativa: com'era prima.
+        add (std::make_unique<C>(juce::ParameterID{ids::eqModel,1},   "EQ Model",   names,
+                                 pedal::indexOf ("eq_tonestack")));
     }
-    for (const char* pre : { "od", "dist", "ng", "gate" }) {
+    for (const char* pre : { "od", "dist", "ng", "gate", "comp", "eq" }) {
         for (int i = 1; i <= pedal::kMaxKnobs; ++i)
             add (std::make_unique<P>(juce::ParameterID{juce::String (pre) + "_p" + juce::String (i), 1},
                                      juce::String (pre).toUpperCase() + " P" + juce::String (i),
@@ -448,11 +455,12 @@ void NAMAudioProcessor::pushParametersToPipelines()
     // Pedali selezionabili: i parametri della riserva sono normalizzati 0..1 e
     // vanno portati nell'intervallo reale dichiarato dal modello scelto. Un
     // controllo che il modello non usa resta semplicemente ignorato.
-    static const char* kSlotPrefix[4] = { "od", "dist", "ng", "gate" };
-    const char* kSlotModelId[4] = { ids::odModel, ids::distModel, ids::ngModel, ids::gateModel };
-    int   pedModel [4] {};
-    float pedKnobs [4][pedal::kMaxKnobs] {};
-    int   pedSwitch[4][pedal::kMaxSwitch] {};
+    static const char* kSlotPrefix[6] = { "od", "dist", "ng", "gate", "comp", "eq" };
+    const char* kSlotModelId[6] = { ids::odModel, ids::distModel, ids::ngModel,
+                                    ids::gateModel, ids::compModel, ids::eqModel };
+    int   pedModel [6] {};
+    float pedKnobs [6][pedal::kMaxKnobs] {};
+    int   pedSwitch[6][pedal::kMaxSwitch] {};
     {
         auto fill = [this] (const char* prefix, int modelIdx, float* knobs, int* sw)
         {
@@ -468,36 +476,30 @@ void NAMAudioProcessor::pushParametersToPipelines()
                 sw[i] = (int) apvts.getRawParameterValue (id)->load();
             }
         };
-        for (int sl = 0; sl < 4; ++sl) {
+        for (int sl = 0; sl < 6; ++sl) {
             pedModel[sl] = juce::jlimit (0, pedal::count() - 1,
                                          (int) apvts.getRawParameterValue (kSlotModelId[sl])->load());
             fill (kSlotPrefix[sl], pedModel[sl], pedKnobs[sl], pedSwitch[sl]);
         }
     }
+    // Nella sezione EQ lavora un equalizzatore solo: scegliendo un pedale, la
+    // torre di tono nativa va piatta, altrimenti le due curve si sommerebbero.
+    if (pedal::at (pedModel[5]).topo != pedal::Topology::EqNative)
+        bass = midG = pres = treb = air = 0.f;
     const bool  ir2En= apvts.getRawParameterValue (ids::ir2Enable)->load() > 0.5f;
     const float irBal= apvts.getRawParameterValue (ids::irBalance)->load();
     const float ir1V = apvts.getRawParameterValue (ids::ir1Volume)->load();
     const float ir2V = apvts.getRawParameterValue (ids::ir2Volume)->load();
     const bool  mdBp = apvts.getRawParameterValue (ids::modelBypass)->load() > 0.5f;
 
-    const float gT  = apvts.getRawParameterValue (ids::gateThresh)->load();
-    const float gR  = apvts.getRawParameterValue (ids::gateRelease)->load();
     const bool  gBp = apvts.getRawParameterValue (ids::gateBypass)->load() > 0.5f;
-    const float odD = apvts.getRawParameterValue (ids::odDrive)->load();
-    const float odT = apvts.getRawParameterValue (ids::odTone)->load();
-    const float odL = apvts.getRawParameterValue (ids::odLevel)->load();
     const bool  odBp= apvts.getRawParameterValue (ids::odBypass)->load() > 0.5f;
-    const float dsD = apvts.getRawParameterValue (ids::distDrive)->load();
-    const float dsT = apvts.getRawParameterValue (ids::distTone)->load();
-    const float dsL = apvts.getRawParameterValue (ids::distLevel)->load();
     const bool  dsBp= apvts.getRawParameterValue (ids::distBypass)->load() > 0.5f;
     const float hpF = apvts.getRawParameterValue (ids::hpFreq)->load();
     const bool  hpBp= apvts.getRawParameterValue (ids::hpBypass)->load() > 0.5f;
     const bool  lnOn= apvts.getRawParameterValue (ids::lnEnabled)->load() > 0.5f;
     const float lnT = apvts.getRawParameterValue (ids::lnTargetDB)->load();
 
-    const float ngT  = apvts.getRawParameterValue (ids::ngThresh)->load();
-    const float ngR  = apvts.getRawParameterValue (ids::ngRelease)->load();
     const bool  ngBp = apvts.getRawParameterValue (ids::ngBypass)->load() > 0.5f;
     const float dT  = apvts.getRawParameterValue (ids::delTime)->load();
     const float dFb = apvts.getRawParameterValue (ids::delFb)->load();
@@ -559,10 +561,6 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const int   mSens= (int) apvts.getRawParameterValue (ids::marSens)->load();
 
     const bool  cpBp = apvts.getRawParameterValue (ids::compBypass)->load()  > 0.5f;
-    const float cpS  = apvts.getRawParameterValue (ids::compSustain)->load();
-    const float cpA  = apvts.getRawParameterValue (ids::compAttack)->load();
-    const float cpTn = apvts.getRawParameterValue (ids::compTone)->load();
-    const float cpL  = apvts.getRawParameterValue (ids::compLevel)->load();
     const int   cpPos = (int) apvts.getRawParameterValue (ids::compPos)->load();
     const bool  pwBp = apvts.getRawParameterValue (ids::powerBypass)->load() > 0.5f;
     const float mVol = apvts.getRawParameterValue (ids::modelVolume)->load();
@@ -588,9 +586,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setIr1VolumeDB (ir1V);
         p.setIr2VolumeDB (ir2V);
         p.setModelBypass (mdBp);
-        // I due gate nativi hanno lasciato il posto ai pedali negli slot 2 e 3.
-        const bool slotBypass[4] = { odBp, dsBp, ngBp, gBp };
-        for (int sl = 0; sl < 4; ++sl)
+        // I due gate nativi e il compressore hanno lasciato il posto ai pedali
+        // negli slot 2, 3 e 4.
+        const bool slotBypass[6] = { odBp, dsBp, ngBp, gBp, cpBp, eqBp };
+        for (int sl = 0; sl < 6; ++sl)
             p.setPedal (sl, pedModel[sl], pedKnobs[sl], pedSwitch[sl], slotBypass[sl]);
         p.setHighPass (hpF, hpBp);
         p.setLoudnessNorm (lnOn, lnT);
@@ -609,7 +608,6 @@ void NAMAudioProcessor::pushParametersToPipelines()
                         aG2, aMa2,
                         aB3, aM3, aT3, aG3, aMa3);
         p.setMarshall  (aEn2 && aModel == 1, mVal, mSens, mPre, mMas, mB, mM, mT, mPr);
-        p.setCompressor (cpS, cpA, cpTn, cpL, cpBp);
         p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
         p.setModelStage (mVol, mBs, mMd, mTr);
