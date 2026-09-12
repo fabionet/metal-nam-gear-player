@@ -13,6 +13,7 @@
 #include "DepthFilter.h"
 #include "IRConvolver.h"
 #include "PreampFX.h"
+#include "PedalDSP.h"
 #include "NativeAmp.h"
 #include "MarshallAmp.h"
 #include "Biquad.h"
@@ -79,10 +80,17 @@ public:
     // Pre-FX
     void setGate(float threshDB, float releaseMs, bool byp)
     { gate_.setThresholdDB(threshDB); gate_.setReleaseMs(releaseMs); gate_.setBypass(byp); }
-    void setOverdrive(float drive, float toneDB, float levelDB, bool byp)
-    { od_.setDrive(drive); od_.setToneDB(toneDB); od_.setLevelDB(levelDB); od_.setBypass(byp); }
-    void setDistortion(float drive, float toneDB, float levelDB, bool byp)
-    { dist_.setDrive(drive); dist_.setToneDB(toneDB); dist_.setLevelDB(levelDB); dist_.setBypass(byp); }
+    // I due stadi sono ora pedali selezionabili dal registro condiviso. I valori
+    // arrivano gia' convertiti nell'intervallo reale del modello scelto.
+    void setPedal (bool distSlot, int model, const float* knobs, const int* switches, bool byp)
+    {
+        pedal::PedalFX& p = distSlot ? distPedal_ : odPedal_;
+        p.setModel (model);
+        for (int i = 0; i < pedal::kMaxKnobs;  ++i) p.setKnob   (i, knobs[i]);
+        for (int i = 0; i < pedal::kMaxSwitch; ++i) p.setSwitch (i, switches[i]);
+        p.setBypass (byp);
+        p.commit();
+    }
     void setHighPass(float freqHz, bool byp)
     { hp_.setFreqHz(freqHz); hp_.setBypass(byp); }
     void setLoudnessNorm(bool enabled, float targetDB)
@@ -196,8 +204,8 @@ private:
     preamp_fx::CompressorFX  comp_;
     std::atomic<int>         compPos_ { 0 };
     preamp_fx::SmartGate     gate_;
-    preamp_fx::Overdrive     od_;
-    preamp_fx::Distortion    dist_;
+    pedal::PedalFX  odPedal_;
+    pedal::PedalFX  distPedal_;
     preamp_fx::HighPass      hp_;
     preamp_fx::LoudnessNorm  loud_;
     preamp_fx::NoiseGate     ng_;

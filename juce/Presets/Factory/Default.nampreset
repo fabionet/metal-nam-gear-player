@@ -43,6 +43,8 @@
       <PARAM id="dist_tone" value="0"/>
       <PARAM id="dist_level" value="0"/>
       <PARAM id="dist_bypass" value="1"/>
+      <PARAM id="od_model" value="2"/>
+      <PARAM id="dist_model" value="6"/>
       <PARAM id="hp_freq" value="30"/>
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="0"/>
@@ -125,6 +127,22 @@
       <PARAM id="split_balance" value="0"/>
       <PARAM id="width_amount" value="1"/>
       <PARAM id="width_enable" value="0"/>
+      <PARAM id="od_p1" value="0.4"/>
+      <PARAM id="od_p2" value="0.5"/>
+      <PARAM id="od_p3" value="0.5"/>
+      <PARAM id="od_p4" value="0.5"/>
+      <PARAM id="od_p5" value="0.5"/>
+      <PARAM id="od_p6" value="0.5"/>
+      <PARAM id="dist_p1" value="0.5"/>
+      <PARAM id="dist_p2" value="0.5"/>
+      <PARAM id="dist_p3" value="0.5"/>
+      <PARAM id="dist_p4" value="0.5"/>
+      <PARAM id="dist_p5" value="0.5"/>
+      <PARAM id="dist_p6" value="0.5"/>
+      <PARAM id="od_sw1" value="0"/>
+      <PARAM id="od_sw2" value="0"/>
+      <PARAM id="dist_sw1" value="0"/>
+      <PARAM id="dist_sw2" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

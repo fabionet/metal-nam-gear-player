@@ -13,6 +13,7 @@
 #include "MeterStripComponent.h"
 #include "EQAnalyserComponent.h"
 #include "LCDDisplayComponent.h"
+#include "PedalDSP.h"
 
 class NAMAudioProcessorEditor : public juce::AudioProcessorEditor,
                                 private juce::Timer
@@ -198,6 +199,18 @@ private:
     std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
     std::unique_ptr<EQAnalyserComponent> eqAnalyser_;
     std::unique_ptr<LCDDisplayComponent> lcd_;
+
+    // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
+    juce::ComboBox pedalBox_[2];                 // 0 = OVERDRIVE, 1 = DISTORTION
+    std::unique_ptr<CAtt> pedalAtt_[2];
+    juce::ComboBox pedalSwitch_[2][pedal::kMaxSwitch];
+    std::unique_ptr<CAtt> pedalSwitchAtt_[2][pedal::kMaxSwitch];
+    juce::Label    pedalSwitchLabel_[2][pedal::kMaxSwitch];
+    int pedalKnobBase_[2] { -1, -1 };            // indice del primo knob di riserva
+    int lastPedalModel_[2] { -1, -1 };
+    void buildPedalMenu (juce::ComboBox&);
+    void refreshPedalSection (int slot);
+    std::vector<int> pedalKnobIds (int slot) const;
     bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
