@@ -523,6 +523,42 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     addAndMakeVisible (modelVolLabel_);
     modelVolAtt_ = std::make_unique<SAtt> (processorRef.apvts, "model_volume", modelVolSlider_);
 
+    // --- pedali selezionabili: riserva di pomelli e interruttori -----------
+    // I pomelli si aggiungono in coda a knobs_, cosi' gli indici dei k* gia'
+    // esistenti non si spostano.
+    for (int slot = 0; slot < 2; ++slot)
+    {
+        const char* prefix = (slot == 0) ? "od" : "dist";
+        pedalKnobBase_[slot] = (int) knobs_.size();
+        for (int i = 1; i <= pedal::kMaxKnobs; ++i)
+            addKnob (juce::String (prefix) + "_p" + juce::String (i), "");
+
+        addAndMakeVisible (pedalBox_[slot]);
+        buildPedalMenu (pedalBox_[slot]);
+        pedalAtt_[slot] = std::make_unique<CAtt> (
+            processorRef.apvts, juce::String (prefix) + "_model", pedalBox_[slot]);
+        pedalBox_[slot].onChange = [this, slot] {
+            refreshPedalSection (slot);
+            resized();
+            // resized() rifa' il layout ma non ridisegna: senza questo i titoli
+            // dei pannelli restano dipinti alle posizioni precedenti e si
+            // vedono sovrapposti a quelli nuovi.
+            repaint();
+        };
+
+        for (int i = 0; i < pedal::kMaxSwitch; ++i) {
+            addChildComponent (pedalSwitch_[slot][i]);
+            pedalSwitchAtt_[slot][i] = std::make_unique<CAtt> (
+                processorRef.apvts,
+                juce::String (prefix) + "_sw" + juce::String (i + 1), pedalSwitch_[slot][i]);
+            addChildComponent (pedalSwitchLabel_[slot][i]);
+            pedalSwitchLabel_[slot][i].setJustificationType (juce::Justification::centred);
+            pedalSwitchLabel_[slot][i].setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+            pedalSwitchLabel_[slot][i].setColour (juce::Label::textColourId, juce::Colour (0xfff5efdc));
+        }
+        refreshPedalSection (slot);
+    }
+
     eqAnalyser_ = std::make_unique<EQAnalyserComponent> (processorRef, processorRef.apvts);
     addChildComponent (*eqAnalyser_);
 
@@ -666,6 +702,82 @@ void NAMAudioProcessorEditor::updateSlimEnabled()
         knobs_[kQuality]->slider.setAlpha  (a);
         knobs_[kQuality]->label .setAlpha  (a);
     }
+}
+
+
+// Il menu e' lo stesso per ogni sezione che lo espone, raggruppato per
+// categoria di pedale mantenendo l'ordine del registro.
+void NAMAudioProcessorEditor::buildPedalMenu (juce::ComboBox& box)
+{
+    box.clear (juce::dontSendNotification);
+    int lastCat = -1;
+    for (int i = 0; i < pedal::count(); ++i) {
+        const auto& m = pedal::at (i);
+        if ((int) m.cat != lastCat) {
+            box.addSectionHeading (pedal::categoryName (m.cat));
+            lastCat = (int) m.cat;
+        }
+        box.addItem (m.name, i + 1);            // gli id della ComboBox partono da 1
+    }
+}
+
+// Rietichetta la riserva secondo il pedale scelto e mostra solo i controlli che
+// quel pedale possiede davvero. I valori predefiniti vengono scritti una volta
+// sola, al cambio di modello, altrimenti si sovrascriverebbe la regolazione.
+void NAMAudioProcessorEditor::refreshPedalSection (int slot)
+{
+    const int idx = juce::jlimit (0, pedal::count() - 1, pedalBox_[slot].getSelectedItemIndex());
+    const auto& m = pedal::at (idx);
+    const bool changed = (idx != lastPedalModel_[slot]);
+    lastPedalModel_[slot] = idx;
+
+    const char* prefix = (slot == 0) ? "od" : "dist";
+    const int base = pedalKnobBase_[slot];
+
+    for (int i = 0; i < pedal::kMaxKnobs; ++i) {
+        auto* kb = (base >= 0 && base + i < (int) knobs_.size()) ? knobs_[(size_t)(base + i)].get() : nullptr;
+        if (kb == nullptr) continue;
+        const bool used = (i < m.numKnobs);
+        kb->label.setText (used ? m.knobs[i].label : "", juce::dontSendNotification);
+        if (used && changed) {
+            // Il parametro e' normalizzato: si riporta il predefinito reale.
+            const auto& k = m.knobs[i];
+            const float norm = (k.max > k.min) ? (k.def - k.min) / (k.max - k.min) : 0.f;
+            if (auto* p = processorRef.apvts.getParameter (
+                    juce::String (prefix) + "_p" + juce::String (i + 1)))
+                p->setValueNotifyingHost (juce::jlimit (0.f, 1.f, norm));
+        }
+    }
+
+    for (int i = 0; i < pedal::kMaxSwitch; ++i) {
+        const bool used = (i < m.numSwitches);
+        auto& cb = pedalSwitch_[slot][i];
+        if (used) {
+            const auto keep = cb.getSelectedItemIndex();
+            cb.clear (juce::dontSendNotification);
+            for (int o = 0; o < m.switches[i].numOptions; ++o)
+                cb.addItem (m.switches[i].options[o], o + 1);
+            cb.setSelectedItemIndex (juce::jlimit (0, m.switches[i].numOptions - 1,
+                                                   changed ? m.switches[i].def : keep),
+                                     juce::dontSendNotification);
+            pedalSwitchLabel_[slot][i].setText (m.switches[i].label, juce::dontSendNotification);
+        }
+    }
+    pedalBox_[slot].setTooltip (m.blurb);
+}
+
+
+// Gli indici dei pomelli di riserva effettivamente usati dal pedale scelto.
+std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
+{
+    std::vector<int> ids;
+    const int base = pedalKnobBase_[slot];
+    if (base < 0) return ids;
+    const int idx = juce::jlimit (0, pedal::count() - 1, lastPedalModel_[slot]);
+    const auto& m = pedal::at (idx);
+    for (int i = 0; i < m.numKnobs && base + i < (int) knobs_.size(); ++i)
+        ids.push_back (base + i);
+    return ids;
 }
 
 void NAMAudioProcessorEditor::timerCallback()
@@ -848,6 +960,12 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
     // Inner highlight line.
     g.setColour (juce::Colour::fromFloatRGBA (1.f, 1.f, 1.f, 0.05f));
     g.drawHorizontalLine ((int) a.getY() + 1, a.getX() + 2, a.getRight() - 2);
+
+    // Le sezioni col menu dei pedali lo hanno SOPRA al titolo: qui si salta la
+    // striscia che il layout ha riservato alla tendina, altrimenti il titolo
+    // finirebbe disegnato sotto di essa e sparirebbe.
+    if (title == "OVERDRIVE" || title == "DISTORTION")
+        a.removeFromTop (24.f);
 
     // Title strip at top.
     auto titleStrip = a.removeFromTop (30.f);
@@ -1487,6 +1605,13 @@ void NAMAudioProcessorEditor::resized()
         splitModeBox_.setVisible (false);  // shown only inside the SPLITTER section below
         splitModeLabel_.setVisible (false);
         if (eqAnalyser_) eqAnalyser_->setVisible (false);  // solo dentro la sezione EQ
+        for (int sl = 0; sl < 2; ++sl) {
+            pedalBox_[sl].setVisible (false);
+            for (int i = 0; i < pedal::kMaxSwitch; ++i) {
+                pedalSwitch_[sl][i].setVisible (false);
+                pedalSwitchLabel_[sl][i].setVisible (false);
+            }
+        }
     }
 
     r.removeFromBottom (6);
@@ -1502,8 +1627,11 @@ void NAMAudioProcessorEditor::resized()
             { "NGATE",      { kNgThresh, kNgRelease } },
             { "GATE",       { kGateThresh, kGateRelease } },
             { "COMP",       { kCompSustain, kCompAttack, kCompTone, kCompLevel } },
-            { "OVERDRIVE",  { kOdDrive, kOdTone, kOdLevel } },
-            { "DISTORTION", { kDistDrive, kDistTone, kDistLevel } },
+            // Le due sezioni con il menu dei pedali elencano solo i controlli che
+            // il modello scelto possiede davvero: la larghezza del pannello e'
+            // proporzionale al numero di id, quindi si adatta da sola.
+            { "OVERDRIVE",  pedalKnobIds (0) },
+            { "DISTORTION", pedalKnobIds (1) },
             { "SPLITTER",   { kSplitLeft, kSplitRight, kSplitBalance, kWidth } },
             { "AMP",        { kInput, kOutput } },
             { "EQ",         { kBass, kMidGain, kTreble, kPres, kAir, kMidFreq, kMidQ } },
@@ -1529,7 +1657,15 @@ void NAMAudioProcessorEditor::resized()
     }
 
     // Total knobs across all groups: 2+3+3+2+7+3+2 = 22 (ok, kCount)
-    int totalKnobs = 0; for (auto& g : groups) totalKnobs += (int) g.ids.size();
+    // Le sezioni col menu dei pedali non possono scendere sotto una larghezza
+    // minima: con un modello da un solo pomello collasserebbero, e titolo e
+    // menu diventerebbero illeggibili.
+    auto widthUnits = [] (const Group& g) {
+        const bool hasMenu = (g.name == "OVERDRIVE" || g.name == "DISTORTION");
+        const int n = (int) g.ids.size();
+        return hasMenu ? std::max (n, 3) : n;
+    };
+    int totalKnobs = 0; for (auto& g : groups) totalKnobs += widthUnits (g);
 
     // Allocate widths proportionally.
     const int gap = 6;
@@ -1562,12 +1698,37 @@ void NAMAudioProcessorEditor::resized()
     for (size_t gi = 0; gi < groups.size(); ++gi)
     {
         auto& gr = groups[gi];
-        const int w = (int) std::round ((double) availW * (double) gr.ids.size() / (double) totalKnobs);
+        const int w = (int) std::round ((double) availW * (double) widthUnits (gr) / (double) totalKnobs);
         auto panel = cursorRect.removeFromLeft (w);
         groupPanels_.push_back ({ panel, gr.name });
 
         auto inside = panel.reduced (6, 4);
+
+        // Menu del pedale SOPRA al titolo, per le sezioni che lo espongono.
+        const int pedalSlot = (gr.name == "OVERDRIVE") ? 0 : (gr.name == "DISTORTION" ? 1 : -1);
+        if (pedalSlot >= 0) {
+            pedalBox_[pedalSlot].setVisible (true);
+            pedalBox_[pedalSlot].setBounds (inside.removeFromTop (22).reduced (2, 1));
+            inside.removeFromTop (2);
+        }
+
         inside.removeFromTop (30); // title strip
+
+        // Gli interruttori del pedale stanno sotto al titolo, sopra ai pomelli.
+        if (pedalSlot >= 0) {
+            const auto& m = pedal::at (juce::jlimit (0, pedal::count() - 1,
+                                                     lastPedalModel_[pedalSlot]));
+            for (int i = 0; i < pedal::kMaxSwitch; ++i) {
+                const bool used = (i < m.numSwitches);
+                pedalSwitch_[pedalSlot][i].setVisible (used);
+                pedalSwitchLabel_[pedalSlot][i].setVisible (used);
+                if (! used) continue;
+                auto row = inside.removeFromTop (32);
+                pedalSwitchLabel_[pedalSlot][i].setBounds (row.removeFromTop (12));
+                pedalSwitch_[pedalSlot][i].setBounds (row.reduced (4, 1));
+                inside.removeFromTop (2);
+            }
+        }
 
         // Reserve a bottom strip for this section's bypass/enable button(s).
         auto sectionBtns = bypassButtonsFor (gr.name);

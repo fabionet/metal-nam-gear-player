@@ -8,6 +8,7 @@
 
 #include "NAMPipeline.h"
 #include "Metronome.h"
+#include "PedalDSP.h"
 
 class PresetManager;
 

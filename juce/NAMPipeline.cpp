@@ -35,8 +35,8 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     depth_.prepare(sampleRate, 1);
     comp_.prepare(sampleRate);
     gate_.prepare(sampleRate);
-    od_.prepare(sampleRate);
-    dist_.prepare(sampleRate);
+    odPedal_.prepare(sampleRate);
+    distPedal_.prepare(sampleRate);
     hp_.prepare(sampleRate);
     loud_.prepare(sampleRate);
     ng_.prepare(sampleRate);
@@ -79,8 +79,8 @@ void NAMPipeline::reset()
     depth_.reset();
     comp_.reset();
     gate_.reset();
-    od_.reset();
-    dist_.reset();
+    odPedal_.reset();
+    distPedal_.reset();
     hp_.reset();
     loud_.reset();
     ng_.reset();
@@ -204,8 +204,8 @@ void NAMPipeline::process(const float* in, float* out, int n)
         s = ng_.process   (s);
         s = gate_.process (s);
         if (cpos == 1) s = comp_.process (s);
-        s = od_.process   (s);
-        s = dist_.process (s);
+        s = odPedal_.process   (s);
+        s = distPedal_.process (s);
         out[i] = s;
     }
 
