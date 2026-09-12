@@ -82,9 +82,10 @@ public:
     { gate_.setThresholdDB(threshDB); gate_.setReleaseMs(releaseMs); gate_.setBypass(byp); }
     // I due stadi sono ora pedali selezionabili dal registro condiviso. I valori
     // arrivano gia' convertiti nell'intervallo reale del modello scelto.
-    void setPedal (bool distSlot, int model, const float* knobs, const int* switches, bool byp)
+    // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE.
+    void setPedal (int slot, int model, const float* knobs, const int* switches, bool byp)
     {
-        pedal::PedalFX& p = distSlot ? distPedal_ : odPedal_;
+        pedal::PedalFX& p = pedals_[(std::size_t) (slot < 0 ? 0 : (slot > 3 ? 3 : slot))];
         p.setModel (model);
         for (int i = 0; i < pedal::kMaxKnobs;  ++i) p.setKnob   (i, knobs[i]);
         for (int i = 0; i < pedal::kMaxSwitch; ++i) p.setSwitch (i, switches[i]);
@@ -204,8 +205,7 @@ private:
     preamp_fx::CompressorFX  comp_;
     std::atomic<int>         compPos_ { 0 };
     preamp_fx::SmartGate     gate_;
-    pedal::PedalFX  odPedal_;
-    pedal::PedalFX  distPedal_;
+    pedal::PedalFX  pedals_[4];   // od, dist, ngate, gate
     preamp_fx::HighPass      hp_;
     preamp_fx::LoudnessNorm  loud_;
     preamp_fx::NoiseGate     ng_;

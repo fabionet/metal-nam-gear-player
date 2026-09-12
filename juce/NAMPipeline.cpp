@@ -35,8 +35,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     depth_.prepare(sampleRate, 1);
     comp_.prepare(sampleRate);
     gate_.prepare(sampleRate);
-    odPedal_.prepare(sampleRate);
-    distPedal_.prepare(sampleRate);
+    for (auto& p : pedals_) p.prepare(sampleRate);
     hp_.prepare(sampleRate);
     loud_.prepare(sampleRate);
     ng_.prepare(sampleRate);
@@ -79,8 +78,7 @@ void NAMPipeline::reset()
     depth_.reset();
     comp_.reset();
     gate_.reset();
-    odPedal_.reset();
-    distPedal_.reset();
+    for (auto& p : pedals_) p.reset();
     hp_.reset();
     loud_.reset();
     ng_.reset();
@@ -201,11 +199,11 @@ void NAMPipeline::process(const float* in, float* out, int n)
     for (int i = 0; i < n; ++i) {
         float s = out[i];
         if (cpos == 0) s = comp_.process (s);
-        s = ng_.process   (s);
-        s = gate_.process (s);
+        s = pedals_[2].process (s);   // NGATE
+        s = pedals_[3].process (s);   // GATE
         if (cpos == 1) s = comp_.process (s);
-        s = odPedal_.process   (s);
-        s = distPedal_.process (s);
+        s = pedals_[0].process (s);   // OVERDRIVE
+        s = pedals_[1].process (s);   // DISTORTION
         out[i] = s;
     }
 

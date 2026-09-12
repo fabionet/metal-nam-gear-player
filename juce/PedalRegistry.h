@@ -24,10 +24,12 @@
 
 namespace pedal {
 
-constexpr int kMaxKnobs  = 6;   // riserva di parametri continui per sezione
+// Otto e non sei: l'equalizzatore grafico a sette bande piu' il livello e'
+// il modello con piu' controlli dell'elenco, e detta la dimensione.
+constexpr int kMaxKnobs  = 8;   // riserva di parametri continui per sezione
 constexpr int kMaxSwitch = 2;   // riserva di parametri a scatti per sezione
 
-enum class Category { Overdrive, Distortion, HighGain, Fuzz, Booster };
+enum class Category { Overdrive, Distortion, HighGain, Fuzz, Booster, Gate, Equalizer };
 
 // Quale algoritmo usa il modello. Dichiarata esplicitamente invece di dedurla
 // dall'id: dedurla dai caratteri faceva collidere od_screamer con od_super, e
@@ -43,7 +45,11 @@ enum class Topology {
     DistBody,       // clipping duro con rientro controllato delle basse
     HgColor,        // due filtri di colore indipendenti sommati
     HgZone,         // doppio stadio con tre bande e medio parametrico
-    FuzzGate        // asimmetria forte con componente continua
+    FuzzGate,       // asimmetria forte con componente continua
+    GateSuppress,   // soppressore con soglia e decadimento, modi Reduction/Mute
+    GateHard,       // cancello secco: sopra soglia passa, sotto chiude
+    EqGraphic7,     // sette bande fisse a 100/200/400/800/1.6k/3.2k/6.4k piu' livello
+    EqParametric    // due campane spazzolabili piu' livello
 };
 
 inline const char* categoryName (Category c)
@@ -54,6 +60,8 @@ inline const char* categoryName (Category c)
         case Category::HighGain:   return "High Gain";
         case Category::Fuzz:       return "Fuzz";
         case Category::Booster:    return "Booster";
+        case Category::Gate:       return "Gate / Noise";
+        case Category::Equalizer:  return "Equalizer";
     }
     return "?";
 }
@@ -188,6 +196,37 @@ inline const std::vector<Model>& models()
       "Guadagno pulito con passa-alto regolabile all'ingresso: serve a spingere lo "
       "stadio successivo, non a distorcere.",
       { { "BOOST", 0.f, 24.f, 6.f, " dB" }, { "LOW CUT", 20.f, 800.f, 80.f, " Hz" } }, 2,
+      { none(), none() }, 0 },
+
+    // --- Gate / Noise ------------------------------------------------------
+    { "ng_suppress", "NS-TWO Suppressor", Category::Gate, Topology::GateSuppress,
+      "Soppressore con soglia e decadimento. In Reduction attenua il fondo lasciando "
+      "passare la coda; in Mute chiude del tutto sotto la soglia.",
+      { { "THRESHOLD", -80.f, 0.f, -55.f, " dB" }, { "DECAY", 5.f, 800.f, 120.f, " ms" } }, 2,
+      { { "MODE", { "Reduction", "Mute", "", "" }, 2, 0 }, none() }, 1 },
+
+    { "ng_hard", "NF-ONE Noise Gate", Category::Gate, Topology::GateHard,
+      "Cancello secco: sopra la soglia passa, sotto chiude. Il piu' semplice e il "
+      "piu' deciso, adatto al metal a canale chiuso.",
+      { { "THRESHOLD", -80.f, 0.f, -60.f, " dB" }, { "RELEASE", 5.f, 500.f, 80.f, " ms" } }, 2,
+      { none(), none() }, 0 },
+
+    // --- Equalizer ---------------------------------------------------------
+    { "eq_graphic", "GE-SEVEN Graphic", Category::Equalizer, Topology::EqGraphic7,
+      "Sette bande fisse a 100, 200, 400 e 800 Hz, 1.6, 3.2 e 6.4 kHz, piu' il "
+      "livello: l'equalizzatore grafico classico da pedaliera.",
+      { { "100", -15.f, 15.f, 0.f, " dB" }, { "200", -15.f, 15.f, 0.f, " dB" },
+        { "400", -15.f, 15.f, 0.f, " dB" }, { "800", -15.f, 15.f, 0.f, " dB" },
+        { "1.6k", -15.f, 15.f, 0.f, " dB" }, { "3.2k", -15.f, 15.f, 0.f, " dB" },
+        { "6.4k", -15.f, 15.f, 0.f, " dB" }, { "LEVEL", -15.f, 15.f, 0.f, " dB" } }, 8,
+      { none(), none() }, 0 },
+
+    { "eq_param", "EQ-TWENTY Parametric", Category::Equalizer, Topology::EqParametric,
+      "Due campane spazzolabili con guadagno e frequenza indipendenti, piu' il "
+      "livello: si interviene dove serve invece che su bande fisse.",
+      { { "LOW GAIN", -15.f, 15.f, 0.f, " dB" }, { "LOW FREQ", 40.f, 1000.f, 200.f, " Hz" },
+        { "HI GAIN", -15.f, 15.f, 0.f, " dB" },  { "HI FREQ", 500.f, 8000.f, 2500.f, " Hz" },
+        { "LEVEL", -15.f, 15.f, 0.f, " dB" } }, 5,
       { none(), none() }, 0 },
     };
     return list;

@@ -120,7 +120,8 @@ public:
         inHP_.reset(); loopHP_.reset(); postLP_.reset(); bodyLP_.reset();
         toneHP_.reset(); colorLo_.reset(); colorHi_.reset(); boostHP_.reset();
         low_.reset(); mid_.reset(); high_.reset();
-        dc_ = 0.f;
+        for (auto& b : band_) b.reset();
+        dc_ = 0.f; env_ = 0.f; gain_ = 1.f;
     }
 
     void setBypass (bool b) { bypass_ = b; }
@@ -171,6 +172,14 @@ public:
 
             case Topology::FuzzGate:
                 return fuzz (inHP_.process (x), m);
+
+            case Topology::GateSuppress:
+            case Topology::GateHard:
+                return gate (x, m);
+
+            case Topology::EqGraphic7:
+            case Topology::EqParametric:
+                return equaliser (x, m);
         }
         return x;
     }
@@ -276,6 +285,48 @@ private:
         return v * (0.2f + lvl * 1.1f);
     }
 
+    // --- gate -------------------------------------------------------------
+    // Inseguitore di inviluppo con attacco immediato e rilascio governato dal
+    // decadimento. Reduction attenua il fondo lasciando passare la coda, Mute
+    // chiude del tutto: e' la differenza che si sente fra i due modi.
+    float gate (float x, const Model& m)
+    {
+        const float thDB   = k_[0];
+        const float decayMs = std::max (1.f, k_[1]);
+        const bool  mute   = (m.topo == Topology::GateHard) || (m.numSwitches > 0 && s_[0] == 1);
+
+        const float a = std::exp (-1.0f / (float) (sr_ * decayMs * 0.001));
+        const float lvl = std::fabs (x);
+        env_ = (lvl > env_) ? lvl : (env_ * a + lvl * (1.f - a));
+
+        const float envDB = 20.f * std::log10 (std::max (env_, 1.0e-7f));
+        // Ginocchio di 6 dB: sotto soglia la chiusura e' progressiva, non a
+        // gradino, altrimenti il gate "respira" udibilmente sulle code.
+        const float over = envDB - thDB;
+        float target;
+        if (over >= 0.f)        target = 1.f;
+        else if (over > -6.f)   target = 1.f + over / 6.f;
+        else                    target = mute ? 0.f : 0.12f;   // Reduction lascia un filo
+
+        // Rampa del guadagno, per non produrre scalini.
+        const float ga = std::exp (-1.0f / (float) (sr_ * 0.005));
+        gain_ = gain_ * ga + target * (1.f - ga);
+        return x * gain_;
+    }
+
+    // --- equalizzatori ----------------------------------------------------
+    float equaliser (float x, const Model& m)
+    {
+        float v = x;
+        if (m.topo == Topology::EqGraphic7) {
+            for (int i = 0; i < 7; ++i) v = band_[i].process (v);
+            return v * std::pow (10.f, k_[7] / 20.f);
+        }
+        v = band_[0].process (v);
+        v = band_[1].process (v);
+        return v * std::pow (10.f, k_[4] / 20.f);
+    }
+
     // --- reti di tono -----------------------------------------------------
     // Bilanciamento fra gravi e acuti attorno a un perno.
     float tilt (float v, float t)
@@ -296,6 +347,18 @@ private:
     void updateEq()
     {
         const Model& m = at (model_);
+
+        if (m.topo == Topology::EqGraphic7) {
+            // Le sette frequenze fisse del grafico classico.
+            static const float kF[7] = { 100.f, 200.f, 400.f, 800.f, 1600.f, 3200.f, 6400.f };
+            for (int i = 0; i < 7; ++i) band_[i].set (kF[i], 1.4f, k_[i], sr_);
+            return;
+        }
+        if (m.topo == Topology::EqParametric) {
+            band_[0].set (std::clamp (k_[1],  40.f, 1000.f), 1.0f, k_[0], sr_);
+            band_[1].set (std::clamp (k_[3], 500.f, 8000.f), 1.0f, k_[2], sr_);
+            return;
+        }
         if (m.topo != Topology::HgZone) return;
         low_ .set (100.f,  0.8f, k_[2], sr_);
         high_.set (3200.f, 0.8f, k_[3], sr_);
@@ -310,7 +373,10 @@ private:
 
     OnePole inHP_, loopHP_, postLP_, bodyLP_, toneHP_, colorLo_, colorHi_, boostHP_;
     Peak    low_, mid_, high_;
-    float   dc_ = 0.f;
+    Peak    band_[7];               // bande dell'equalizzatore grafico
+    float   dc_   = 0.f;
+    float   env_  = 0.f;            // inviluppo del gate
+    float   gain_ = 1.f;            // guadagno del gate, con rampa
 };
 
 } // namespace pedal

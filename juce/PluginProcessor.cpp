@@ -33,6 +33,8 @@ namespace ids {
     // decide quanti di questi parametri usare e come chiamarli.
     constexpr auto odModel       = "od_model";
     constexpr auto distModel     = "dist_model";
+    constexpr auto ngModel       = "ng_model";
+    constexpr auto gateModel     = "gate_model";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
     constexpr auto gateThresh    = "gate_threshold";
@@ -209,18 +211,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
                                  pedal::indexOf ("od_screamer")));
         add (std::make_unique<C>(juce::ParameterID{ids::distModel,1}, "Dist Model", names,
                                  pedal::indexOf ("ds_classic")));
+        add (std::make_unique<C>(juce::ParameterID{ids::ngModel,1},   "NG Model",   names,
+                                 pedal::indexOf ("ng_suppress")));
+        add (std::make_unique<C>(juce::ParameterID{ids::gateModel,1}, "Gate Model", names,
+                                 pedal::indexOf ("ng_hard")));
     }
-    for (int i = 1; i <= pedal::kMaxKnobs; ++i) {
-        add (std::make_unique<P>(juce::ParameterID{juce::String ("od_p")   + juce::String (i), 1},
-                                 "OD P"   + juce::String (i), juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-        add (std::make_unique<P>(juce::ParameterID{juce::String ("dist_p") + juce::String (i), 1},
-                                 "Dist P" + juce::String (i), juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-    }
-    for (int i = 1; i <= pedal::kMaxSwitch; ++i) {
-        add (std::make_unique<C>(juce::ParameterID{juce::String ("od_sw")   + juce::String (i), 1},
-                                 "OD SW"   + juce::String (i), juce::StringArray{"0","1","2","3"}, 0));
-        add (std::make_unique<C>(juce::ParameterID{juce::String ("dist_sw") + juce::String (i), 1},
-                                 "Dist SW" + juce::String (i), juce::StringArray{"0","1","2","3"}, 0));
+    for (const char* pre : { "od", "dist", "ng", "gate" }) {
+        for (int i = 1; i <= pedal::kMaxKnobs; ++i)
+            add (std::make_unique<P>(juce::ParameterID{juce::String (pre) + "_p" + juce::String (i), 1},
+                                     juce::String (pre).toUpperCase() + " P" + juce::String (i),
+                                     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+        for (int i = 1; i <= pedal::kMaxSwitch; ++i)
+            add (std::make_unique<C>(juce::ParameterID{juce::String (pre) + "_sw" + juce::String (i), 1},
+                                     juce::String (pre).toUpperCase() + " SW" + juce::String (i),
+                                     juce::StringArray{"0","1","2","3"}, 0));
     }
 
     // Master post-cab
@@ -444,12 +448,11 @@ void NAMAudioProcessor::pushParametersToPipelines()
     // Pedali selezionabili: i parametri della riserva sono normalizzati 0..1 e
     // vanno portati nell'intervallo reale dichiarato dal modello scelto. Un
     // controllo che il modello non usa resta semplicemente ignorato.
-    const int odModel   = juce::jlimit (0, pedal::count() - 1,
-                                        (int) apvts.getRawParameterValue (ids::odModel)->load());
-    const int distModel = juce::jlimit (0, pedal::count() - 1,
-                                        (int) apvts.getRawParameterValue (ids::distModel)->load());
-    float odKnobs[pedal::kMaxKnobs] {}, dsKnobs[pedal::kMaxKnobs] {};
-    int   odSwitch[pedal::kMaxSwitch] {}, dsSwitch[pedal::kMaxSwitch] {};
+    static const char* kSlotPrefix[4] = { "od", "dist", "ng", "gate" };
+    const char* kSlotModelId[4] = { ids::odModel, ids::distModel, ids::ngModel, ids::gateModel };
+    int   pedModel [4] {};
+    float pedKnobs [4][pedal::kMaxKnobs] {};
+    int   pedSwitch[4][pedal::kMaxSwitch] {};
     {
         auto fill = [this] (const char* prefix, int modelIdx, float* knobs, int* sw)
         {
@@ -465,8 +468,11 @@ void NAMAudioProcessor::pushParametersToPipelines()
                 sw[i] = (int) apvts.getRawParameterValue (id)->load();
             }
         };
-        fill ("od",   odModel,   odKnobs, odSwitch);
-        fill ("dist", distModel, dsKnobs, dsSwitch);
+        for (int sl = 0; sl < 4; ++sl) {
+            pedModel[sl] = juce::jlimit (0, pedal::count() - 1,
+                                         (int) apvts.getRawParameterValue (kSlotModelId[sl])->load());
+            fill (kSlotPrefix[sl], pedModel[sl], pedKnobs[sl], pedSwitch[sl]);
+        }
     }
     const bool  ir2En= apvts.getRawParameterValue (ids::ir2Enable)->load() > 0.5f;
     const float irBal= apvts.getRawParameterValue (ids::irBalance)->load();
@@ -582,12 +588,12 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setIr1VolumeDB (ir1V);
         p.setIr2VolumeDB (ir2V);
         p.setModelBypass (mdBp);
-        p.setGate (gT, gR, gBp);
-        p.setPedal (false, odModel,   odKnobs, odSwitch, odBp);
-        p.setPedal (true,  distModel, dsKnobs, dsSwitch, dsBp);
+        // I due gate nativi hanno lasciato il posto ai pedali negli slot 2 e 3.
+        const bool slotBypass[4] = { odBp, dsBp, ngBp, gBp };
+        for (int sl = 0; sl < 4; ++sl)
+            p.setPedal (sl, pedModel[sl], pedKnobs[sl], pedSwitch[sl], slotBypass[sl]);
         p.setHighPass (hpF, hpBp);
         p.setLoudnessNorm (lnOn, lnT);
-        p.setNoiseGate (ngT, ngR, ngBp);
         p.setDelay     (dT, dFb, dMx, dBp);
         p.setChorus    (cR, cD, cMx, cBp);
         p.setFlanger   (fR, fD, fFb, fMx, fBp);

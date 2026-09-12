@@ -45,6 +45,8 @@
       <PARAM id="dist_bypass" value="1"/>
       <PARAM id="od_model" value="2"/>
       <PARAM id="dist_model" value="6"/>
+      <PARAM id="ng_model" value="14"/>
+      <PARAM id="gate_model" value="15"/>
       <PARAM id="hp_freq" value="40"/>
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="0"/>
@@ -133,16 +135,40 @@
       <PARAM id="od_p4" value="0.5"/>
       <PARAM id="od_p5" value="0.5"/>
       <PARAM id="od_p6" value="0.5"/>
+      <PARAM id="od_p7" value="0.5"/>
+      <PARAM id="od_p8" value="0.5"/>
+      <PARAM id="od_sw1" value="0"/>
+      <PARAM id="od_sw2" value="0"/>
       <PARAM id="dist_p1" value="0.5"/>
       <PARAM id="dist_p2" value="0.5"/>
       <PARAM id="dist_p3" value="0.5"/>
       <PARAM id="dist_p4" value="0.5"/>
       <PARAM id="dist_p5" value="0.5"/>
       <PARAM id="dist_p6" value="0.5"/>
-      <PARAM id="od_sw1" value="0"/>
-      <PARAM id="od_sw2" value="0"/>
+      <PARAM id="dist_p7" value="0.5"/>
+      <PARAM id="dist_p8" value="0.5"/>
       <PARAM id="dist_sw1" value="0"/>
       <PARAM id="dist_sw2" value="0"/>
+      <PARAM id="ng_p1" value="0.5"/>
+      <PARAM id="ng_p2" value="0.5"/>
+      <PARAM id="ng_p3" value="0.5"/>
+      <PARAM id="ng_p4" value="0.5"/>
+      <PARAM id="ng_p5" value="0.5"/>
+      <PARAM id="ng_p6" value="0.5"/>
+      <PARAM id="ng_p7" value="0.5"/>
+      <PARAM id="ng_p8" value="0.5"/>
+      <PARAM id="ng_sw1" value="0"/>
+      <PARAM id="ng_sw2" value="0"/>
+      <PARAM id="gate_p1" value="0.5"/>
+      <PARAM id="gate_p2" value="0.5"/>
+      <PARAM id="gate_p3" value="0.5"/>
+      <PARAM id="gate_p4" value="0.5"/>
+      <PARAM id="gate_p5" value="0.5"/>
+      <PARAM id="gate_p6" value="0.5"/>
+      <PARAM id="gate_p7" value="0.5"/>
+      <PARAM id="gate_p8" value="0.5"/>
+      <PARAM id="gate_sw1" value="0"/>
+      <PARAM id="gate_sw2" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>
