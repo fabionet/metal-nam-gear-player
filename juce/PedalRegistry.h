@@ -27,7 +27,10 @@ namespace pedal {
 // Otto e non sei: l'equalizzatore grafico a sette bande piu' il livello e'
 // il modello con piu' controlli dell'elenco, e detta la dimensione.
 constexpr int kMaxKnobs  = 8;   // riserva di parametri continui per sezione
-constexpr int kMaxSwitch = 2;   // riserva di parametri a scatti per sezione
+// Uno solo: nessun pedale dell'elenco ne usa due, e ogni posto in piu' e' un
+// parametro per sezione che resta vuoto nei preset e nella lista
+// dell'automazione dell'host.
+constexpr int kMaxSwitch = 1;   // riserva di parametri a scatti per sezione
 
 enum class Category { Overdrive, Distortion, HighGain, Fuzz, Booster, Gate, Equalizer, Compressor };
 
@@ -124,55 +127,55 @@ inline const std::vector<Model>& models()
     // --- Overdrive ---------------------------------------------------------
     { "clean", "Bypass / Clean", Category::Overdrive, Topology::Clean,
       "Nessuna colorazione: lo stadio passa il segnale invariato.",
-      { level(1.0f) }, 1, { none(), none() }, 0 },
+      { level(1.0f) }, 1, { none() }, 0 },
 
     { "od_asym", "OD-ONE Asymmetric", Category::Overdrive, Topology::OdSoftAsym,
       "Clipping morbido asimmetrico nell'anello di reazione: due diodi da un lato "
       "e uno dall'altro, e la seconda armonica resta in evidenza.",
-      { drive(0.35f), tone(), level() }, 3, { none(), none() }, 0 },
+      { drive(0.35f), tone(), level() }, 3, { none() }, 0 },
 
     { "od_screamer", "GREEN SCREAM 808", Category::Overdrive, Topology::OdSoftSym,
       "Clipping morbido simmetrico con forte taglio dei bassi dentro l'anello: la "
       "gobba sui medi che spinge l'amplificatore senza impastare.",
-      { drive(), tone(), level() }, 3, { none(), none() }, 0 },
+      { drive(), tone(), level() }, 3, { none() }, 0 },
 
     { "od_super", "SUPER DRIVE W", Category::Overdrive, Topology::OdSoftAsym,
       "L'asimmetrico a due modi: Standard come l'originale, Custom con piu' "
       "guadagno e i bassi meno tagliati.",
-      { drive(), tone(), level() }, 3, { mode(), none() }, 1 },
+      { drive(), tone(), level() }, 3, { mode() }, 1 },
 
     { "od_blues", "BLUE DRIVER W", Category::Overdrive, Topology::OdJfet,
       "Risposta a JFET, piu' aperta e dinamica: pulisce abbassando il volume della "
       "chitarra. Custom spinge il fronte senza sgranare.",
-      { drive(), tone(), level() }, 3, { mode(), none() }, 1 },
+      { drive(), tone(), level() }, 3, { mode() }, 1 },
 
     { "od_natural", "NATURAL OD", Category::Overdrive, Topology::OdSoftSym,
       "Compressione dolce e tono aperto, pensato per restare trasparente sul "
       "carattere dell'amplificatore.",
-      { drive(), tone(), level() }, 3, { none(), none() }, 0 },
+      { drive(), tone(), level() }, 3, { none() }, 0 },
 
     // --- Distortion --------------------------------------------------------
     { "ds_classic", "DS-ONE Classic", Category::Distortion, Topology::DistHard,
       "Clipping duro simmetrico a diodi verso massa dopo uno stadio op-amp ad alto "
       "guadagno, con la rete di tono che scava i medi.",
-      { drive(0.5f), tone(), level() }, 3, { none(), none() }, 0 },
+      { drive(0.5f), tone(), level() }, 3, { none() }, 0 },
 
     { "ds_w", "DS-ONE W", Category::Distortion, Topology::DistHard,
       "Il classico con il modo Custom: piu' corpo sui bassi e clipping meno "
       "compresso.",
-      { drive(0.5f), tone(), level() }, 3, { mode(), none() }, 1 },
+      { drive(0.5f), tone(), level() }, 3, { mode() }, 1 },
 
     { "ds_turbo", "TURBO DS II", Category::Distortion, Topology::DistTurbo,
       "Due modi: I e' il classico, II aggiunge un secondo stadio di clipping per un "
       "attacco piu' spesso e sostenuto.",
       { drive(0.5f), tone(), level() }, 3,
-      { { "TURBO", { "I", "II", "", "" }, 2, 0 }, none() }, 1 },
+      { { "TURBO", { "I", "II", "", "" }, 2, 0 } }, 1 },
 
     { "ds_mega", "MEGA DS", Category::Distortion, Topology::DistBody,
       "Guadagno alto con un controllo di corpo dedicato alle basse, che tiene saldo "
       "il fondo anche a distorsione estrema.",
       { drive(0.55f), tone(), level(), { "BOTTOM", 0.f, 1.f, 0.5f, "" } }, 4,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     // --- High Gain ---------------------------------------------------------
     { "hg_metal", "HEAVY M-2 Chainsaw", Category::HighGain, Topology::HgColor,
@@ -180,7 +183,7 @@ inline const std::vector<Model>& models()
       "entrambi al massimo e' il suono svedese.",
       { drive(0.7f), level(),
         { "COLOR LOW", 0.f, 1.f, 0.5f, "" }, { "COLOR HIGH", 0.f, 1.f, 0.5f, "" } }, 4,
-      { mode(), none() }, 1 },
+      { mode() }, 1 },
 
     { "hg_zone", "METAL ZONE W", Category::HighGain, Topology::HgZone,
       "Doppio stadio di guadagno con equalizzatore a tre bande e medio parametrico "
@@ -188,40 +191,40 @@ inline const std::vector<Model>& models()
       { drive(0.6f), level(),
         { "LOW", -15.f, 15.f, 0.f, " dB" }, { "HIGH", -15.f, 15.f, 0.f, " dB" },
         { "MID", -15.f, 15.f, 0.f, " dB" }, { "MID FREQ", 200.f, 5000.f, 800.f, " Hz" } }, 6,
-      { mode(), none() }, 1 },
+      { mode() }, 1 },
 
     // --- Fuzz --------------------------------------------------------------
     { "fz_w", "FUZZ ONE W", Category::Fuzz, Topology::FuzzGate,
       "Fuzz a transistor con taglio ruvido e coda lunga; Custom apre i bassi e rende "
       "il decadimento piu' aperto.",
-      { { "FUZZ", 0.f, 1.f, 0.6f, "" }, tone(), level() }, 3, { mode(), none() }, 1 },
+      { { "FUZZ", 0.f, 1.f, 0.6f, "" }, tone(), level() }, 3, { mode() }, 1 },
 
     // --- Booster -----------------------------------------------------------
     { "bs_clean", "CLEAN BOOST", Category::Booster, Topology::Boost,
       "Guadagno pulito con passa-alto regolabile all'ingresso: serve a spingere lo "
       "stadio successivo, non a distorcere.",
       { { "BOOST", 0.f, 24.f, 6.f, " dB" }, { "LOW CUT", 20.f, 800.f, 80.f, " Hz" } }, 2,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     // --- Gate / Noise ------------------------------------------------------
     { "ng_suppress", "NS-TWO Suppressor", Category::Gate, Topology::GateSuppress,
       "Soppressore con soglia e decadimento. In Reduction attenua il fondo lasciando "
       "passare la coda; in Mute chiude del tutto sotto la soglia.",
       { { "THRESHOLD", -80.f, 0.f, -55.f, " dB" }, { "DECAY", 5.f, 800.f, 120.f, " ms" } }, 2,
-      { { "MODE", { "Reduction", "Mute", "", "" }, 2, 0 }, none() }, 1 },
+      { { "MODE", { "Reduction", "Mute", "", "" }, 2, 0 } }, 1 },
 
     { "ng_hard", "NF-ONE Noise Gate", Category::Gate, Topology::GateHard,
       "Cancello secco: sopra la soglia passa, sotto chiude. Il piu' semplice e il "
       "piu' deciso, adatto al metal a canale chiuso.",
       { { "THRESHOLD", -80.f, 0.f, -60.f, " dB" }, { "RELEASE", 5.f, 500.f, 80.f, " ms" } }, 2,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     // --- Equalizer ---------------------------------------------------------
     { "eq_tonestack", "AMP Tone Stack", Category::Equalizer, Topology::EqNative,
       "La torre di tono dell'amplificatore: bassi, medio spazzolabile con Q, "
       "presenza, acuti e aria. E' quella gia' presente nella catena.",
       { { "", 0.f, 1.f, 0.f, "" } }, 0,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     { "eq_graphic", "GE-SEVEN Graphic", Category::Equalizer, Topology::EqGraphic7,
       "Sette bande fisse a 100, 200, 400 e 800 Hz, 1.6, 3.2 e 6.4 kHz, piu' il "
@@ -230,7 +233,7 @@ inline const std::vector<Model>& models()
         { "400", -15.f, 15.f, 0.f, " dB" }, { "800", -15.f, 15.f, 0.f, " dB" },
         { "1.6k", -15.f, 15.f, 0.f, " dB" }, { "3.2k", -15.f, 15.f, 0.f, " dB" },
         { "6.4k", -15.f, 15.f, 0.f, " dB" }, { "LEVEL", -15.f, 15.f, 0.f, " dB" } }, 8,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     { "eq_param", "EQ-TWENTY Parametric", Category::Equalizer, Topology::EqParametric,
       "Due campane spazzolabili con guadagno e frequenza indipendenti, piu' il "
@@ -238,7 +241,7 @@ inline const std::vector<Model>& models()
       { { "LOW GAIN", -15.f, 15.f, 0.f, " dB" }, { "LOW FREQ", 40.f, 1000.f, 200.f, " Hz" },
         { "HI GAIN", -15.f, 15.f, 0.f, " dB" },  { "HI FREQ", 500.f, 8000.f, 2500.f, " Hz" },
         { "LEVEL", -15.f, 15.f, 0.f, " dB" } }, 5,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     // --- Compressor --------------------------------------------------------
     { "cp_sustain", "CS-THREE Sustainer", Category::Compressor, Topology::CompSustain,
@@ -246,21 +249,21 @@ inline const std::vector<Model>& models()
       "pennata. L'attacco in senso orario lascia passare il transiente.",
       { { "SUSTAIN", 0.f, 1.f, 0.4f, "" }, { "ATTACK", 1.f, 100.f, 15.f, " ms" },
         { "TONE", -12.f, 12.f, 0.f, " dB" }, { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 4,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     { "cp_simple", "CS-TWO Compressor", Category::Compressor, Topology::CompSimple,
       "Il predecessore senza controllo di tono: solo sustain, attacco e livello. "
       "Piu' schietto e meno colorato.",
       { { "SUSTAIN", 0.f, 1.f, 0.4f, "" }, { "ATTACK", 1.f, 100.f, 20.f, " ms" },
         { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 3,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     { "cp_limit", "LM-THREE Limiter", Category::Compressor, Topology::CompLimiter,
       "Limitatore con rapporto e soglia espliciti: tiene il livello sotto controllo "
       "invece di dare sustain, utile in coda alla catena.",
       { { "THRESHOLD", -40.f, 0.f, -18.f, " dB" }, { "RATIO", 1.5f, 20.f, 4.f, ":1" },
         { "RELEASE", 10.f, 800.f, 150.f, " ms" }, { "LEVEL", -12.f, 12.f, 0.f, " dB" } }, 4,
-      { none(), none() }, 0 },
+      { none() }, 0 },
 
     };
     return list;

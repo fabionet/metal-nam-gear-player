@@ -32,16 +32,8 @@
       <PARAM id="metro_sig" value="0"/>
       <PARAM id="preset_bank" value="0"/>
       <PARAM id="model_bypass" value="0"/>
-      <PARAM id="gate_threshold" value="-60"/>
-      <PARAM id="gate_release" value="80"/>
       <PARAM id="gate_bypass" value="0"/>
-      <PARAM id="od_drive" value="0.45"/>
-      <PARAM id="od_tone" value="0"/>
-      <PARAM id="od_level" value="1.5"/>
       <PARAM id="od_bypass" value="0"/>
-      <PARAM id="dist_drive" value="0.4"/>
-      <PARAM id="dist_tone" value="0"/>
-      <PARAM id="dist_level" value="0"/>
       <PARAM id="dist_bypass" value="1"/>
       <PARAM id="od_model" value="2"/>
       <PARAM id="dist_model" value="6"/>
@@ -51,8 +43,6 @@
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="0"/>
       <PARAM id="ln_target_db" value="-18"/>
-      <PARAM id="ng_threshold" value="-55"/>
-      <PARAM id="ng_release" value="80"/>
       <PARAM id="ng_bypass" value="0"/>
       <PARAM id="delay_time_ms" value="350"/>
       <PARAM id="delay_feedback" value="0.35"/>
@@ -113,10 +103,6 @@
       <PARAM id="mar_fx_send" value="0.5"/>
       <PARAM id="mar_fx_return" value="0.5"/>
       <PARAM id="comp_bypass" value="1"/>
-      <PARAM id="comp_sustain" value="0.4"/>
-      <PARAM id="comp_attack" value="15"/>
-      <PARAM id="comp_tone" value="0"/>
-      <PARAM id="comp_level" value="0"/>
       <PARAM id="comp_pos" value="0"/>
       <PARAM id="model_volume" value="0"/>
       <PARAM id="model_bass" value="0"/>
@@ -138,7 +124,6 @@
       <PARAM id="od_p7" value="0.5"/>
       <PARAM id="od_p8" value="0.5"/>
       <PARAM id="od_sw1" value="0"/>
-      <PARAM id="od_sw2" value="0"/>
       <PARAM id="dist_p1" value="0.5"/>
       <PARAM id="dist_p2" value="0.5"/>
       <PARAM id="dist_p3" value="0.5"/>
@@ -148,7 +133,6 @@
       <PARAM id="dist_p7" value="0.5"/>
       <PARAM id="dist_p8" value="0.5"/>
       <PARAM id="dist_sw1" value="0"/>
-      <PARAM id="dist_sw2" value="0"/>
       <PARAM id="ng_p1" value="0.5"/>
       <PARAM id="ng_p2" value="0.5"/>
       <PARAM id="ng_p3" value="0.5"/>
@@ -158,7 +142,6 @@
       <PARAM id="ng_p7" value="0.5"/>
       <PARAM id="ng_p8" value="0.5"/>
       <PARAM id="ng_sw1" value="0"/>
-      <PARAM id="ng_sw2" value="0"/>
       <PARAM id="gate_p1" value="0.5"/>
       <PARAM id="gate_p2" value="0.5"/>
       <PARAM id="gate_p3" value="0.5"/>
@@ -168,7 +151,6 @@
       <PARAM id="gate_p7" value="0.5"/>
       <PARAM id="gate_p8" value="0.5"/>
       <PARAM id="gate_sw1" value="0"/>
-      <PARAM id="gate_sw2" value="0"/>
       <PARAM id="comp_model" value="19"/>
       <PARAM id="comp_p1" value="0.4"/>
       <PARAM id="comp_p2" value="0.1414"/>
@@ -179,7 +161,6 @@
       <PARAM id="comp_p7" value="0.5"/>
       <PARAM id="comp_p8" value="0.5"/>
       <PARAM id="comp_sw1" value="0"/>
-      <PARAM id="comp_sw2" value="0"/>
       <PARAM id="eq_model" value="16"/>
       <PARAM id="eq_p1" value="0.5"/>
       <PARAM id="eq_p2" value="0.5"/>
@@ -190,7 +171,6 @@
       <PARAM id="eq_p7" value="0.5"/>
       <PARAM id="eq_p8" value="0.5"/>
       <PARAM id="eq_sw1" value="0"/>
-      <PARAM id="eq_sw2" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

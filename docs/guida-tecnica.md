@@ -101,7 +101,7 @@ Quando `modelHasCab()` è vero, l'editor forza `ir_bypass` a 1 e disabilita i co
 
 Sei sezioni — NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ — non hanno effetti fissi: sono **posti** nella catena, e cosa ci suona lo decide la tendina della sezione. Tre file soli:
 
-- **`PedalRegistry.h`** — l'elenco, uno e condiviso. Ogni `Model` dichiara id, nome, categoria, **topologia**, una descrizione e la sua tabella di pomelli (`label`, `min`, `max`, `def`, suffisso) e interruttori. Le due costanti `kMaxKnobs = 8` e `kMaxSwitch = 2` dimensionano la riserva: otto perché il grafico a sette bande più il livello è il modello con più controlli.
+- **`PedalRegistry.h`** — l'elenco, uno e condiviso. Ogni `Model` dichiara id, nome, categoria, **topologia**, una descrizione e la sua tabella di pomelli (`label`, `min`, `max`, `def`, suffisso) e interruttori. Le due costanti `kMaxKnobs = 8` e `kMaxSwitch = 1` dimensionano la riserva: otto perché il grafico a sette bande più il livello è il modello con più controlli, uno perché nessun pedale dell'elenco usa due interruttori.
 - **`PedalDSP.h`** — gli algoritmi, senza dipendenze da JUCE, un'istanza per canale. `process()` smista sulla topologia, non sull'id: un primo tentativo distingueva i modelli dal quarto carattere dell'id e `od_screamer` e `od_super` finivano nello stesso ramo.
 - Nell'editor, `pedalSlotFor()` mappa il nome della sezione sullo slot e `refreshPedalSection()` rietichetta la riserva quando cambia il modello.
 
@@ -111,9 +111,13 @@ Sei sezioni — NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ — non hanno effet
 
 **La presa dello spettro segue l'equalizzatore.** `NAMPipeline::setScopeSlot()` dice dopo quale slot campionare; il processore lo calcola dal primo slot che ospita un equalizzatore e ripiega sullo slot EQ. Lo slot del compressore puo' trovarsi in tre punti della catena, quindi la presa sta nel ciclo pre-modello o in quello post-IR a seconda del selettore di posizione. Se il blocco fosse piu' lungo del buffer allocato in `prepare()` la presa si salta: allocare sul thread audio non si puo', e uno spettro che perde un blocco non si nota.
 
-**Perché una riserva di parametri.** I parametri di un `AudioProcessorValueTreeState` si creano nel costruttore e non si possono aggiungere a runtime, mentre il pedale si sceglie mentre il plugin suona. Ogni sezione ha quindi `<prefisso>_p1..p8` normalizzati 0..1 e `<prefisso>_sw1..sw2`, e il modello scelto dice come leggerli: il processore riporta ogni pomello nell'intervallo reale dichiarato (`k.min + norm * (k.max - k.min)`) prima di passarlo al DSP, e l'interfaccia fa la strada inversa in `textFromValueFunction`, altrimenti sui pomelli comparirebbe `0.313` invece di `120 ms`.
+**Perché una riserva di parametri.** I parametri di un `AudioProcessorValueTreeState` si creano nel costruttore e non si possono aggiungere a runtime, mentre il pedale si sceglie mentre il plugin suona. Ogni sezione ha quindi `<prefisso>_p1..p8` normalizzati 0..1 e `<prefisso>_sw1`, e il modello scelto dice come leggerli: il processore riporta ogni pomello nell'intervallo reale dichiarato (`k.min + norm * (k.max - k.min)`) prima di passarlo al DSP, e l'interfaccia fa la strada inversa in `textFromValueFunction`, altrimenti sui pomelli comparirebbe `0.313` invece di `120 ms`.
 
-Costo: dieci parametri per sezione, occupati o no. I preset di fabbrica sono passati da 120 a 186 parametri.
+Costo: **nove parametri per sezione**, occupati o no — otto pomelli e un interruttore — più quello che sceglie il modello. È il minimo che questo schema consente: i parametri si creano nel costruttore, quindi la riserva deve bastare al modello più ricco, e da quando un pedale può andare in qualunque sezione la riserva dev'essere uguale in tutte.
+
+Quello che si poteva togliere è stato tolto: i quattordici parametri nativi delle sezioni diventate slot (`od_drive`, `ng_threshold`, `comp_sustain` e compagnia) restavano registrati e non li leggeva più nessuno, e con loro sparivano altrettanti pomelli costruiti e mai mostrati. Il secondo interruttore per sezione non lo usava nessun modello. I preset di fabbrica sono così passati da 186 a **166 parametri**, che è esattamente quanti ne registra il processore: nessun parametro senza valore, nessun valore senza parametro.
+
+Un preset salvato prima di questa pulizia si carica lo stesso: `replaceState` ignora i nodi che non corrispondono più a un parametro.
 
 **Topologie.** Seguono gli schemi pubblici dei circuiti: clipping morbido **nell'anello** di reazione (famiglia overdrive, guadagno `(Rf/Rg)+1`), clipping duro **verso massa** dopo lo stadio di guadagno (famiglia distorsore), condensatore in serie a Rg da cui il passa-alto interno all'anello intorno ai 720 Hz. Sui distorsori è la **soglia** a decidere il timbro, non il guadagno: passato il ginocchio la forma d'onda è già piatta, e alzare solo il guadagno non cambia niente di udibile.
 

@@ -21,10 +21,8 @@ namespace {
 namespace {
     // Indices into knobs_ vector — must match the order of addKnob calls below.
     enum K {
-        kNgThresh, kNgRelease,
-        kGateThresh, kGateRelease,
-        kOdDrive, kOdTone, kOdLevel,
-        kDistDrive, kDistTone, kDistLevel,
+        // Le sezioni a pedale non hanno piu' pomelli propri: i loro comandi
+        // stanno nella riserva dello slot, che il modello scelto rietichetta.
         kInput, kOutput,
         kBass, kMidFreq, kMidQ, kMidGain, kTreble, kPres, kAir,
         kDepth, kRes, kResFreq,
@@ -36,7 +34,6 @@ namespace {
         kRvRoom, kRvDamp, kRvMix,
         kTrRate, kTrDepth, kTrShape,
         kIrHp, kIrLp, kIrTrim,
-        kCompSustain, kCompAttack, kCompTone, kCompLevel,
         kSplitLeft, kSplitRight, kSplitBalance, kWidth,
         kIrBalance,
         kCount
@@ -44,10 +41,6 @@ namespace {
 
     struct KnobDef { const char* id; const char* label; };
     constexpr std::array<KnobDef, kCount> kDefs {{
-        {"ng_threshold",   "THRESH"}, {"ng_release",  "RELEASE"},
-        {"gate_threshold", "THRESH"}, {"gate_release", "RELEASE"},
-        {"od_drive",       "DRIVE"},  {"od_tone",     "TONE"},   {"od_level",  "LEVEL"},
-        {"dist_drive",     "DRIVE"},  {"dist_tone",   "TONE"},   {"dist_level","LEVEL"},
         {"input_level",    "INPUT"},  {"output_level","OUTPUT"},
         {"eq_bass",        "BASS"},   {"eq_mid_freq", "MID F"},  {"eq_mid_q",  "MID Q"},
         {"eq_mid_gain",    "MID"},    {"eq_treble",   "TREBLE"}, {"eq_presence","PRES"},
@@ -61,7 +54,6 @@ namespace {
         {"reverb_room",    "ROOM"},   {"reverb_damping","DAMP"}, {"reverb_mix",       "MIX"},
         {"tremolo_rate_hz","RATE"},   {"tremolo_depth","DEPTH"}, {"tremolo_shape",    "SHAPE"},
         {"ir_hp_freq",     "IR HP"},  {"ir_lp_freq",   "IR LP"}, {"ir_trim_db",       "TRIM"},
-        {"comp_sustain",   "SUSTAIN"},{"comp_attack",  "ATTACK"},{"comp_tone",   "TONE"}, {"comp_level","LEVEL"},
         {"split_left",     "LEFT"},   {"split_right",  "RIGHT"}, {"split_balance","BAL"}, {"width_amount","WIDTH"},
         {"ir_balance",     "IR BAL"}
     }};
