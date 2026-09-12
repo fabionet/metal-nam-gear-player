@@ -16,10 +16,15 @@ class EQAnalyserComponent : public juce::Component,
                             private juce::Timer
 {
 public:
-    EQAnalyserComponent (NAMAudioProcessor& proc, juce::AudioProcessorValueTreeState& state);
+    // `prefix` e' quello dello slot ("od", "dist", "ng", "gate", "comp", "eq").
+    // `ownsNativeStack` vale solo per lo slot EQ, l'unico in cui la torre di
+    // tono nativa dell'amplificatore sta davvero nella catena.
+    EQAnalyserComponent (NAMAudioProcessor& proc, juce::AudioProcessorValueTreeState& state,
+                         juce::String prefix, bool ownsNativeStack);
     ~EQAnalyserComponent() override;
 
     void paint (juce::Graphics&) override;
+    void visibilityChanged() override;
     void resized() override;
 
     void mouseDown (const juce::MouseEvent&) override;
@@ -57,11 +62,19 @@ private:
     float bandParam (const BandInfo&, const juce::String& id) const;
     void  setBandParam (const BandInfo&, const juce::String& id, float real);
 
+    // Vero quando il modello scelto in questo slot e' un equalizzatore da
+    // disegnare: la torre di tono nativa conta solo nello slot EQ, altrove e'
+    // un passante e non avrebbe una curva da mostrare.
+public:
+    bool showsCurve() const;
+private:
+
     // Risposta in dB della curva scelta, a una data frequenza.
     double curveDB (double hz, double sr) const;
 
     void timerCallback() override;
 
+    juce::String slotParam (const char* suffix) const;   // "<prefisso>_<suffisso>"
     float paramValue (const char* id) const;
     void  setParamValue (const char* id, float v);
 
@@ -76,6 +89,8 @@ private:
 
     NAMAudioProcessor&                   proc_;
     juce::AudioProcessorValueTreeState&  apvts_;
+    const juce::String                   prefix_;          // slot a cui e' legato
+    const bool                           ownsNativeStack_; // solo lo slot EQ
 
     // Analisi
     static constexpr int kFftOrder = 11;              // 2048 punti

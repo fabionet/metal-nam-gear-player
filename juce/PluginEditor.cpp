@@ -394,9 +394,6 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         repaint();
     };
 
-    // GR meter for COMP (MAIN tab).
-    addAndMakeVisible (compGrMeter_);
-
     // COMP routing-position selector (visible only inside the COMP section).
     compPosBox_.addItem ("Front",     1);
     compPosBox_.addItem ("Post-Gate", 2);
@@ -559,8 +556,14 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         refreshPedalSection (slot);
     }
 
-    eqAnalyser_ = std::make_unique<EQAnalyserComponent> (processorRef, processorRef.apvts);
-    addChildComponent (*eqAnalyser_);
+    for (int slot = 0; slot < kPedalSlots; ++slot) {
+        pedalAnalyser_[slot] = std::make_unique<EQAnalyserComponent> (
+            processorRef, processorRef.apvts, pedalPrefix (slot), slot == 5);
+        addChildComponent (*pedalAnalyser_[slot]);
+        pedalGrMeter_[slot] = std::make_unique<GrMeterComponent> (
+            [this, slot] { return processorRef.getPedalGrDb (slot); });
+        addChildComponent (*pedalGrMeter_[slot]);
+    }
 
     lcd_ = std::make_unique<LCDDisplayComponent> (processorRef, processorRef.apvts,
                                                   processorRef.getPresetManager());
@@ -808,9 +811,53 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
             pedalSwitchLabel_[slot][i].setText (m.switches[i].label, juce::dontSendNotification);
         }
     }
+    // Il tasto prende il nome dal pedale scelto, non dalla sezione. Si cambia
+    // solo il testo: lo stato acceso/spento e' un parametro e non si tocca,
+    // cosi' una sezione spenta resta spenta anche cambiando pedale.
+    if (auto* b = pedalBypassButton (slot))
+        b->setButtonText (pedalSectionTitle (slot));
+
     pedalBox_[slot].setTooltip (m.blurb);
 }
 
+
+// Il tasto di attivazione appartiene allo slot, ma il nome glielo da' il
+// pedale che ci sta dentro: spostando l'equalizzatore in un'altra sezione, e'
+// li' che si vede comparire il tasto EQUALIZER.
+juce::TextButton* NAMAudioProcessorEditor::pedalBypassButton (int slot)
+{
+    switch (slot) {
+        case 0: return &odBypass;
+        case 1: return &distBypass;
+        case 2: return &ngBypass;
+        case 3: return &gateBypass;
+        case 4: return &compBypass;
+        case 5: return &eqBypass;
+        default: break;
+    }
+    return nullptr;
+}
+
+// La sezione prende il nome dal pedale che ci sta dentro: sostituendo
+// l'equalizzatore con un compressore, titolo e tasto diventano COMPRESSORE. La
+// posizione nella catena resta quella, ed e' leggibile dall'ordine dei pannelli.
+juce::String NAMAudioProcessorEditor::pedalSectionTitle (int slot) const
+{
+    if (slot < 0 || slot >= kPedalSlots) return {};
+    const auto& m = pedal::at (juce::jlimit (0, pedal::count() - 1, lastPedalModel_[slot]));
+    if (m.topo == pedal::Topology::Clean) return "CLEAN";
+    switch (m.cat) {
+        case pedal::Category::Overdrive:  return "OVERDRIVE";
+        case pedal::Category::Distortion: return "DISTORTION";
+        case pedal::Category::HighGain:   return "HIGH GAIN";
+        case pedal::Category::Fuzz:       return "FUZZ";
+        case pedal::Category::Booster:    return "BOOSTER";
+        case pedal::Category::Gate:       return "GATE";
+        case pedal::Category::Equalizer:  return "EQUALIZER";
+        case pedal::Category::Compressor: return "COMPRESSOR";
+    }
+    return {};
+}
 
 // L'equalizzatore grafico si comanda a cursori verticali, uno per banda: e'
 // la forma del pedale vero e si legge a colpo d'occhio quali bande sono alzate.
@@ -1031,9 +1078,12 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
     g.setFont (groupFont);
     // Shadow.
     g.setColour (juce::Colour (0xff000000).withAlpha (0.75f));
-    g.drawText (title, titleStrip.toNearestInt().translated (1, 1), juce::Justification::centred);
+    // I nomi lunghi come COMPRESSOR devono rimpicciolirsi invece di venire
+    // tagliati, perche' i pannelli stretti esistono.
+    g.drawFittedText (title, titleStrip.toNearestInt().translated (1, 1),
+                      juce::Justification::centred, 1, 0.7f);
     g.setColour (juce::Colour (0xfff2c438));
-    g.drawText (title, titleStrip.toNearestInt(), juce::Justification::centred);
+    g.drawFittedText (title, titleStrip.toNearestInt(), juce::Justification::centred, 1, 0.7f);
 }
 
 // Custom black/gold faceplate for the native "GEAR SX" tube amp page.
@@ -1652,12 +1702,12 @@ void NAMAudioProcessorEditor::resized()
                          &trBypass, &irHpBypass, &irLpBypass, &irPhaseInv,
                          &splitBypass, &widthEnableBtn })
             b->setVisible (false);
-        compGrMeter_.setVisible (false); // shown only inside the COMP section below
         compPosBox_.setVisible (false);  // shown only inside the COMP section below
         splitModeBox_.setVisible (false);  // shown only inside the SPLITTER section below
         splitModeLabel_.setVisible (false);
-        if (eqAnalyser_) eqAnalyser_->setVisible (false);  // solo dentro la sezione EQ
         for (int sl = 0; sl < kPedalSlots; ++sl) {
+            if (pedalAnalyser_[sl]) pedalAnalyser_[sl]->setVisible (false);
+            if (pedalGrMeter_[sl])  pedalGrMeter_[sl] ->setVisible (false);
             pedalBox_[sl].setVisible (false);
             for (int i = 0; i < pedal::kMaxSwitch; ++i) {
                 pedalSwitch_[sl][i].setVisible (false);
@@ -1718,6 +1768,10 @@ void NAMAudioProcessorEditor::resized()
         // Otto cursori affiancati in un pannello stretto sarebbero illeggibili:
         // la sezione a bande si prende qualche unita' in piu'.
         if (slot >= 0 && pedalUsesFaders (slot)) return n + 4;
+        // Chi ospita l'equalizzatore mostra anche l'analizzatore, e in un
+        // pannello stretto la curva non si leggerebbe.
+        if (slot >= 0 && pedalAnalyser_[slot] != nullptr && pedalAnalyser_[slot]->showsCurve())
+            return std::max (n, 6);
         return (slot >= 0) ? std::max (n, 3) : n;
     };
     // Durante la costruzione dell'editor una tendina puo' far scattare resized()
@@ -1759,7 +1813,11 @@ void NAMAudioProcessorEditor::resized()
         auto& gr = groups[gi];
         const int w = (int) std::round ((double) availW * (double) widthUnits (gr) / (double) totalKnobs);
         auto panel = cursorRect.removeFromLeft (w);
-        groupPanels_.push_back ({ panel, gr.name });
+        // Il titolo dipinto segue il pedale; `gr.name` resta la chiave dello
+        // slot, perche' e' con quella che si ritrovano tasti e posizione.
+        const int titleSlot = pedalSlotFor (gr.name);
+        groupPanels_.push_back ({ panel, titleSlot >= 0 ? pedalSectionTitle (titleSlot)
+                                                        : gr.name });
 
         auto inside = panel.reduced (6, 4);
         inside.removeFromTop (30); // title strip
@@ -1800,26 +1858,35 @@ void NAMAudioProcessorEditor::resized()
             }
         }
 
-        // COMP: routing-position selector (top) + vertical gain-reduction meter (right).
+        // Il selettore di posizione appartiene allo SLOT, non al pedale: sposta
+        // nella catena qualunque cosa ci sia dentro.
         if (gr.name == "COMP") {
             auto posStrip = inside.removeFromTop (20);
             posStrip.removeFromTop (2);
             compPosBox_.setVisible (true);
             compPosBox_.setBounds (posStrip.reduced (2, 0));
-
-            auto grCol = inside.removeFromRight (20);
-            grCol.removeFromLeft (3);
-            compGrMeter_.setVisible (true);
-            compGrMeter_.setBounds (grCol.reduced (0, 2));
         }
 
-        // EQ: analizzatore di spettro con sopra la curva, fra i pomelli e il
-        // tasto di attivazione. La striscia del tasto e' gia' stata tolta dal
-        // fondo, quindi togliendo ancora dal fondo si finisce sopra di esso.
-        if (gr.name == "EQ" && eqAnalyser_) {
+        // Misuratore di riduzione: compare dove sta il compressore, in qualunque
+        // sezione lo si sia messo.
+        if (pedalSlot >= 0 && pedalGrMeter_[pedalSlot] != nullptr
+            && pedal::at (juce::jlimit (0, pedal::count() - 1, lastPedalModel_[pedalSlot])).cat
+                   == pedal::Category::Compressor) {
+            auto grCol = inside.removeFromRight (20);
+            grCol.removeFromLeft (3);
+            pedalGrMeter_[pedalSlot]->setVisible (true);
+            pedalGrMeter_[pedalSlot]->setBounds (grCol.reduced (0, 2));
+        }
+
+        // Analizzatore di spettro con sopra la curva: compare dove sta
+        // l'equalizzatore, fra i comandi e il tasto di attivazione. La striscia
+        // del tasto e' gia' stata tolta dal fondo, quindi togliendo ancora dal
+        // fondo si finisce sopra di esso.
+        if (pedalSlot >= 0 && pedalAnalyser_[pedalSlot] != nullptr
+            && pedalAnalyser_[pedalSlot]->showsCurve()) {
             inside.removeFromBottom (3);
-            eqAnalyser_->setVisible (true);
-            eqAnalyser_->setBounds (inside.removeFromBottom (118).reduced (2, 0));
+            pedalAnalyser_[pedalSlot]->setVisible (true);
+            pedalAnalyser_[pedalSlot]->setBounds (inside.removeFromBottom (118).reduced (2, 0));
         }
 
         // SPLITTER: Mono / Dual-Mono / Stereo selector at the top of the panel.

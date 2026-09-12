@@ -67,10 +67,16 @@ public:
         explicit GrMeterComponent (std::function<float()> getGr)
             : getGr_ (std::move (getGr))
         {
-            startTimerHz (15);
             setInterceptsMouseClicks (false, false);
         }
         ~GrMeterComponent() override { stopTimer(); }
+
+        // Ce n'e' uno per slot: solo quello mostrato deve ridisegnarsi.
+        void visibilityChanged() override
+        {
+            if (isVisible()) startTimerHz (15);
+            else             stopTimer();
+        }
 
         void paint (juce::Graphics& g) override
         {
@@ -197,7 +203,10 @@ private:
     juce::Label  irVol1Label_ { {}, "VOL" }, irVol2Label_ { {}, "VOL" };
     std::unique_ptr<SAtt> irVol1Att_, irVol2Att_;
     std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
-    std::unique_ptr<EQAnalyserComponent> eqAnalyser_;
+    // Un analizzatore e un misuratore di riduzione per ogni slot: si mostra
+    // quello dello slot in cui e' finito l'equalizzatore o il compressore.
+    std::unique_ptr<EQAnalyserComponent> pedalAnalyser_[6];
+    std::unique_ptr<GrMeterComponent>    pedalGrMeter_[6];
     std::unique_ptr<LCDDisplayComponent> lcd_;
 
     // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
@@ -217,6 +226,12 @@ private:
     std::vector<int> pedalKnobIds (int slot) const;
     // Vero quando il modello scelto si comanda a cursori verticali per banda.
     bool pedalUsesFaders (int slot) const;
+    // Il tasto di attivazione della sezione: e' quello dello slot, ma prende il
+    // nome dal pedale che ci sta dentro.
+    juce::TextButton* pedalBypassButton (int slot);
+    // Come si chiama la sezione quando ospita quel pedale: il titolo dipinto e
+    // il nome sul tasto sono la stessa cosa.
+    juce::String pedalSectionTitle (int slot) const;
     bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
@@ -258,7 +273,6 @@ private:
     CpuMeterComponent cpuMeter_ { [this] { return processorRef.getCpuLoadPct(); } };
 
     // Gain-reduction readout for the COMP section (MAIN tab).
-    GrMeterComponent compGrMeter_ { [this] { return processorRef.getCompGrDb(); } };
 
     // COMP routing-position selector (Front / Post-Gate / Post-IR), COMP section.
     juce::ComboBox compPosBox_;

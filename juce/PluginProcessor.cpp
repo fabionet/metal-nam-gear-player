@@ -486,6 +486,15 @@ void NAMAudioProcessor::pushParametersToPipelines()
     // torre di tono nativa va piatta, altrimenti le due curve si sommerebbero.
     if (pedal::at (pedModel[5]).topo != pedal::Topology::EqNative)
         bass = midG = pres = treb = air = 0.f;
+
+    // L'analizzatore preleva subito dopo lo slot che ospita l'equalizzatore:
+    // se lo si sposta in un'altra sezione, la presa lo segue. Il primo slot
+    // vince, se per qualche motivo ce ne fosse piu' d'uno.
+    int scopeSlot = 5;
+    for (int sl = 0; sl < 5; ++sl)
+        if (pedal::at (pedModel[sl]).cat == pedal::Category::Equalizer
+            && pedal::at (pedModel[sl]).topo != pedal::Topology::EqNative)
+        { scopeSlot = sl; break; }
     const bool  ir2En= apvts.getRawParameterValue (ids::ir2Enable)->load() > 0.5f;
     const float irBal= apvts.getRawParameterValue (ids::irBalance)->load();
     const float ir1V = apvts.getRawParameterValue (ids::ir1Volume)->load();
@@ -591,6 +600,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         const bool slotBypass[6] = { odBp, dsBp, ngBp, gBp, cpBp, eqBp };
         for (int sl = 0; sl < 6; ++sl)
             p.setPedal (sl, pedModel[sl], pedKnobs[sl], pedSwitch[sl], slotBypass[sl]);
+        p.setScopeSlot (scopeSlot);
         p.setHighPass (hpF, hpBp);
         p.setLoudnessNorm (lnOn, lnT);
         p.setDelay     (dT, dFb, dMx, dBp);
@@ -773,7 +783,8 @@ void NAMAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     // Compressor gain-reduction meter tap (L pipeline is representative).
-    compGr_.store (pipelineL_->compGainReductionDB(), std::memory_order_relaxed);
+    for (int sl = 0; sl < 6; ++sl)
+        pedalGr_[sl].store (pipelineL_->pedalGainReductionDB (sl), std::memory_order_relaxed);
 
     // CPU load % (EMA smoothing).
     const double dt = juce::Time::highResolutionTicksToSeconds (

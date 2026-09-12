@@ -102,8 +102,15 @@ public:
     void setDepthBypass(bool byp) { depthBypass_.store(byp); }
     // Compressor routing position: 0=Front (pre-gate), 1=Post-Gate, 2=Post-IR.
     void setCompPos(int p) { compPos_.store(p); }
-    // Il misuratore legge il pedale nello slot del compressore.
-    float compGainReductionDB() const noexcept { return pedals_[4].gainReductionDB(); }
+    // Riduzione di guadagno di un singolo slot: il compressore puo' stare in
+    // una sezione qualunque, e il misuratore va mostrato dove sta lui.
+    float pedalGainReductionDB (int slot) const noexcept
+    { return pedals_[(std::size_t) (slot < 0 ? 0 : (slot > 5 ? 5 : slot))].gainReductionDB(); }
+
+    // Dove prelevare il segnale per l'analizzatore: subito dopo lo slot che
+    // ospita l'equalizzatore, cosi' nello spettro si vede l'effetto della sua
+    // curva. 5 e' lo slot EQ, cioe' il comportamento di sempre.
+    void setScopeSlot (int slot) { scopeSlot_.store (slot); }
     void setDelay(float timeMs, float feedback, float mix, bool byp)
     { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
     void setChorus(float rateHz, float depth, float mix, bool byp)
@@ -202,6 +209,7 @@ private:
     nam_dsp::DepthFilter  depth_;
 
     std::atomic<int>         compPos_ { 0 };
+    std::atomic<int>         scopeSlot_ { 5 };
     preamp_fx::SmartGate     gate_;
     pedal::PedalFX  pedals_[6];   // od, dist, ngate, gate, comp, eq
     preamp_fx::HighPass      hp_;
@@ -224,6 +232,18 @@ private:
     float modelVolLin_ = 1.f;
     float lastModelPeak_ = 0.f;
     std::array<float, kScopeSize> scope_ {};
+    std::vector<float>            scopeTap_;   // presa del blocco, dimensionata in prepare()
+
+    // Riempie la coda circolare letta dall'analizzatore.
+    void writeScope (const float* src, int n) noexcept
+    {
+        int w = scopeWrite_.load (std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i) {
+            scope_[(std::size_t) w] = src[i];
+            w = (w + 1) & (kScopeSize - 1);
+        }
+        scopeWrite_.store (w, std::memory_order_release);
+    }
     std::atomic<int> scopeWrite_ { 0 };
     float lastIr1Peak_   = 0.f;
     float lastIr2Peak_   = 0.f;

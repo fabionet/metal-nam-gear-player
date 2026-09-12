@@ -115,7 +115,10 @@ public:
     float getCpuLoadPct() const noexcept { return cpuLoad_.load (std::memory_order_relaxed); }
 
     // Compressor gain-reduction (dB, <= 0), updated at every processBlock.
-    float getCompGrDb() const noexcept { return compGr_.load (std::memory_order_relaxed); }
+    // Riduzione di guadagno per slot: il compressore puo' stare in qualunque
+    // sezione, e il misuratore va mostrato dov'e' lui.
+    float getPedalGrDb (int slot) const noexcept
+    { return pedalGr_[(size_t) juce::jlimit (0, 5, slot)].load (std::memory_order_relaxed); }
 
     // Oversampling (session-local; not APVTS).
     void setOversamplingEnabled (bool on);
@@ -140,7 +143,7 @@ private:
     // Tornando in Mono non lo spegne: li' resta una scelta manuale.
     void parameterChanged (const juce::String& id, float value) override;
     std::atomic<float> cpuLoad_   { 0.f };
-    std::atomic<float> compGr_    { 0.f };
+    std::atomic<float> pedalGr_[6] {};
 
     // Two pipelines for 3 channel modes (mono mirror / dual-mono / stereo split).
     std::unique_ptr<NAMPipeline> pipelineL_;
