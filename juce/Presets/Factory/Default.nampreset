@@ -208,6 +208,35 @@
       <PARAM id="rec2_mid" value="-4"/>
       <PARAM id="rec2_treble" value="0"/>
       <PARAM id="rec2_presence" value="0"/>
+      <PARAM id="amp_enable4" value="0"/>
+      <PARAM id="ampx_k1" value="0.5"/>
+      <PARAM id="ampx_k2" value="0.5"/>
+      <PARAM id="ampx_k3" value="0.5"/>
+      <PARAM id="ampx_k4" value="0.5"/>
+      <PARAM id="ampx_k5" value="0.5"/>
+      <PARAM id="ampx_k6" value="0.5"/>
+      <PARAM id="ampx_k7" value="0.5"/>
+      <PARAM id="ampx_k8" value="0.5"/>
+      <PARAM id="ampx_k9" value="0.5"/>
+      <PARAM id="ampx_k10" value="0.5"/>
+      <PARAM id="ampx_k11" value="0.5"/>
+      <PARAM id="ampx_k12" value="0.5"/>
+      <PARAM id="ampx_k13" value="0.5"/>
+      <PARAM id="ampx_k14" value="0.5"/>
+      <PARAM id="ampx_k15" value="0.5"/>
+      <PARAM id="ampx_k16" value="0.5"/>
+      <PARAM id="ampx_k17" value="0.5"/>
+      <PARAM id="ampx_k18" value="0.5"/>
+      <PARAM id="ampx_k19" value="0.5"/>
+      <PARAM id="ampx_k20" value="0.5"/>
+      <PARAM id="ampx_k21" value="0.5"/>
+      <PARAM id="ampx_k22" value="0.5"/>
+      <PARAM id="ampx_k23" value="0.5"/>
+      <PARAM id="ampx_k24" value="0.5"/>
+      <PARAM id="ampx_s1" value="0"/>
+      <PARAM id="ampx_s2" value="0"/>
+      <PARAM id="ampx_s3" value="0"/>
+      <PARAM id="ampx_s4" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

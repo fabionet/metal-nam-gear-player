@@ -164,6 +164,27 @@ armonica in evidenza; Modern tre stadi piu' duri con un passa-alto fra il
 secondo e il terzo, che e' quello che tiene pulite le basse sotto guadagno alto.
 Misurata sulla stessa nota: THD 0,275 / 0,357 / 0,695.
 
+## Le sei teste a riserva condivisa
+
+`AmpRegistry.h` e `AmpDSP.h`, stesso schema dei pedali: i modelli dichiarano i
+loro comandi e tutti si dividono una riserva sola — ventiquattro pomelli e
+quattro tendine. Sei teste con parametri dedicati ne avrebbero voluti quasi
+novanta; cosi' ne bastano ventinove, e la settima non ne costa nessuno. Ogni
+comando dichiara anche a quale canale appartiene, e da li' l'interfaccia ricava
+le file e attenua i canali che non suonano.
+
+**La perdita d'inserzione della torre di tono.** Una torre passiva butta via dai
+dieci ai venti decibel, e va messa: senza, il finale riceve un segnale gia'
+saturo e le regolazioni non si sentono quasi. Nella prima stesura un taglio di
+6 dB sull'equalizzatore grafico si misurava come 1 dB, perche' la saturazione
+lo ricomprimeva subito, e le tre posizioni di potenza suonavano identiche.
+Aggiunta la perdita, lo stesso taglio si misura a 3,3 dB e il cedimento del
+finale passa da 0,88 dB a dieci watt a 0,27 a novanta.
+
+**Il cedimento non si regola solo col tempo.** Con lo stesso tetto per tutte le
+potenze si arriva comunque allo stesso fondo, e le posizioni suonano uguali: il
+tetto va scalato con la potenza, e il tempo di risalita con lui.
+
 ## Analizzatore EQ
 
 `EQAnalyserComponent` disegna spettro e curva sovrapposti.

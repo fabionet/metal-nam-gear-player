@@ -57,7 +57,7 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
     // Il riquadro del valore era alto 14 px e il font vi si adattava sotto i
     // 10: numeri come -55.0 risultavano illeggibili. Portato a 18, con il
     // testo in crema pieno invece del grigio predefinito di JUCE.
-    box->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 18);
+    box->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 20);
     box->slider.setLookAndFeel (&lnf_);
     box->slider.setColour (juce::Slider::textBoxTextColourId, juce::Colour (0xfff5efdc));
     box->slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
@@ -65,8 +65,11 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
 
     box->label.setText (name, juce::dontSendNotification);
     box->label.setJustificationType (juce::Justification::centredTop);
-    box->label.setFont (juce::Font (juce::FontOptions (11.5f).withStyle ("Bold")));
-    box->label.setColour (juce::Label::textColourId, juce::Colour (0xfff5efdc));
+    // Le etichette dicono a cosa serve il pomello: vanno lette senza sforzo, e
+    // a 11,5 px in maiuscolo grassetto su fondo scuro non era cosi'. Il colore
+    // passa da crema smorzata a crema piena per lo stesso motivo.
+    box->label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
+    box->label.setColour (juce::Label::textColourId, juce::Colour (0xfffdf8ea));
     addAndMakeVisible (box->label);
 
     box->att = std::make_unique<SAtt> (processorRef.apvts, paramId, box->slider);
@@ -265,7 +268,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         for (auto& d : ampDefs) {
             auto& kb = addKnob (d.id, d.label);
             // Larger, brighter captions on the AMP page for readability.
-            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            kb.label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
             ampKnobs_.push_back (&kb);
         }
     }
@@ -360,7 +363,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     // Un solo amplificatore acceso per volta: accendendone uno gli altri due si
     // spengono. Vale per tutti e tre allo stesso modo.
     auto soloAmp = [this] (const char* mine) {
-        for (const char* other : { "amp_enable", "amp_enable2", "amp_enable3" }) {
+        for (const char* other : { "amp_enable", "amp_enable2", "amp_enable3", "amp_enable4" }) {
             if (juce::String (other) == mine) continue;
             if (auto* p = processorRef.apvts.getParameter (other);
                 p != nullptr && p->getValue() >= 0.5f)
@@ -421,7 +424,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         }};
         for (auto& d : marDefs) {
             auto& kb = addKnob (d.id, d.label);
-            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            kb.label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
             marKnobs_.push_back (&kb);
         }
     }
@@ -440,7 +443,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         }};
         for (auto& d : recDefs) {
             auto& kb = addKnob (d.id, d.label);
-            kb.label.setFont (juce::Font (juce::FontOptions (11.0f).withStyle ("Bold")));
+            kb.label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
             recKnobs_.push_back (&kb);
         }
     }
@@ -475,6 +478,37 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtnRec_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
     ampEnableBtnRec_.setTooltip ("Accende il MAUSE RECTIFIER (due canali, raddrizzatore commutabile)");
     ampEnableBtnRecAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable3", ampEnableBtnRec_);
+    // --- teste a riserva condivisa ----------------------------------------
+    // Ventiquattro pomelli e quattro tendine, rietichettati dal modello scelto:
+    // e' lo stesso schema dei pedali, e per questo aggiungere una testa non
+    // costa nuovi parametri.
+    for (int i = 1; i <= ampmodel::kMaxKnobs; ++i) {
+        auto& kb = addKnob ("ampx_k" + juce::String (i), "");
+        kb.label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
+        axKnobs_.push_back (&kb);
+    }
+    for (int i = 0; i < ampmodel::kMaxSwitch; ++i) {
+        addChildComponent (axSwLabel_[i]);
+        axSwLabel_[i].setJustificationType (juce::Justification::centred);
+        axSwLabel_[i].setFont (juce::Font (juce::FontOptions (10.0f).withStyle ("Bold")));
+        axSwLabel_[i].setColour (juce::Label::textColourId, juce::Colour (0xfff0e6c2));
+        addChildComponent (axSwBox_[i]);
+        axSwAtt_[i] = std::make_unique<CAtt> (processorRef.apvts,
+                                              "ampx_s" + juce::String (i + 1), axSwBox_[i]);
+        axSwBox_[i].onChange = [this] { resized(); repaint(); };
+    }
+    addAndMakeVisible (ampEnableBtnPool_);
+    ampEnableBtnPool_.setClickingTogglesState (true);
+    ampEnableBtnPool_.setColour (juce::TextButton::textColourOffId, juce::Colour (0xfff0e6c2));
+    ampEnableBtnPool_.setColour (juce::TextButton::textColourOnId,  juce::Colours::white);
+    ampEnableBtnPool_.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff3a3a3a));
+    ampEnableBtnPool_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
+    ampEnableBtnPoolAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable4", ampEnableBtnPool_);
+    ampEnableBtnPool_.onStateChange = [this, soloAmp] {
+        if (ampEnableBtnPool_.getToggleState()) soloAmp ("amp_enable4");
+        else { updateTubeIndicator(); refreshLabels(); repaint(); }
+    };
+
     ampEnableBtnRec_.onStateChange = [this, soloAmp] {
         if (ampEnableBtnRec_.getToggleState()) soloAmp ("amp_enable3");
         else { updateTubeIndicator(); refreshLabels(); repaint(); }
@@ -528,14 +562,22 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampModelBox_.addItem ("GEAR SX",    1);
     ampModelBox_.addItem ("MARCHELLOW", 2);
     ampModelBox_.addItem ("MAUSE RECTIFIER", 3);
+    for (int i = 0; i < ampmodel::count(); ++i)
+        ampModelBox_.addItem (ampmodel::at (i).name, 4 + i);
     ampModelBox_.setColour (juce::ComboBox::textColourId,       juce::Colour (0xfff0e6c2));
     ampModelBox_.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff2a2a2a));
     ampModelBox_.setColour (juce::ComboBox::outlineColourId,    juce::Colour (0xffd9a200).withAlpha (0.7f));
     ampModelBox_.setColour (juce::ComboBox::arrowColourId,      juce::Colour (0xffd9a200));
     ampModelBox_.setTooltip ("Scelta dell'ampli: GEAR SX / MARCHELLOW / MAUSE RECTIFIER");
-    ampModelBox_.onChange = [this] { updateAmpModelUI(); };
+    ampModelBox_.onChange = [this] { updateAmpModelUI(); refreshPoolAmp(); resized(); repaint(); };
+    addChildComponent (ampRefLabel_);
+    ampRefLabel_.setJustificationType (juce::Justification::centredLeft);
+    ampRefLabel_.setFont (juce::Font (juce::FontOptions (12.5f)));
+    ampRefLabel_.setColour (juce::Label::textColourId, juce::Colour (0xff9a9289));
+    ampRefLabel_.setInterceptsMouseClicks (false, false);
     ampModelAtt_ = std::make_unique<CAtt> (processorRef.apvts, "amp_model", ampModelBox_);
     updateAmpModelUI();
+    refreshPoolAmp();
 
     // SPLITTER mode selector (MAIN tab) — a second view onto `channel_mode`,
     // synced with the footer modeBox via the shared APVTS param.
@@ -662,7 +704,7 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
         }};
         for (auto& d : namToneDefs) {
             auto& kb = addKnob (d.id, d.label);
-            kb.label.setFont (juce::Font (juce::FontOptions (12.5f).withStyle ("Bold")));
+            kb.label.setFont (juce::Font (juce::FontOptions (13.0f).withStyle ("Bold")));
             namToneKnobs_.push_back (&kb);
         }
         namToneTitle_.setJustificationType (juce::Justification::centred);
@@ -950,7 +992,7 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
             kb->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 46, 16);
         } else {
             kb->slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-            kb->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 18);
+            kb->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 20);
         }
 
         // Il parametro e' normalizzato 0..1, ma l'utente deve leggere il valore
@@ -1225,11 +1267,90 @@ void NAMAudioProcessorEditor::updateLoadStatus()
 
 // TUBE button acts as a pure status indicator: lit red when at least one AMP SIM
 // (GEAR SX / amp_enable, or MARCHELLOW / amp_enable2) is powered on.
+// Rietichetta la riserva secondo la testa scelta: nomi, unita' e tendine
+// vengono dal registro, come per i pedali.
+void NAMAudioProcessorEditor::refreshPoolAmp()
+{
+    const int sel = (int) processorRef.apvts.getRawParameterValue ("amp_model")->load();
+    if (sel < 3) { lastPoolModel_ = -1; return; }
+    const int idx = juce::jlimit (0, ampmodel::count() - 1, sel - 3);
+    const auto& m = ampmodel::at (idx);
+
+    // Scegliendo una testa a mano, la riserva prende i valori di fabbrica di
+    // quel modello: senza, i pomelli resterebbero dov'erano e ogni testa
+    // partirebbe con le regolazioni della precedente, che non vogliono dire
+    // niente. Come per i pedali, si scrive solo se la scelta l'ha fatta
+    // l'utente: un preset o uno stato salvato portano i loro valori.
+    const bool byUser = ampModelBox_.userDriven;
+    ampModelBox_.userDriven = false;
+    if (byUser && idx != lastPoolModel_) {
+        for (int i = 0; i < m.numKnobs; ++i) {
+            const auto& k = m.knobs[i];
+            const float norm = (k.max > k.min) ? (k.def - k.min) / (k.max - k.min) : 0.f;
+            if (auto* p = processorRef.apvts.getParameter ("ampx_k" + juce::String (i + 1)))
+                p->setValueNotifyingHost (juce::jlimit (0.f, 1.f, norm));
+        }
+        for (int i = 0; i < m.numSwitches; ++i)
+            if (auto* p = processorRef.apvts.getParameter ("ampx_s" + juce::String (i + 1)))
+                p->setValueNotifyingHost (p->convertTo0to1 ((float) m.switches[i].def));
+    }
+    lastPoolModel_ = idx;
+
+    for (int i = 0; i < (int) axKnobs_.size(); ++i) {
+        auto* kb = axKnobs_[(size_t) i];
+        const bool used = (i < m.numKnobs);
+        kb->label.setText (used ? m.knobs[i].label : "", juce::dontSendNotification);
+        if (! used) continue;
+        const auto k = m.knobs[i];
+        kb->slider.textFromValueFunction = [k] (double norm) {
+            const double real = k.min + norm * (k.max - k.min);
+            const double span = k.max - k.min;
+            const int dec = (span > 100.0) ? 0 : (span > 4.0 ? 1 : 2);
+            return juce::String (real, dec) + k.suffix;
+        };
+        kb->slider.valueFromTextFunction = [k] (const juce::String& t) {
+            const double real = t.retainCharacters ("-0123456789.").getDoubleValue();
+            return (k.max > k.min) ? juce::jlimit (0.0, 1.0, (real - k.min) / (k.max - k.min)) : 0.0;
+        };
+        kb->slider.updateText();
+    }
+    for (int i = 0; i < ampmodel::kMaxSwitch; ++i) {
+        const bool used = (i < m.numSwitches);
+        if (! used) continue;
+        auto& cb = axSwBox_[i];
+        const auto id = "ampx_s" + juce::String (i + 1);
+        cb.clear (juce::dontSendNotification);
+        for (int o = 0; o < m.switches[i].numOptions; ++o)
+            cb.addItem (m.switches[i].options[o], o + 1);
+        int cur = 0;
+        if (auto* v = processorRef.apvts.getRawParameterValue (id)) cur = (int) v->load();
+        cb.setSelectedItemIndex (juce::jlimit (0, m.switches[i].numOptions - 1, cur),
+                                 juce::dontSendNotification);
+        axSwLabel_[i].setText (m.switches[i].label, juce::dontSendNotification);
+    }
+    ampModelBox_.setTooltip (m.blurb);
+}
+
+// A quale testa reale si ispira quella scelta, scritto accanto al selettore.
+// Le prime tre non stanno nel registro, quindi il riferimento e' qui.
+juce::String NAMAudioProcessorEditor::ampReferenceText (int sel)
+{
+    switch (sel) {
+        case 0: return juce::String (juce::CharPointer_UTF8 (
+                    "voce originale della catena, non un\xe2\x80\x99emulazione"));
+        case 1: return "sulla scia del Marshall JCM800 2203";
+        case 2: return "sulla scia del Mesa/Boogie Dual Rectifier a due canali";
+        default: break;
+    }
+    const int i = juce::jlimit (0, ampmodel::count() - 1, sel - 3);
+    return juce::String ("sulla scia del ") + ampmodel::at (i).reference;
+}
+
 void NAMAudioProcessorEditor::updateTubeIndicator()
 {
     // La valvola si accende se e' acceso uno qualunque dei tre amplificatori.
     bool anyOn = false;
-    for (const char* id : { "amp_enable", "amp_enable2", "amp_enable3" })
+    for (const char* id : { "amp_enable", "amp_enable2", "amp_enable3", "amp_enable4" })
         if (auto* p = processorRef.apvts.getRawParameterValue (id))
             anyOn = anyOn || (p->load() >= 0.5f);
     if (tubeToggle_.getToggleState() != anyOn)
@@ -1402,13 +1523,17 @@ void NAMAudioProcessorEditor::paintAmpFaceplate (juce::Graphics& g, juce::Rectan
     // Top brand strip: selected-amp logo + POWER LED.
     const int ampSel = (int) processorRef.apvts.getRawParameterValue ("amp_model")->load();
     static const char* kBrand[3] = { "GEAR SX", "MARCHELLOW", "MAUSE RECTIFIER" };
+    static const char* kPow4 = "amp_enable4";
     static const char* kPower[3] = { "amp_enable", "amp_enable2", "amp_enable3" };
-    const juce::String brand = kBrand[juce::jlimit (0, 2, ampSel)];
+    const juce::String brand = (ampSel >= 3)
+        ? juce::String (ampmodel::at (ampSel - 3).name).toUpperCase()
+        : juce::String (kBrand[juce::jlimit (0, 2, ampSel)]);
     auto strip = a.removeFromTop (44.f).reduced (14.f, 4.f);
 
     // POWER LED (lit when the SELECTED amp is enabled — each amp has its own power).
     const bool on = processorRef.apvts
-                        .getRawParameterValue (kPower[juce::jlimit (0, 2, ampSel)])
+                        .getRawParameterValue (ampSel >= 3 ? kPow4
+                                                           : kPower[juce::jlimit (0, 2, ampSel)])
                         ->load() >= 0.5f;
     auto led = strip.removeFromRight (72.f);
     auto dot = led.removeFromLeft (14.f).withSizeKeepingCentre (10.f, 10.f);
@@ -2272,6 +2397,7 @@ void NAMAudioProcessorEditor::resized()
     const bool gearPage = ampPage && ampSel == 0;   // GEAR SX (NativeAmp)
     const bool marPage  = ampPage && ampSel == 1;   // MARCHELLOW (2203)
     const bool recPage  = ampPage && ampSel == 2;   // RECTIFIER (Dual Rectifier)
+    const bool poolPage = ampPage && ampSel >= 3;   // teste a riserva condivisa
 
     // GEAR SX controls: visible only when its model is the selected amp.
     ampChannelBox_  .setVisible (gearPage);
@@ -2315,7 +2441,34 @@ void NAMAudioProcessorEditor::resized()
     ampEnableBtn2_  .setVisible (gearPage);
     ampEnableBtnMar_.setVisible (marPage);
     ampEnableBtnRec_.setVisible (recPage);
+    ampEnableBtnPool_.setVisible (poolPage);
     ampModelBox_    .setVisible (ampPage);
+    ampRefLabel_    .setVisible (ampPage);
+    if (ampPage) ampRefLabel_.setText (ampReferenceText (ampSel), juce::dontSendNotification);
+
+    // Teste a riserva condivisa: si vedono solo i comandi che la testa scelta
+    // ha davvero, e i canali che non stanno suonando restano attenuati.
+    {
+        const auto& am = ampmodel::at (juce::jlimit (0, ampmodel::count() - 1, ampSel - 3));
+        const int chSel = (am.channelSwitch >= 0)
+                        ? juce::jlimit (0, am.numChannels - 1,
+                                        axSwBox_[am.channelSwitch].getSelectedItemIndex()) : 0;
+        for (int i = 0; i < (int) axKnobs_.size(); ++i) {
+            const bool used = poolPage && i < am.numKnobs;
+            axKnobs_[(size_t) i]->slider.setVisible (used);
+            axKnobs_[(size_t) i]->label .setVisible (used);
+            if (! used) continue;
+            const int grp = am.knobs[i].group;
+            const bool attivo = (grp < 0) || (grp == chSel);
+            axKnobs_[(size_t) i]->slider.setAlpha (attivo ? 1.0f : 0.4f);
+            axKnobs_[(size_t) i]->label .setAlpha (attivo ? 1.0f : 0.4f);
+        }
+        for (int i = 0; i < ampmodel::kMaxSwitch; ++i) {
+            const bool used = poolPage && i < am.numSwitches;
+            axSwBox_[i]  .setVisible (used);
+            axSwLabel_[i].setVisible (used);
+        }
+    }
 
     if (ampPage) {
         auto area = panelArea_.reduced (12, 10);
@@ -2331,8 +2484,11 @@ void NAMAudioProcessorEditor::resized()
             ampEnableBtn2_  .setBounds (powerRect);   // i tre tasti di accensione
             ampEnableBtnMar_.setBounds (powerRect);   // condividono lo stesso posto
             ampEnableBtnRec_.setBounds (powerRect);
+            ampEnableBtnPool_.setBounds (powerRect);
             header.removeFromLeft (230);   // spazio per il nome dipinto, ora piu' grande
-            ampModelBox_  .setBounds (header.removeFromLeft (150).reduced (2, 4));
+            ampModelBox_  .setBounds (header.removeFromLeft (170).reduced (2, 4));
+            header.removeFromLeft (10);
+            ampRefLabel_  .setBounds (header.removeFromLeft (420));
         }
         area.removeFromTop (6);
 
@@ -2357,7 +2513,46 @@ void NAMAudioProcessorEditor::resized()
         const int rowH  = area.getHeight() / 4;
         const int cellW = area.getWidth()  / 5;
 
-        if (ampSel == 0) {
+        if (ampSel >= 3) {
+            // ---- teste a riserva condivisa -------------------------------
+            // Una fila per canale piu' una per i comandi globali, e in fondo le
+            // tendine. Le file si ricavano dal gruppo dichiarato da ogni
+            // comando, quindi la disposizione segue il modello invece di essere
+            // scritta a mano per ciascuna testa.
+            const auto& am = ampmodel::at (juce::jlimit (0, ampmodel::count() - 1, ampSel - 3));
+            auto selRow = area.removeFromBottom (am.numSwitches > 0 ? 56 : 0);
+            area.removeFromTop (8);
+
+            std::vector<std::vector<int>> file ((size_t) am.numChannels + 1);
+            for (int i = 0; i < am.numKnobs; ++i) {
+                const int grp = am.knobs[i].group;
+                file[(size_t) (grp < 0 ? am.numChannels : grp)].push_back (i);
+            }
+            int quante = 0;
+            for (auto& f : file) if (! f.empty()) ++quante;
+            const int rowH = area.getHeight() / juce::jmax (1, quante);
+
+            for (auto& f : file) {
+                if (f.empty()) continue;
+                auto row = area.removeFromTop (rowH);
+                const int cw = row.getWidth() / juce::jmax (1, (int) f.size());
+                for (int idx : f) {
+                    auto cell = row.removeFromLeft (cw).reduced (7, 4);
+                    axKnobs_[(size_t) idx]->label.setBounds (cell.removeFromTop (15));
+                    cell.removeFromTop (2);
+                    axKnobs_[(size_t) idx]->slider.setBounds (cell);
+                }
+            }
+            if (am.numSwitches > 0) {
+                const int w = selRow.getWidth() / am.numSwitches;
+                for (int i = 0; i < am.numSwitches; ++i) {
+                    auto cell = selRow.removeFromLeft (w).reduced (12, 6);
+                    axSwLabel_[i].setBounds (cell.removeFromTop (15));
+                    cell.removeFromTop (3);
+                    axSwBox_[i].setBounds (cell.removeFromTop (26));
+                }
+            }
+        } else if (ampSel == 0) {
             // ---- GEAR SX (NativeAmp): CHANNEL combo + 14 knobs, 4 rows -------
             // Bigger label band + more inter-cell padding so the knob captions
             // read clearly and the controls are well spaced from one another.

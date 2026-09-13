@@ -105,6 +105,29 @@ Due cose che cambiano davvero il suono e non solo il nome:
 
 I pomelli del canale non selezionato restano visibili ma attenuati, così si vedono le regolazioni dell'altro senza confonderle con quelle che stanno suonando.
 
+## 4-sexies. Le altre sei teste
+
+Il menu degli amplificatori ne conta ora nove. Le prime tre hanno una pagina
+disegnata su misura; le altre sei condividono una riserva di comandi e si
+rietichettano da sole secondo la testa scelta — è lo stesso meccanismo dei
+pedali, ed è il motivo per cui aggiungerne una non costa nuovi parametri.
+
+Accanto al selettore c'è scritto **a quale testa reale si ispira** quella
+scelta, così il nome di fantasia non resta un indovinello.
+
+| Nome | Si ispira a | Struttura |
+|---|---|---|
+| SOLDERANO | Soldano SLO-100 | 2 canali, torre di tono in comune, modo Crunch sul pulito |
+| BUGNER | Bogner Ecstasy 101B | 3 canali, struttura alta/bassa, pre-equalizzazione, classe A o A/B |
+| DizBenZA | Diezel VH4 | 4 canali completamente separati |
+| MAZZALARGA | Mezzabarba Trinity | 3 canali, controreazione regolabile nel finale |
+| BRUNTELLI | Brunetti XL R-Evo | 3 canali con messa a fuoco propria |
+| Mause Mark 5 | Mesa/Boogie Mark V | 3 canali più l'equalizzatore grafico a cinque cursori |
+
+I comandi del canale che non sta suonando restano visibili ma attenuati, così
+si vedono le regolazioni degli altri senza confonderle con quelle attive. Anche
+queste teste si accendono una per volta, come le prime tre.
+
 ## 5. Catena effetti
 
 Ordine di segnale:

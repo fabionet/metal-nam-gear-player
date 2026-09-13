@@ -15,6 +15,15 @@ NAMLookAndFeel::NAMLookAndFeel()
     setColour (juce::TextButton::textColourOffId,   juce::Colours::lightgrey);
 }
 
+juce::Label* NAMLookAndFeel::createSliderTextBox (juce::Slider& slider)
+{
+    auto* l = juce::LookAndFeel_V4::createSliderTextBox (slider);
+    l->setFont (juce::Font (juce::FontOptions (13.5f).withStyle ("Bold")));
+    l->setColour (juce::Label::textColourId, juce::Colour (0xfffdf8ea));
+    l->setJustificationType (juce::Justification::centred);
+    return l;
+}
+
 void NAMLookAndFeel::drawRotarySlider (juce::Graphics& g,
                                        int x, int y, int w, int h,
                                        float pos,

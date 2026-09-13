@@ -12,6 +12,7 @@
 #include "MeterStripComponent.h"
 #include "EQAnalyserComponent.h"
 #include "FxRegistry.h"
+#include "AmpRegistry.h"
 #include "LCDDisplayComponent.h"
 #include "PedalDSP.h"
 
@@ -453,7 +454,7 @@ private:
     // 1 = MARCHELLOW), placed beside the painted title in the faceplate strip.
     // Selection changes the active amp + title and swaps which per-amp power
     // button (and POWER LED state) is shown; each amp keeps its own power.
-    juce::ComboBox ampModelBox_;
+    PedalBox ampModelBox_;
     std::unique_ptr<CAtt> ampModelAtt_;
     void updateAmpModelUI();
 
@@ -469,6 +470,20 @@ private:
     std::unique_ptr<BAtt> ampEnableBtnRecAtt_;
     juce::ComboBox recChanBox_, recMode1Box_, recMode2Box_, recRectBox_, recPowerBox_;
     std::unique_ptr<CAtt> recChanAtt_, recMode1Att_, recMode2Att_, recRectAtt_, recPowerAtt_;
+    // Teste a riserva condivisa: i comandi li disegna il registro, quindi
+    // bastano una riserva di pomelli e quattro tendine.
+    std::vector<KnobBox*> axKnobs_;
+    juce::TextButton ampEnableBtnPool_ { "POWER" };
+    std::unique_ptr<BAtt> ampEnableBtnPoolAtt_;
+    juce::ComboBox axSwBox_[ampmodel::kMaxSwitch];
+    std::unique_ptr<CAtt> axSwAtt_[ampmodel::kMaxSwitch];
+    juce::Label axSwLabel_[ampmodel::kMaxSwitch];
+    void refreshPoolAmp();
+    // Accanto al selettore: a quale testa reale si ispira quella scelta.
+    juce::Label ampRefLabel_;
+    static juce::String ampReferenceText (int sel);
+    int  lastPoolModel_ = -1;
+
     juce::Label recChanLabel_  { {}, "CHANNEL" }, recMode1Label_ { {}, "CH 1 MODE" },
                 recMode2Label_ { {}, "CH 2 MODE" }, recRectLabel_ { {}, "RECTIFIER" },
                 recPowerLabel_ { {}, "POWER" };   // pointers into knobs_, in layout order

@@ -100,6 +100,9 @@ namespace ids {
     constexpr auto recMode2      = "rec_mode2";
     constexpr auto recRect       = "rec_rect";
     constexpr auto recPower      = "rec_power";
+    // Teste a riserva condivisa: un solo interruttore di accensione e la
+    // riserva, che tutti i modelli dell'elenco si dividono.
+    constexpr auto ampEnable4    = "amp_enable4";
     constexpr auto marPreamp     = "mar_preamp";
     constexpr auto marMaster     = "mar_master";
     constexpr auto marBass       = "mar_bass";
@@ -292,8 +295,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     // Amp-model selector + MARCHELLOW (Marshall JCM800 2203). This selector routes
     // GEAR SX (0) vs MARCHELLOW (1). Each amp has its own independent power state:
     // ampEnable = GEAR SX power, ampEnable2 = MARCHELLOW power.
-    add (std::make_unique<C>(juce::ParameterID{ids::ampModel,1},    "Amp Model",    juce::StringArray{"GEAR SX","MARCHELLOW","MAUSE RECTIFIER"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::ampModel,1},    "Amp Model",    [] { juce::StringArray n { "GEAR SX", "MARCHELLOW", "MAUSE RECTIFIER" };
+                                      for (int i = 0; i < ampmodel::count(); ++i) n.add (ampmodel::at (i).name);
+                                      return n; } (), 0));
     add (std::make_unique<B>(juce::ParameterID{ids::ampEnable3,1},  "Amp Enable 3", false));
+    add (std::make_unique<B>(juce::ParameterID{ids::ampEnable4,1},  "Amp Enable 4", false));
+    for (int i = 1; i <= ampmodel::kMaxKnobs; ++i)
+        add (std::make_unique<P>(juce::ParameterID{"ampx_k" + juce::String (i), 1},
+                                 "AMPX K" + juce::String (i),
+                                 juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+    for (int i = 1; i <= ampmodel::kMaxSwitch; ++i)
+        add (std::make_unique<C>(juce::ParameterID{"ampx_s" + juce::String (i), 1},
+                                 "AMPX S" + juce::String (i),
+                                 juce::StringArray{"0","1","2","3"}, 0));
     add (std::make_unique<C>(juce::ParameterID{ids::recChannel,1},  "Rec Channel",  juce::StringArray{"Ch 1","Ch 2"}, 0));
     add (std::make_unique<C>(juce::ParameterID{ids::recMode1,1},    "Rec Mode 1",   juce::StringArray{"Clean","Vintage","Modern"}, 1));
     add (std::make_unique<C>(juce::ParameterID{ids::recMode2,1},    "Rec Mode 2",   juce::StringArray{"Clean","Vintage","Modern"}, 2));
@@ -581,6 +595,22 @@ void NAMAudioProcessor::pushParametersToPipelines()
         rTreb[c] = apvts.getRawParameterValue (pre + "treble")->load();
         rPres[c] = apvts.getRawParameterValue (pre + "presence")->load();
     }
+    const bool aEn4 = apvts.getRawParameterValue (ids::ampEnable4)->load() > 0.5f;
+    // La riserva e' normalizzata 0..1: si riporta nell'intervallo reale che il
+    // modello scelto dichiara, come per i pedali.
+    float axKnobs[ampmodel::kMaxKnobs] {};
+    int   axSw   [ampmodel::kMaxSwitch] {};
+    const int axModel = juce::jlimit (0, ampmodel::count() - 1, aModel - 3);
+    {
+        const auto& am = ampmodel::at (axModel);
+        for (int i = 0; i < ampmodel::kMaxKnobs; ++i) {
+            const float norm = apvts.getRawParameterValue ("ampx_k" + juce::String (i + 1))->load();
+            const auto& kn = am.knobs[i];
+            axKnobs[i] = (i < am.numKnobs) ? (kn.min + norm * (kn.max - kn.min)) : 0.f;
+        }
+        for (int i = 0; i < ampmodel::kMaxSwitch; ++i)
+            axSw[i] = (int) apvts.getRawParameterValue ("ampx_s" + juce::String (i + 1))->load();
+    }
     const float mPre = apvts.getRawParameterValue (ids::marPreamp)->load();
     const float mMas = apvts.getRawParameterValue (ids::marMaster)->load();
     const float mB   = apvts.getRawParameterValue (ids::marBass)->load();
@@ -639,6 +669,7 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setMarshall  (aEn2 && aModel == 1, mVal, mSens, mPre, mMas, mB, mM, mT, mPr);
         p.setRectifier (aEn3 && aModel == 2, rCh, rM1, rM2, rRec, rPow,
                         rGain, rMas, rBass, rMid, rTreb, rPres);
+        p.setPoolAmp   (aEn4 && aModel >= 3, axModel, axKnobs, axSw);
         p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
         p.setModelStage (mVol, mBs, mMd, mTr);

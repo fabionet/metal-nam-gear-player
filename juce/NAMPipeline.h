@@ -18,6 +18,7 @@
 #include "NativeAmp.h"
 #include "MarshallAmp.h"
 #include "RectifierAmp.h"
+#include "AmpDSP.h"
 #include "Biquad.h"
 
 class NAMPipeline {
@@ -168,7 +169,9 @@ public:
 
     // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp),
     // 2 = RECTIFIER (RectifierAmp, due canali).
-    void setAmpModel(int m) { ampModel_.store(m < 0 ? 0 : (m > 2 ? 2 : m)); }
+    // 0..2 le tre teste con parametri propri, da 3 in poi quelle a riserva
+    // condivisa, nell'ordine del loro registro.
+    void setAmpModel(int m) { ampModel_.store(m < 0 ? 0 : m); }
 
     // MARCHELLOW (Marshall JCM800 2203). Enable is gated by the caller so the
     // non-selected amp receives en=false and stays idle.
@@ -198,6 +201,17 @@ public:
         for (int c = 0; c < 2; ++c)
             rect_.setChannelControls (c, gain[c], masterDB[c], bassDB[c],
                                       midDB[c], trebleDB[c], presDB[c]);
+    }
+
+    // Teste a riserva condivisa: il modello e i comandi arrivano gia' convertiti.
+    void setPoolAmp (bool en, int model, const float* knobs, const int* switches)
+    {
+        poolEnabled_.store (en);
+        poolAmp_.setEnabled (en);
+        poolAmp_.setModel (model);
+        for (int i = 0; i < ampmodel::kMaxKnobs;  ++i) poolAmp_.setKnob   (i, knobs[i]);
+        for (int i = 0; i < ampmodel::kMaxSwitch; ++i) poolAmp_.setSwitch (i, switches[i]);
+        poolAmp_.commit();
     }
 
     // --- Model / IR loading (call from non-audio thread) ---
@@ -244,6 +258,7 @@ private:
     preamp_fx::NativeAmp     amp_;
     preamp_fx::MarshallAmp   marshall_;
     preamp_fx::RectifierAmp  rect_;
+    ampmodel::AmpFX          poolAmp_;
     std::atomic<int>         ampModel_ { 0 };
 
     nam_dsp::Biquad modelBass_, modelMid_, modelTreble_;
@@ -301,6 +316,7 @@ private:
     std::atomic<bool>  ampEnabled_    { false };
     std::atomic<bool>  marshallEnabled_ { false };
     std::atomic<bool>  rectEnabled_     { false };
+    std::atomic<bool>  poolEnabled_     { false };
 
 public:
     // True when prepare() has already run for exactly this sr/blocksize. Lets the
