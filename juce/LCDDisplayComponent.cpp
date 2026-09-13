@@ -31,7 +31,20 @@ LCDDisplayComponent::LCDDisplayComponent (NAMAudioProcessor& proc,
     {
         styleBtn (bankBtn_[i], true);
         bankBtn_[i].setRadioGroupId (0);   // gestiti a mano: e' un parametro a scelta
-        bankBtn_[i].onClick = [this, i] { setParamValue ("preset_bank", (float) i); repaint(); };
+        bankBtn_[i].onClick = [this, i] {
+            // Un clic solo richiama la variante, se quel preset ce l'ha. Se non
+            // c'e' ancora, il tasto la seleziona soltanto e lascia il suono
+            // com'e': e' cosi' che si prepara una variante nuova da salvare.
+            // Caricando comunque, il ripiego sul banco A riportava subito il
+            // display su A e non si riusciva piu' a crearne di nuove.
+            const int idx = mgr_.getCurrentIndex();
+            const bool esiste = idx >= 0
+                             && idx < (int) mgr_.presets().size()
+                             && (mgr_.presets()[(size_t) idx].bankMask & (1 << i)) != 0;
+            setParamValue ("preset_bank", (float) i);
+            if (esiste) mgr_.load (idx, i);
+            repaint();
+        };
     }
 
     styleBtn (saveBtn_, false);
@@ -119,7 +132,6 @@ void LCDDisplayComponent::tapPressed()
 void LCDDisplayComponent::doSave()
 {
     const int bank = juce::jlimit (0, 3, (int) paramValue ("preset_bank"));
-    const char bankLetter = (char) ('A' + bank);
     auto base = mgr_.getCurrentName();
     if (base.isEmpty() || PresetManager::isReservedName (base))
     {
@@ -128,12 +140,15 @@ void LCDDisplayComponent::doSave()
         if (onSaveRequested) onSaveRequested();
         return;
     }
-    // Toglie un eventuale suffisso di banco gia' presente, per non accumularli.
+    // I preset salvati prima portavano la lettera del banco nel nome, perche'
+    // ogni variante era un file a se'. Adesso le varianti stanno dentro il
+    // preset, quindi il suffisso va tolto: altrimenti si continuerebbe a
+    // generare "Nome [A]" come preset separato.
     if (base.length() > 4 && base.getLastCharacter() == ']'
         && base.substring (base.length() - 4, base.length() - 1).startsWith ("["))
         base = base.dropLastCharacters (4).trim();
 
-    mgr_.saveAs (base + " [" + juce::String::charToString (bankLetter) + "]");
+    mgr_.saveBank (base, bank);
     repaint();
 }
 

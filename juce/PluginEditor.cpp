@@ -357,16 +357,22 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtn2_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
     ampEnableBtn2_.setTooltip ("Enable native GEAR SX tube amp");
     ampEnableBtn2Att_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable", ampEnableBtn2_);
-    // Mutual exclusion: turning GEAR SX on forces MARCHELLOW off so the two amps
-    // never run at once. Also refresh the TUBE indicator + faceplate/labels.
-    ampEnableBtn2_.onStateChange = [this] {
-        if (ampEnableBtn2_.getToggleState())
-            if (auto* pm = processorRef.apvts.getParameter ("amp_enable2");
-                pm != nullptr && pm->getValue() >= 0.5f)
-                pm->setValueNotifyingHost (0.f);
+    // Un solo amplificatore acceso per volta: accendendone uno gli altri due si
+    // spengono. Vale per tutti e tre allo stesso modo.
+    auto soloAmp = [this] (const char* mine) {
+        for (const char* other : { "amp_enable", "amp_enable2", "amp_enable3" }) {
+            if (juce::String (other) == mine) continue;
+            if (auto* p = processorRef.apvts.getParameter (other);
+                p != nullptr && p->getValue() >= 0.5f)
+                p->setValueNotifyingHost (0.f);
+        }
         updateTubeIndicator();
         refreshLabels();
         repaint();
+    };
+    ampEnableBtn2_.onStateChange = [this, soloAmp] {
+        if (ampEnableBtn2_.getToggleState()) soloAmp ("amp_enable");
+        else { updateTubeIndicator(); refreshLabels(); repaint(); }
     };
 
     // MARCHELLOW power button — independent power state, bound to `amp_enable2`.
@@ -381,14 +387,9 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtnMar_.setTooltip ("Enable MARCHELLOW (Marshall JCM800 2203) amp");
     ampEnableBtnMarAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable2", ampEnableBtnMar_);
     // Mutual exclusion: turning MARCHELLOW on forces GEAR SX off.
-    ampEnableBtnMar_.onStateChange = [this] {
-        if (ampEnableBtnMar_.getToggleState())
-            if (auto* pg = processorRef.apvts.getParameter ("amp_enable");
-                pg != nullptr && pg->getValue() >= 0.5f)
-                pg->setValueNotifyingHost (0.f);
-        updateTubeIndicator();
-        refreshLabels();
-        repaint();
+    ampEnableBtnMar_.onStateChange = [this, soloAmp] {
+        if (ampEnableBtnMar_.getToggleState()) soloAmp ("amp_enable2");
+        else { updateTubeIndicator(); refreshLabels(); repaint(); }
     };
 
     // COMP routing-position selector (visible only inside the COMP section).
@@ -474,6 +475,10 @@ NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     ampEnableBtnRec_.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffcc2020));
     ampEnableBtnRec_.setTooltip ("Accende il MAUSE RECTIFIER (due canali, raddrizzatore commutabile)");
     ampEnableBtnRecAtt_ = std::make_unique<BAtt> (processorRef.apvts, "amp_enable3", ampEnableBtnRec_);
+    ampEnableBtnRec_.onStateChange = [this, soloAmp] {
+        if (ampEnableBtnRec_.getToggleState()) soloAmp ("amp_enable3");
+        else { updateTubeIndicator(); refreshLabels(); repaint(); }
+    };
 
     // Valves selector: EU (4x EL34) vs US (4x 6550).
     addAndMakeVisible (marValvesLabel_);
@@ -1222,10 +1227,11 @@ void NAMAudioProcessorEditor::updateLoadStatus()
 // (GEAR SX / amp_enable, or MARCHELLOW / amp_enable2) is powered on.
 void NAMAudioProcessorEditor::updateTubeIndicator()
 {
-    auto* pg = processorRef.apvts.getRawParameterValue ("amp_enable");
-    auto* pm = processorRef.apvts.getRawParameterValue ("amp_enable2");
-    const bool anyOn = (pg != nullptr && pg->load() >= 0.5f)
-                    || (pm != nullptr && pm->load() >= 0.5f);
+    // La valvola si accende se e' acceso uno qualunque dei tre amplificatori.
+    bool anyOn = false;
+    for (const char* id : { "amp_enable", "amp_enable2", "amp_enable3" })
+        if (auto* p = processorRef.apvts.getRawParameterValue (id))
+            anyOn = anyOn || (p->load() >= 0.5f);
     if (tubeToggle_.getToggleState() != anyOn)
         tubeToggle_.setToggleState (anyOn, juce::dontSendNotification);
 }
@@ -1310,17 +1316,48 @@ void NAMAudioProcessorEditor::paintGroupPanel (juce::Graphics& g,
                                                juce::Rectangle<int> r,
                                                const juce::String& title)
 {
+    // Pannello in rilievo. Come per i pomelli, la profondita' si costruisce a
+    // strati: un'ombra sotto che lo stacca dal fondo, un gradiente piu' marcato
+    // sul corpo, e due fili sui bordi — chiaro in alto dove la lamiera si gira
+    // verso la luce, scuro in basso dove si allontana.
     auto a = r.toFloat().reduced (3.f);
-    juce::ColourGradient gr (juce::Colour (0xff262626), a.getX(), a.getY(),
-                             juce::Colour (0xff141414), a.getX(), a.getBottom(),
+
+    // Ombra portata, spostata in basso.
+    g.setColour (juce::Colours::black.withAlpha (0.42f));
+    g.fillRoundedRectangle (a.translated (0.f, 2.5f).expanded (1.0f, 0.5f), 5.f);
+
+    juce::ColourGradient gr (juce::Colour (0xff343434), a.getX(), a.getY(),
+                             juce::Colour (0xff0e0e0e), a.getX(), a.getBottom(),
                              false);
+    // Il punto di mezzo piu' scuro del gradiente lineare fa curvare la
+    // superficie invece di farla sembrare inclinata.
+    gr.addColour (0.55, juce::Colour (0xff191919));
     g.setGradientFill (gr);
-    g.fillRoundedRectangle (a, 4.f);
-    g.setColour (juce::Colour (0xff0a0a0a));
-    g.drawRoundedRectangle (a, 4.f, 1.0f);
-    // Inner highlight line.
-    g.setColour (juce::Colour::fromFloatRGBA (1.f, 1.f, 1.f, 0.05f));
-    g.drawHorizontalLine ((int) a.getY() + 1, a.getX() + 2, a.getRight() - 2);
+    g.fillRoundedRectangle (a, 5.f);
+
+    // Smusso interno: filo chiaro sopra e a sinistra, scuro sotto e a destra.
+    {
+        juce::Path top;
+        top.startNewSubPath (a.getX() + 5.f, a.getY() + 1.2f);
+        top.lineTo (a.getRight() - 5.f, a.getY() + 1.2f);
+        g.setColour (juce::Colours::white.withAlpha (0.10f));
+        g.strokePath (top, juce::PathStrokeType (1.4f));
+
+        juce::Path left;
+        left.startNewSubPath (a.getX() + 1.2f, a.getY() + 6.f);
+        left.lineTo (a.getX() + 1.2f, a.getBottom() - 6.f);
+        g.setColour (juce::Colours::white.withAlpha (0.055f));
+        g.strokePath (left, juce::PathStrokeType (1.2f));
+
+        juce::Path bot;
+        bot.startNewSubPath (a.getX() + 5.f, a.getBottom() - 1.2f);
+        bot.lineTo (a.getRight() - 5.f, a.getBottom() - 1.2f);
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.strokePath (bot, juce::PathStrokeType (1.4f));
+    }
+
+    g.setColour (juce::Colour (0xff070707));
+    g.drawRoundedRectangle (a, 5.f, 1.0f);
 
     // Title strip at top.
     auto titleStrip = a.removeFromTop (30.f);
@@ -2349,35 +2386,32 @@ void NAMAudioProcessorEditor::resized()
             // i cinque selettori. Le due file stanno una sopra l'altra perche'
             // si vedano insieme: sull'ampli vero i due canali hanno le loro
             // manopole tutte sul frontale, non nascoste a turno.
-            auto placeRec = [&] (juce::Rectangle<int>& row, int idx) {
-                auto cell = row.removeFromLeft (cellW).reduced (7, 5);
-                auto lab  = cell.removeFromTop (16);
-                recKnobs_[(size_t) idx]->label .setBounds (lab);
-                cell.removeFromTop (2);
-                recKnobs_[(size_t) idx]->slider.setBounds (cell);
-            };
-            const int rowRec = area.getHeight() * 2 / 5;
+            // La fila dei selettori si toglie prima, dal fondo: quel che
+            // resta e' lo spazio dei pomelli, diviso in due file uguali. Cosi'
+            // i pomelli stanno in mezzo invece di ammucchiarsi in alto e
+            // lasciare un vuoto sotto.
+            auto selRow = area.removeFromBottom (58);
+            area.removeFromTop (12);
+            const int rowRec  = area.getHeight() / 2;
             const int cellRec = area.getWidth() / 6;
-            { auto row = area.removeFromTop (rowRec);
-              for (int i = 0; i < 6; ++i) { auto cell = row.removeFromLeft (cellRec).reduced (7, 5);
-                  auto lab = cell.removeFromTop (16);
-                  recKnobs_[(size_t) i]->label.setBounds (lab); cell.removeFromTop (2);
-                  recKnobs_[(size_t) i]->slider.setBounds (cell); } }
-            { auto row = area.removeFromTop (rowRec);
-              for (int i = 6; i < 12; ++i) { auto cell = row.removeFromLeft (cellRec).reduced (7, 5);
-                  auto lab = cell.removeFromTop (16);
-                  recKnobs_[(size_t) i]->label.setBounds (lab); cell.removeFromTop (2);
-                  recKnobs_[(size_t) i]->slider.setBounds (cell); } }
-            (void) placeRec;
-            { // I cinque selettori, in fila sull'ultima riga.
-                auto row = area;
+            auto fila = [&] (juce::Rectangle<int> row, int from) {
+                for (int i = from; i < from + 6; ++i) {
+                    auto cell = row.removeFromLeft (cellRec).reduced (8, 4);
+                    recKnobs_[(size_t) i]->label.setBounds (cell.removeFromTop (16));
+                    cell.removeFromTop (3);
+                    recKnobs_[(size_t) i]->slider.setBounds (cell);
+                }
+            };
+            fila (area.removeFromTop (rowRec), 0);
+            fila (area,                        6);
+            {
                 juce::ComboBox* boxes[5] = { &recChanBox_, &recMode1Box_, &recMode2Box_,
                                              &recRectBox_, &recPowerBox_ };
                 juce::Label*    labs [5] = { &recChanLabel_, &recMode1Label_, &recMode2Label_,
                                              &recRectLabel_, &recPowerLabel_ };
-                const int w = row.getWidth() / 5;
+                const int w = selRow.getWidth() / 5;
                 for (int i = 0; i < 5; ++i) {
-                    auto cell = row.removeFromLeft (w).reduced (10, 8);
+                    auto cell = selRow.removeFromLeft (w).reduced (10, 6);
                     labs[i]->setJustificationType (juce::Justification::centred);
                     labs[i]->setBounds (cell.removeFromTop (16));
                     cell.removeFromTop (3);
