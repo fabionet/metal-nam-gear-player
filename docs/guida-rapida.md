@@ -61,6 +61,8 @@ Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DI
 
 Gli elenchi contengono due serie: quella costruita sugli schemi della casa giapponese (compresa la serie artigianale) e una seconda che raccoglie le altre scuole — il roditore col suo op-amp spinto, i quattro stadi in cascata della scuola newyorkese, le due bande separate della scuola americana da studio, e i circuiti silenziosissimi della scuola inglese su misura. Nomi evocativi e non marchi, topologie vere.
 
+La casa modenese è nell'elenco principale con i suoi drive e il suo booster ibrido, e nell'elenco FX col suo ritardo a valvola: il tempo lo tiene un circuito digitale ma il segnale passa tutto per la valvola, e un selettore dà quattro colori alla ripetizione.
+
 Anche le cinque sezioni della scheda **FX** hanno la loro tendina, con un **elenco a parte**: lì hanno senso ritardi, modulazioni e riverberi, non distorsori. Le categorie sono Delay, Chorus, Flanger, Reverb, Tremolo, e ognuna si apre con l'effetto che quella sezione ha sempre avuto — scegliendolo si torna esattamente al suono di prima.
 
 Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.

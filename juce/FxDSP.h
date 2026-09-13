@@ -164,6 +164,11 @@ public:
             case Topology::DelayMod:
                 fbLp_.setCutoff (5000.f, sr_, false);
                 break;
+            case Topology::DelayTube:
+                fbLp_.setCutoff (2200.f, sr_, false);   // colore buio
+                wetHp_.setCutoff (2600.f, sr_, true);   // colore brillante
+                spring_.set (900.f, 1.1f, 6.f, sr_);    // colore coi medi avanti
+                break;
             case Topology::ReverbSix:
             case Topology::ReverbMod: {
                 const float tone = (m.topo == Topology::ReverbSix) ? k_[1] : k_[1];
@@ -210,6 +215,7 @@ public:
             case Topology::ReverbGrail:     return reverbGrail (x);
             case Topology::ReverbPolara:    return reverbPolara (x);
             case Topology::TremPulsar:      return tremPulsar (x);
+            case Topology::DelayTube:       return delayTube (x);
         }
         return x;
     }
@@ -580,6 +586,37 @@ private:
         const float sq = std::tanh (si * 12.f);
         const float l  = si * (1.f - k_[2]) + sq * k_[2];
         return x * (1.f - k_[1] * 0.5f * (1.f - l));
+    }
+
+    // Tempo gestito in digitale, percorso del segnale a valvola: le ripetizioni
+    // si scaldano invece di sgranare, e anche il diretto passa per il buffer,
+    // che gli lascia un filo di seconda armonica. Il selettore colora la sola
+    // ripetizione, non il diretto.
+    float delayTube (float x)
+    {
+        const float ts = k_[0] * 0.001f * (float) sr_;
+        float y = long_.read (ts);
+
+        // La valvola: asimmetrica, quindi seconda armonica, e con la componente
+        // continua sottratta perche' lo stadio non introduca offset.
+        // Il guadagno a piccolo segnale va riportato a uno: lo stadio sta
+        // DENTRO l'anello di reazione, e senza normalizzarlo il guadagno
+        // d'anello supera l'unita' gia' a meta' corsa della reazione e il
+        // ritardo parte in oscillazione da solo.
+        const float drive = 1.f + k_[3] * 3.5f;
+        y = (std::tanh (y * drive + 0.06f) - std::tanh (0.06f)) / drive;
+
+        switch (std::clamp (sw_[0], 0, 3)) {
+            case 0:  y = fbLp_.process (y); break;                       // buio
+            case 2:  y += wetHp_.process (y) * 0.9f; break;              // brillante
+            case 3:  y = spring_.process (y); break;                     // medi avanti
+            default: break;                                              // normale
+        }
+
+        long_.write (x + y * k_[1]);
+        // Il buffer a valvola sul diretto: pochissimo, ma c'e'.
+        const float dry = x + (std::tanh (x * 1.15f + 0.04f) - std::tanh (0.04f) - x) * 0.35f;
+        return dry + y * k_[2];
     }
 
     float wetLpFixed (float v)

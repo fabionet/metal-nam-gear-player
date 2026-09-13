@@ -239,6 +239,7 @@ public:
             case Topology::OdTubeLike:      return odTubeLike (inHP_.process (x));
             case Topology::DistTwoChan:     return distTwoChan (inHP_.process (x));
             case Topology::DistBritish:     return distBritish (inHP_.process (x));
+            case Topology::BoostFetDiode:   return boostFetDiode (inHP_.process (x));
         }
         return x;
     }
@@ -694,6 +695,28 @@ private:
         v = softClip (v * 2.2f, 0.85f);
         v = tilt (tiltA_, v, (k_[1] - 0.5f) * 14.f);
         return v * k_[2] * 0.5f;
+    }
+
+    // Ibrido FET piu' diodi, in classe A. Il FET spinge sempre e colora con la
+    // seconda armonica, perche' la polarizzazione e' asimmetrica; i diodi hanno
+    // una soglia e restano fuori finche' il livello non ci arriva. E' per
+    // questo che a comando basso spinge pulito e alzandolo diventa crunch,
+    // invece di distorcere in modo uniforme come farebbe un solo stadio.
+    float boostFetDiode (float x)
+    {
+        const float g = 1.5f + k_[0] * 22.f;
+        float v = x * g;
+        // L'asimmetria della classe A non viene da una componente continua
+        // aggiunta: quella sparisce appena il segnale cresce, e infatti con la
+        // prima stesura la seconda armonica si perdeva alzando il comando.
+        // Viene dalla curva stessa, che tosa prima da un lato: cosi' resta
+        // asimmetrica a ogni livello.
+        v = softClip (v * 0.7f, 0.f);                            // FET in classe A
+        const float th = 0.62f;                                  // soglia dei diodi
+        if (std::fabs (v) > th)
+            v = (v > 0.f ? th : -th) + std::tanh ((v - (v > 0.f ? th : -th)) * 2.2f) * 0.22f;
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 12.f);
+        return v * std::pow (10.f, k_[2] / 20.f) * 0.5f;
     }
 
     // --- compressori ------------------------------------------------------

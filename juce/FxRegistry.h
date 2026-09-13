@@ -54,7 +54,8 @@ enum class Topology {
     FlangerMistress,// spazzolata lenta con estensione e colore separati
     ReverbGrail,    // tre ambienti a scelta e un comando solo
     ReverbPolara,   // ambienti digitali fra cui uno rovesciato
-    TremPulsar      // onda regolabile e simmetria del ciclo
+    TremPulsar,     // onda regolabile e simmetria del ciclo
+    DelayTube       // tempo gestito in digitale, percorso del segnale a valvola
 };
 
 struct Model
@@ -135,6 +136,15 @@ inline const std::vector<Model>& models()
       { { "TIME", 20.f, 1200.f, 400.f, " ms" }, { "REPEATS", 0.f, 0.9f, 0.35f, "" },
         { "LEVEL", 0.f, 1.f, 0.3f, "" } }, 3,
       { { "MODE", { "Clean", "Analog", "Mod", "Reverse" }, 4, 0 } }, 1 },
+
+    { "dl_magnetic", "MAGNETIC MEMORY BR", Category::Delay, Topology::DelayTube,
+      "Il tempo lo tiene un circuito digitale, ma il segnale passa tutto per una "
+      "valvola: le ripetizioni si scaldano invece di sgranare, e anche il diretto "
+      "prende un filo di seconda armonica dal buffer. Il selettore da' quattro "
+      "colori alla ripetizione, dal buio al brillante.",
+      { { "TIME", 30.f, 900.f, 360.f, " ms" }, { "REPEATS", 0.f, 0.92f, 0.4f, "" },
+        { "LEVEL", 0.f, 1.f, 0.35f, "" }, { "WARMTH", 0.f, 1.f, 0.45f, "" } }, 4,
+      { { "COLOR", { "Dark", "Normal", "Bright", "Mid" }, 4, 1 } }, 1 },
 
     // --- Chorus ------------------------------------------------------------
     { "ch_std", "STANDARD Chorus", Category::Chorus, Topology::ChorusStd,
