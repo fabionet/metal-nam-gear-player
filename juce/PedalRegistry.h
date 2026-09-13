@@ -76,7 +76,14 @@ enum class Topology {
     GateExpander,   // espansore verso il basso, con rapporto
     EqGraphic6,     // sei bande basse a 63/125/250/500/1k/2k piu' livello
     EqKnockout,     // bilancia bassi/acuti con due voci
-    CompOpto        // cella ottica: rilascio a due tempi, molto morbido
+    CompOpto,       // cella ottica: rilascio a due tempi, molto morbido
+
+    // --- terza serie -------------------------------------------------------
+    DistRatVintage, // il roditore col vecchio op-amp lento: fronti arrotondati
+    OdFetBox,       // stadio a FET che imita il canale di un ampli a valvole
+    OdTubeLike,     // clipping morbido con cedimento, come uno stadio finale
+    DistTwoChan,    // due voci in un pedale solo, crunch oppure lead
+    DistBritish     // cascata alla britannica con il condensatore di brillantezza
 };
 
 inline const char* categoryName (Category c)
@@ -196,6 +203,26 @@ inline const std::vector<Model>& models()
         { "SUSTAIN", 0.f, 1.f, 0.45f, "" } }, 3,
       { none() }, 0 },
 
+    { "od_mercury_box", "MERCURY BOX BR", Category::Overdrive, Topology::OdFetBox,
+      "Uno stadio a FET costruito per rifare il secondo canale di un ampli a "
+      "valvole invece di un pedale: comprime come un finale e tiene i medi "
+      "avanti, e risponde alla dinamica della mano piu' che al comando.",
+      { drive (0.45f), tone (0.5f), level () }, 3,
+      { none() }, 0 },
+
+    { "od_mercury_el34", "MERCURY EL34 BR", Category::Overdrive, Topology::OdTubeLike,
+      "Clipping morbido con il cedimento di uno stadio finale a valvole: sotto "
+      "la pennata forte l'attacco si schiaccia e torna su, ed e' quello a dare "
+      "la sensazione liquida.",
+      { drive (0.5f), tone (0.5f), level (), { "SAG", 0.f, 1.f, 0.45f, "" } }, 4,
+      { none() }, 0 },
+
+    { "od_mercury_one", "MERCURY ONE BR", Category::Overdrive, Topology::OdTubeLike,
+      "L'evoluzione a canale singolo: piu' guadagno a disposizione e le basse "
+      "piu' strette, per restare leggibile anche a volume alto.",
+      { drive (0.6f), tone (0.55f), level (), { "SAG", 0.f, 1.f, 0.25f, "" } }, 4,
+      { none() }, 0 },
+
     // --- Distortion --------------------------------------------------------
     { "ds_classic", "DS-ONE Classic", Category::Distortion, Topology::DistHard,
       "Clipping duro simmetrico a diodi verso massa dopo uno stadio op-amp ad alto "
@@ -234,6 +261,15 @@ inline const std::vector<Model>& models()
         { "VOLUME", 0.f, 1.f, 0.5f, "" } }, 3,
       { none() }, 0 },
 
+    { "ds_rat_vintage", "RODENT Vintage", Category::Distortion, Topology::DistRatVintage,
+      "La versione col vecchio op-amp, quello lento. Sopra i due chilohertz e "
+      "mezzo non riesce a seguire il fronte dell'onda alla massima escursione, "
+      "e lo arrotonda: e' da li' che viene la differenza di ruvidezza fra le "
+      "prime unita' e quelle moderne, non dai diodi.",
+      { { "DISTORTION", 0.f, 1.f, 0.5f, "" }, { "FILTER", 0.f, 1.f, 0.4f, "" },
+        { "VOLUME", 0.f, 1.f, 0.5f, "" } }, 3,
+      { none() }, 0 },
+
     { "ds_cornish_g2", "G-TWO PC", Category::Distortion, Topology::DistThick,
       "Distorsione piena e controllata, coi medi in evidenza invece che scavati: "
       "regge gli accordi aperti senza impastare.",
@@ -246,6 +282,20 @@ inline const std::vector<Model>& models()
       "l'equalizzazione a tre bande. Nato per una cosa sola e la fa.",
       { { "LEVEL", 0.f, 1.f, 0.5f, "" }, { "LOW", -15.f, 15.f, 3.f, " dB" },
         { "MID", -15.f, 15.f, -6.f, " dB" }, { "HIGH", -15.f, 15.f, 4.f, " dB" } }, 4,
+      { none() }, 0 },
+
+    { "ds_mercury_two", "MERCURY TWO BR", Category::Distortion, Topology::DistTwoChan,
+      "Due voci in un pedale solo: crunch tiene aperto e dinamico, lead chiude "
+      "il fondo e aggiunge due stadi. Bassi e acuti si regolano a parte.",
+      { drive (0.5f), { "BASS", -15.f, 15.f, 0.f, " dB" },
+        { "TREBLE", -15.f, 15.f, 0.f, " dB" }, level () }, 4,
+      { { "VOICE", { "Crunch", "Lead", "", "" }, 2, 0 } }, 1 },
+
+    { "ds_slp", "SLP BR", Category::Distortion, Topology::DistBritish,
+      "La cascata alla britannica, col condensatore di brillantezza che lascia "
+      "passare gli acuti attorno al primo stadio: aperto e mordente, si sporca "
+      "alzando il volume della chitarra e si pulisce abbassandolo.",
+      { drive (0.5f), tone (0.5f), level (), { "BRIGHT", 0.f, 1.f, 0.5f, "" } }, 4,
       { none() }, 0 },
 
     // --- High Gain ---------------------------------------------------------

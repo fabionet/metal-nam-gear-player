@@ -43,6 +43,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     amp_.prepare(sampleRate);
     marshall_.prepare(sampleRate);
     rect_.prepare(sampleRate);
+    poolAmp_.prepare(sampleRate);
     irHp_.reset();
     irLp_.reset();
 
@@ -82,6 +83,7 @@ void NAMPipeline::reset()
     amp_.reset();
     marshall_.reset();
     rect_.reset();
+    poolAmp_.reset();
     irHp_.reset();
     irLp_.reset();
     if (ir_)  ir_ ->reset();
@@ -272,9 +274,13 @@ void NAMPipeline::process(const float* in, float* out, int n)
             if (marshallEnabled_.load())
                 for (int i = 0; i < n; ++i) out[i] = marshall_.process(out[i]);
             break;
-        default:
+        case 2:
             if (rectEnabled_.load())
                 for (int i = 0; i < n; ++i) out[i] = rect_.process(out[i]);
+            break;
+        default:
+            if (poolEnabled_.load())
+                for (int i = 0; i < n; ++i) out[i] = poolAmp_.process(out[i]);
             break;
     }
 

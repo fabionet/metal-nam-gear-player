@@ -1,4 +1,5 @@
 #include "NAMLookAndFeel.h"
+#include "JuceFontCompat.h"
 
 NAMLookAndFeel::NAMLookAndFeel()
 {
@@ -13,6 +14,15 @@ NAMLookAndFeel::NAMLookAndFeel()
     setColour (juce::ToggleButton::tickDisabledColourId, juce::Colour (0xff555555));
     setColour (juce::TextButton::buttonColourId,    juce::Colour (0xff2a2a2a));
     setColour (juce::TextButton::textColourOffId,   juce::Colours::lightgrey);
+}
+
+juce::Label* NAMLookAndFeel::createSliderTextBox (juce::Slider& slider)
+{
+    auto* l = juce::LookAndFeel_V4::createSliderTextBox (slider);
+    l->setFont (juce::Font (juce::FontOptions (13.5f).withStyle ("Bold")));
+    l->setColour (juce::Label::textColourId, juce::Colour (0xfffdf8ea));
+    l->setJustificationType (juce::Justification::centred);
+    return l;
 }
 
 void NAMLookAndFeel::drawRotarySlider (juce::Graphics& g,

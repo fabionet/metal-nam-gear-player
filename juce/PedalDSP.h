@@ -140,6 +140,7 @@ public:
         low_.reset(); mid_.reset(); high_.reset();
         for (auto& b : band_) b.reset();
         dc_ = 0.f; env_ = 0.f; gain_ = 1.f; cEnv_ = 0.f; cGain_ = 1.f; grDb_ = 0.f;
+        slew_ = 0.f; sagEnv_ = 1.f;
     }
 
     void setBypass (bool b) { bypass_ = b; }
@@ -231,6 +232,13 @@ public:
             case Topology::EqGraphic6:      return eqGraphic6 (x);
             case Topology::EqKnockout:      return eqKnockout (x);
             case Topology::CompOpto:        return compOpto (x);
+
+            // --- terza serie ------------------------------------------------
+            case Topology::DistRatVintage:  return rat (inHP_.process (x), 0.45f, 2.5f, true);
+            case Topology::OdFetBox:        return odFetBox (inHP_.process (x));
+            case Topology::OdTubeLike:      return odTubeLike (inHP_.process (x));
+            case Topology::DistTwoChan:     return distTwoChan (inHP_.process (x));
+            case Topology::DistBritish:     return distBritish (inHP_.process (x));
         }
         return x;
     }
@@ -443,7 +451,7 @@ private:
     // conducono a quasi un volt e mezzo, quindi lo stesso pedale tosa molto
     // piu' tardi, resta piu' dinamico e va alzato di piu'. Il ginocchio dei LED
     // e' anche piu' netto, perche' conducono piu' bruscamente.
-    float rat (float x, float th, float knee)
+    float rat (float x, float th, float knee, bool slowOpAmp = false)
     {
         // Il guadagno parte da uno: a comando chiuso il pedale sporca appena,
         // com'e' giusto. Partendo da otto, come faceva la prima stesura, l'onda
@@ -452,6 +460,18 @@ private:
         const float g = 1.f + k_[0] * 150.f;
         float v = x * g;
         v += ratPre_.process (v) * 0.8f;          // la gobba prima dei diodi
+
+        // Il vecchio op-amp ha una velocita' di salita bassa: alla massima
+        // escursione non tiene il passo sopra i 2,6 kHz circa, e il fronte
+        // dell'onda gli esce arrotondato. E' un limite di pendenza, non un
+        // filtro: agisce solo quando il segnale si muove in fretta, quindi
+        // lascia stare le note tenute e smussa gli attacchi e la tosatura.
+        if (slowOpAmp) {
+            const float maxStep = 6.2831853f * 2600.f * th / (float) sr_;
+            const float d = v - slew_;
+            slew_ += std::max (-maxStep, std::min (maxStep, d));
+            v = slew_;
+        }
         // Non si normalizza per la soglia: la versione coi LED deve restare
         // piu' forte, perche' lo e'.
         v = std::tanh (v * knee / th) * th;
@@ -616,6 +636,66 @@ private:
         return x * g * std::pow (10.f, k_[1] / 20.f);
     }
 
+    // Uno stadio a FET tarato per rifare il canale di un ampli, non un pedale:
+    // la compressione arriva prima del clipping e resta anche a guadagno basso,
+    // ed e' quello che lo fa rispondere alla mano.
+    float odFetBox (float x)
+    {
+        const float g = 5.f + k_[0] * 70.f;
+        float v = loopHP_.process (x) * g;
+        v = std::tanh (v * 0.8f);                 // compressione dello stadio
+        v = softClip (v * 2.2f, 0.9f);
+        v = bandA_.process (v);                   // medi avanti
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 12.f);
+        return v * k_[2] * 0.55f;
+    }
+
+    // Clipping morbido col cedimento di uno stadio finale: l'alimentazione
+    // scende sotto la pennata forte e risale piano, e l'attacco si schiaccia.
+    float odTubeLike (float x)
+    {
+        const float sag = k_[3];
+        const float lvl = std::fabs (x);
+        const float target = 1.f - std::min (0.5f, lvl * sag * 2.2f);
+        const float a = (target < sagEnv_) ? 0.9992f : 0.99992f;
+        sagEnv_ = sagEnv_ * a + target * (1.f - a);
+
+        const float g = 4.f + k_[0] * 60.f;
+        float v = std::tanh (loopHP_.process (x) * g * sagEnv_ * 0.7f);
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 12.f);
+        return v * k_[2] * 0.7f;
+    }
+
+    // Due voci in un pedale: crunch resta aperto, lead chiude il fondo prima
+    // del guadagno e aggiunge due stadi, che e' il modo di stringere senza
+    // impastare.
+    float distTwoChan (float x)
+    {
+        const bool lead = (s_[0] == 1);
+        float v = lead ? muffA_.process (x) : x;
+        // Il crunch deve restare aperto: col guadagno alto come il lead l'onda
+        // sarebbe gia' piatta in entrambi e le due voci suonerebbero uguali.
+        const float g = (lead ? 25.f : 1.2f) + k_[0] * (lead ? 170.f : 14.f);
+        v = softClip (v * g, 0.85f);
+        if (lead) { v = softClip (v * 2.6f, 0.8f); v = softClip (v * 1.8f, 0.8f); }
+        v = shelfLo (shA_, v, k_[1]);
+        v = shelfHi (shB_, v, k_[2]);
+        return v * k_[3] * 0.5f;
+    }
+
+    // Cascata alla britannica: il condensatore di brillantezza porta gli acuti
+    // attorno al primo stadio, quindi a guadagno basso il pedale e' aperto e
+    // mordente, e chiudendo il volume della chitarra si pulisce da solo.
+    float distBritish (float x)
+    {
+        const float bright = boostHP_.process (x) * k_[3] * 1.4f;
+        const float g = 6.f + k_[0] * 90.f;
+        float v = softClip ((x + bright) * g, 0.9f);
+        v = softClip (v * 2.2f, 0.85f);
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 14.f);
+        return v * k_[2] * 0.5f;
+    }
+
     // --- compressori ------------------------------------------------------
     // Inseguitore di picco con attacco regolabile e rilascio fisso per i due
     // sustainer, esplicito per il limitatore. Il rapporto dei sustainer cresce
@@ -726,6 +806,10 @@ private:
             bandA_.set (800.f, 0.9f, 5.f, sr_);          // la gobba sui medi, fissa
             return;
         }
+        if (m.topo == Topology::OdFetBox) {
+            bandA_.set (900.f, 0.8f, 4.f, sr_);
+            return;
+        }
         if (m.topo == Topology::DistFixedHi) {
             bandB_.set (700.f, 1.0f, k_[2], sr_);
             return;
@@ -768,6 +852,8 @@ private:
     float   cGain_ = 1.f;           // guadagno del compressore, livellato
     float   grDb_  = 0.f;           // riduzione in corso, per il misuratore
     float   cAtk_ = 0.f, cRel_ = 0.f, cDetA_ = 0.f, cDetR_ = 0.f;
+    float   slew_ = 0.f;            // uscita dell'op-amp lento
+    float   sagEnv_ = 1.f;          // alimentazione che cede
     float   gain_ = 1.f;            // guadagno del gate, con rampa
 };
 
