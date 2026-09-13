@@ -90,6 +90,11 @@ private:
     juce::String serialize (const juce::String& name) const;
     bool         applyXml  (const juce::XmlElement& root, int bank);
     static int   scanBankMask (const juce::XmlElement& root);
+    // I modelli scelti si scrivono per nome accanto ai parametri, e si
+    // rileggono da li': l'indice nel registro non e' stabile fra una versione e
+    // l'altra, il nome si'.
+    void writeModelIds (juce::XmlElement& dest) const;
+    void applyModelIds (const juce::XmlElement& src);
 
     NAMAudioProcessor& processor_;
     juce::AudioProcessorValueTreeState& apvts_;

@@ -36,9 +36,9 @@
       <PARAM id="od_bypass" value="0"/>
       <PARAM id="dist_bypass" value="1"/>
       <PARAM id="od_model" value="2"/>
-      <PARAM id="dist_model" value="6"/>
-      <PARAM id="ng_model" value="14"/>
-      <PARAM id="gate_model" value="15"/>
+      <PARAM id="dist_model" value="12"/>
+      <PARAM id="ng_model" value="34"/>
+      <PARAM id="gate_model" value="35"/>
       <PARAM id="hp_freq" value="60"/>
       <PARAM id="hp_bypass" value="0"/>
       <PARAM id="ln_enabled" value="0"/>
@@ -135,7 +135,7 @@
       <PARAM id="gate_p7" value="0.5"/>
       <PARAM id="gate_p8" value="0.5"/>
       <PARAM id="gate_sw1" value="0"/>
-      <PARAM id="comp_model" value="19"/>
+      <PARAM id="comp_model" value="43"/>
       <PARAM id="comp_p1" value="0.4"/>
       <PARAM id="comp_p2" value="0.1414"/>
       <PARAM id="comp_p3" value="0.5"/>
@@ -145,7 +145,7 @@
       <PARAM id="comp_p7" value="0.5"/>
       <PARAM id="comp_p8" value="0.5"/>
       <PARAM id="comp_sw1" value="0"/>
-      <PARAM id="eq_model" value="16"/>
+      <PARAM id="eq_model" value="38"/>
       <PARAM id="eq_p1" value="0.5"/>
       <PARAM id="eq_p2" value="0.5"/>
       <PARAM id="eq_p3" value="0.5"/>
@@ -162,28 +162,28 @@
       <PARAM id="fxdel_p4" value="0.5"/>
       <PARAM id="fxdel_p5" value="0.5"/>
       <PARAM id="fxdel_sw1" value="0"/>
-      <PARAM id="fxch_model" value="4"/>
+      <PARAM id="fxch_model" value="8"/>
       <PARAM id="fxch_p1" value="0.0754"/>
       <PARAM id="fxch_p2" value="0.4"/>
       <PARAM id="fxch_p3" value="0.3"/>
       <PARAM id="fxch_p4" value="0.5"/>
       <PARAM id="fxch_p5" value="0.5"/>
       <PARAM id="fxch_sw1" value="0"/>
-      <PARAM id="fxfl_model" value="8"/>
+      <PARAM id="fxfl_model" value="14"/>
       <PARAM id="fxfl_p1" value="0.0251"/>
       <PARAM id="fxfl_p2" value="0.5"/>
       <PARAM id="fxfl_p3" value="0.4444"/>
       <PARAM id="fxfl_p4" value="0.25"/>
       <PARAM id="fxfl_p5" value="0.5"/>
       <PARAM id="fxfl_sw1" value="0"/>
-      <PARAM id="fxrv_model" value="11"/>
+      <PARAM id="fxrv_model" value="18"/>
       <PARAM id="fxrv_p1" value="0.5"/>
       <PARAM id="fxrv_p2" value="0.5"/>
       <PARAM id="fxrv_p3" value="0.25"/>
       <PARAM id="fxrv_p4" value="0.5"/>
       <PARAM id="fxrv_p5" value="0.5"/>
       <PARAM id="fxrv_sw1" value="0"/>
-      <PARAM id="fxtr_model" value="14"/>
+      <PARAM id="fxtr_model" value="23"/>
       <PARAM id="fxtr_p1" value="0.397"/>
       <PARAM id="fxtr_p2" value="0.5"/>
       <PARAM id="fxtr_p3" value="0"/>
@@ -239,4 +239,18 @@
       <PARAM id="ampx_s4" value="0"/>
     </PARAMS>
   </Parameters>
+  <Models>
+    <M p="od_model" id="od_screamer"/>
+    <M p="dist_model" id="ds_classic"/>
+    <M p="ng_model" id="ng_suppress"/>
+    <M p="gate_model" id="ng_hard"/>
+    <M p="comp_model" id="cp_sustain"/>
+    <M p="eq_model" id="eq_tonestack"/>
+    <M p="fxdel_model" id="dl_std"/>
+    <M p="fxch_model" id="ch_std"/>
+    <M p="fxfl_model" id="fl_std"/>
+    <M p="fxrv_model" id="rv_std"/>
+    <M p="fxtr_model" id="tr_std"/>
+    <M p="amp_model" id="gearsx"/>
+  </Models>
 </NAMPreset>
