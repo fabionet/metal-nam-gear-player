@@ -40,9 +40,13 @@ PresetPanelComponent::PresetPanelComponent (PresetManager& mgr)
     categoryFilter_.onChange = [this] { refreshFromManager(); };
     addAndMakeVisible (categoryFilter_);
 
-    saveBtn_  .onClick = [this] { mgr_.save();   };
+    // Salvataggio ed eliminazione agiscono sul preset SCELTO nella lista, che
+    // non e' per forza quello caricato: bastava un clic per sceglierlo, ma i
+    // tasti guardavano il preset corrente, quindi bisognava richiamarlo col
+    // doppio clic — cioe' cambiare suono — prima di poterlo eliminare.
+    saveBtn_  .onClick = [this] { mgr_.saveOver (targetIndex()); };
     saveAsBtn_.onClick = [this] { doSaveAs();    };
-    deleteBtn_.onClick = [this] { mgr_.deleteCurrent(); };
+    deleteBtn_.onClick = [this] { mgr_.deleteAt (targetIndex()); };
     prevBtn_  .onClick = [this] { mgr_.prev();   };
     nextBtn_  .onClick = [this] { mgr_.next();   };
     // Prima apriva soltanto un sito nel browser, cosa che in molti ambienti non
@@ -219,6 +223,7 @@ void PresetPanelComponent::listBoxItemClicked (int row, const juce::MouseEvent&)
 {
     selectedRow_ = row;
     list_.selectRow (row, true, true);
+    updateEnableState();       // un clic basta ad abilitare salva ed elimina
     repaint();
 }
 
@@ -240,6 +245,7 @@ void PresetPanelComponent::listBoxItemDoubleClicked (int row, const juce::MouseE
     selectedRow_ = row;
     const int idx = presetIndexForRow (row);
     if (idx >= 0) mgr_.load (idx);
+    updateEnableState();
 }
 
 void PresetPanelComponent::doSaveAs()
@@ -282,11 +288,19 @@ void PresetPanelComponent::refreshFromManager()
     repaint();
 }
 
+// Il bersaglio delle operazioni: quello scelto nella lista se c'e', altrimenti
+// quello caricato. Un clic solo basta a sceglierlo.
+int PresetPanelComponent::targetIndex() const
+{
+    const int fromList = presetIndexForRow (selectedRow_);
+    return (fromList >= 0) ? fromList : mgr_.getCurrentIndex();
+}
+
 void PresetPanelComponent::updateEnableState()
 {
-    const int idx = mgr_.getCurrentIndex();
-    const bool hasCurrent = idx >= 0;
-    const bool isFactory  = hasCurrent && mgr_.presets()[(size_t) idx].isFactory;
-    saveBtn_  .setEnabled (hasCurrent && ! isFactory);
-    deleteBtn_.setEnabled (hasCurrent && ! isFactory);
+    const int idx = targetIndex();
+    const bool ok = idx >= 0 && idx < (int) mgr_.presets().size();
+    const bool isFactory = ok && mgr_.presets()[(size_t) idx].isFactory;
+    saveBtn_  .setEnabled (ok && ! isFactory);
+    deleteBtn_.setEnabled (ok && ! isFactory);
 }
