@@ -17,6 +17,12 @@ namespace
     constexpr const char* kChildIR    = "IRPath";
     constexpr const char* kChildIR2   = "IR2Path";
     constexpr const char* kChildParams= "Parameters";
+    // Le varianti B, C e D. La A resta <Parameters>, cosi' i file di prima si
+    // leggono senza conversioni e restano leggibili anche da una versione
+    // vecchia del plugin.
+    constexpr const char* kChildBanks = "Banks";
+    constexpr const char* kBank       = "Bank";
+    constexpr const char* kAttrBankId = "id";
 
     static juce::String stem (const juce::File& f) { return f.getFileNameWithoutExtension(); }
 
@@ -80,6 +86,28 @@ juce::File PresetManager::userPresetDir()
     return d;
 }
 
+int PresetManager::scanBankMask (const juce::XmlElement& root)
+{
+    int mask = 1;                                   // il banco A c'e' sempre
+    if (auto* banks = root.getChildByName (kChildBanks))
+        for (auto* b : banks->getChildWithTagNameIterator (kBank)) {
+            const auto id = b->getStringAttribute (kAttrBankId);
+            if (id.isNotEmpty()) {
+                const int i = id[0] - 'A';
+                if (i > 0 && i < 4) mask |= (1 << i);
+            }
+        }
+    return mask;
+}
+
+juce::String PresetManager::bankLetters (int mask)
+{
+    juce::String out;
+    for (int i = 0; i < 4; ++i)
+        if (mask & (1 << i)) { if (out.isNotEmpty()) out << " "; out << (char) ('A' + i); }
+    return out;
+}
+
 void PresetManager::refresh()
 {
     presets_.clear();
@@ -97,8 +125,10 @@ void PresetManager::refresh()
         {
             int sz = 0;
             if (auto* bytes = NAMPresetData::getNamedResource (NAMPresetData::namedResourceList[i], sz))
-                if (auto x = juce::XmlDocument::parse (juce::String::fromUTF8 (bytes, sz)))
+                if (auto x = juce::XmlDocument::parse (juce::String::fromUTF8 (bytes, sz))) {
                     ref.category = x->getStringAttribute (kAttrCategory, ref.category);
+                    ref.bankMask = scanBankMask (*x);
+                }
         }
         presets_.push_back (ref);
     }
@@ -113,8 +143,10 @@ void PresetManager::refresh()
         ref.name      = stem (f);
         ref.isFactory = false;
         ref.userFile  = f;
-        if (auto x = juce::XmlDocument::parse (f))
+        if (auto x = juce::XmlDocument::parse (f)) {
             ref.category = x->getStringAttribute (kAttrCategory, ref.category);
+            ref.bankMask = scanBankMask (*x);
+        }
         presets_.push_back (ref);
     }
 
@@ -168,7 +200,7 @@ juce::String PresetManager::serialize (const juce::String& name) const
     return root.toString();
 }
 
-bool PresetManager::applyXml (const juce::XmlElement& root)
+bool PresetManager::applyXml (const juce::XmlElement& root, int bank)
 {
     if (! root.hasTagName (kRoot)) return false;
 
@@ -179,14 +211,29 @@ bool PresetManager::applyXml (const juce::XmlElement& root)
 
     loading_ = true;
 
-    if (auto* params = root.getChildByName (kChildParams))
-    {
-        if (auto* paramXml = params->getFirstChildElement())
-        {
-            auto vt = juce::ValueTree::fromXml (*paramXml);
-            if (vt.isValid())
-                apvts_.replaceState (vt);
+    // I parametri vengono dal banco richiesto. Se quella variante non c'e' si
+    // ripiega sul banco A, che esiste sempre: meglio richiamare il preset nella
+    // sua versione base che non richiamarlo affatto.
+    const juce::XmlElement* paramXml = nullptr;
+    if (bank > 0) {
+        if (auto* banks = root.getChildByName (kChildBanks)) {
+            const auto letter = juce::String::charToString ((juce::juce_wchar) ('A' + bank));
+            for (auto* b : banks->getChildWithTagNameIterator (kBank))
+                if (b->getStringAttribute (kAttrBankId) == letter) {
+                    paramXml = b->getFirstChildElement();
+                    break;
+                }
         }
+    }
+    if (paramXml == nullptr)
+        if (auto* params = root.getChildByName (kChildParams))
+            paramXml = params->getFirstChildElement();
+
+    if (paramXml != nullptr)
+    {
+        auto vt = juce::ValueTree::fromXml (*paramXml);
+        if (vt.isValid())
+            apvts_.replaceState (vt);
     }
 
     if (! effectiveLock)
@@ -424,6 +471,75 @@ bool PresetManager::save()
     return true;
 }
 
+// Scrive una sola variante dentro il preset, lasciando intatte le altre. Se il
+// file non c'e' ancora lo crea, e quel che si sta salvando diventa il banco A
+// oltre che quello richiesto: un preset senza banco A non avrebbe un punto di
+// partenza da cui caricare.
+bool PresetManager::saveBank (const juce::String& name, int bank)
+{
+    if (name.trim().isEmpty() || isReservedName (name)) return false;
+    bank = juce::jlimit (0, 3, bank);
+
+    const auto safe = juce::File::createLegalFileName (name.trim());
+    auto file = userPresetDir().getChildFile (safe + kExt);
+
+    // Lo stato di adesso, gia' confezionato: da qui si prendono i parametri.
+    auto fresh = juce::parseXML (serialize (safe));
+    if (! fresh) return false;
+    auto* freshParams = fresh->getChildByName (kChildParams);
+    if (freshParams == nullptr) return false;
+
+    std::unique_ptr<juce::XmlElement> root;
+    if (file.existsAsFile()) root = juce::parseXML (file);
+    if (! root || ! root->hasTagName (kRoot)) {
+        // Preset nuovo: parte dallo stato corrente, che diventa anche il banco A.
+        root = std::move (fresh);
+        if (bank == 0) { /* gia' scritto in <Parameters> */ }
+        else {
+            auto* banks = root->createNewChildElement (kChildBanks);
+            auto* b = banks->createNewChildElement (kBank);
+            b->setAttribute (kAttrBankId, juce::String::charToString ((juce::juce_wchar) ('A' + bank)));
+            b->addChildElement (new juce::XmlElement (*freshParams->getFirstChildElement()));
+        }
+    } else {
+        // Preset esistente: si sostituisce solo il banco richiesto, e si
+        // aggiornano i percorsi di modello e IR, che sono del preset e non
+        // della variante.
+        for (const char* tag : { kChildModel, kChildIR, kChildIR2 }) {
+            root->removeChildElement (root->getChildByName (tag), true);
+            if (auto* src = fresh->getChildByName (tag))
+                root->addChildElement (new juce::XmlElement (*src));
+        }
+        root->setAttribute (kAttrCategory, currentCategory_);
+        root->setAttribute (kAttrLock, lockModel_ ? 1 : 0);
+
+        if (bank == 0) {
+            root->removeChildElement (root->getChildByName (kChildParams), true);
+            root->addChildElement (new juce::XmlElement (*freshParams));
+        } else {
+            auto* banks = root->getChildByName (kChildBanks);
+            if (banks == nullptr) banks = root->createNewChildElement (kChildBanks);
+            const auto letter = juce::String::charToString ((juce::juce_wchar) ('A' + bank));
+            juce::XmlElement* target = nullptr;
+            for (auto* b : banks->getChildWithTagNameIterator (kBank))
+                if (b->getStringAttribute (kAttrBankId) == letter) { target = b; break; }
+            if (target != nullptr) banks->removeChildElement (target, true);
+            auto* b = banks->createNewChildElement (kBank);
+            b->setAttribute (kAttrBankId, letter);
+            b->addChildElement (new juce::XmlElement (*freshParams->getFirstChildElement()));
+        }
+    }
+
+    if (! file.replaceWithText (root->toString())) return false;
+
+    currentName_ = safe;
+    currentBank_ = bank;
+    refresh();
+    dirty_ = false;
+    notify();
+    return true;
+}
+
 bool PresetManager::saveAs (const juce::String& name)
 {
     if (name.trim().isEmpty()) return false;
@@ -455,7 +571,7 @@ bool PresetManager::deleteCurrent()
     return true;
 }
 
-bool PresetManager::load (int index)
+bool PresetManager::load (int index, int bank)
 {
     if (index < 0 || index >= (int) presets_.size()) return false;
     const auto& ref = presets_[(size_t) index];
@@ -475,10 +591,25 @@ bool PresetManager::load (int index)
     }
 
     if (! xml) return false;
-    if (! applyXml (*xml)) return false;
+
+    // Richiamando dalla lista si tiene il banco selezionato, se quel preset ce
+    // l'ha; altrimenti si torna al banco A. Dal display il banco arriva invece
+    // esplicito, ed e' quello che si carica.
+    const int mask = scanBankMask (*xml);
+    int wanted = (bank < 0) ? currentBank_ : juce::jlimit (0, 3, bank);
+    if ((mask & (1 << wanted)) == 0) wanted = 0;
+
+    if (! applyXml (*xml, wanted)) return false;
+
+    // Il banco selezionato e' anch'esso un parametro, quindi replaceState lo
+    // riporta a quello scritto nel file: senza questo, richiamando la variante
+    // B il display tornerebbe a dire A un istante dopo.
+    if (auto* pb = apvts_.getParameter ("preset_bank"))
+        pb->setValueNotifyingHost (pb->convertTo0to1 ((float) wanted));
 
     currentIndex_ = index;
     currentName_  = ref.name;
+    currentBank_  = wanted;
     notify();
     return true;
 }

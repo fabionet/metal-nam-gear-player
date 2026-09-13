@@ -196,7 +196,20 @@ void PresetPanelComponent::paintListBoxItem (int row, juce::Graphics& g, int w, 
     g.setFont (juce::Font (juce::FontOptions (13.0f)));
 
     juce::String prefix = ref.isFactory ? "[F] " : "    ";
-    g.drawText (prefix + ref.name, 6, 0, w - 8, h, juce::Justification::centredLeft, true);
+    // Le varianti salvate stanno dentro il preset, non accanto: si mostrano qui
+    // a destra, cosi' si vede a colpo d'occhio quali banchi ha. Un preset col
+    // solo banco A non le mostra, che sarebbe rumore.
+    const juce::String varianti = (ref.bankMask != 1)
+                                ? PresetManager::bankLetters (ref.bankMask) : juce::String();
+    const int varW = varianti.isNotEmpty() ? 62 : 0;
+
+    g.drawText (prefix + ref.name, 6, 0, w - 8 - varW, h, juce::Justification::centredLeft, true);
+
+    if (varianti.isNotEmpty()) {
+        g.setColour (juce::Colour (0xffd9a200).withAlpha (selected ? 1.0f : 0.75f));
+        g.setFont (juce::Font (juce::FontOptions (11.0f).withStyle ("Bold")));
+        g.drawText (varianti, w - varW - 6, 0, varW, h, juce::Justification::centredRight, false);
+    }
 }
 
 // Il clic singolo seleziona soltanto: serve a scegliere il bersaglio di
