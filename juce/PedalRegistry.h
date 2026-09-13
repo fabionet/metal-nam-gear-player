@@ -83,7 +83,8 @@ enum class Topology {
     OdFetBox,       // stadio a FET che imita il canale di un ampli a valvole
     OdTubeLike,     // clipping morbido con cedimento, come uno stadio finale
     DistTwoChan,    // due voci in un pedale solo, crunch oppure lead
-    DistBritish     // cascata alla britannica con il condensatore di brillantezza
+    DistBritish,    // cascata alla britannica con il condensatore di brillantezza
+    BoostFetDiode   // stadio a FET in classe A con i diodi che entrano dopo
 };
 
 inline const char* categoryName (Category c)
@@ -367,6 +368,16 @@ inline const std::vector<Model>& models()
       "Guadagno e basta: nessuna colorazione, nessun taglio. Serve a pilotare un "
       "cavo lungo o a spingere l'ingresso dell'ampli senza cambiargli il suono.",
       { { "LEVEL", -6.f, 20.f, 6.f, " dB" } }, 1,
+      { none() }, 0 },
+
+    { "bs_taxi", "TAXI DRIVE BR", Category::Booster, Topology::BoostFetDiode,
+      "Ibrido: uno stadio a FET polarizzato in classe A spinge, e i diodi "
+      "entrano solo quando il livello sale. A comando basso e' una spinta quasi "
+      "pulita con la seconda armonica in evidenza, che e' la voce della classe "
+      "A; alzandolo la tosatura prende il sopravvento e diventa un crunch "
+      "caldo, da blues a tweed.",
+      { { "DRIVE", 0.f, 1.f, 0.3f, "" }, tone (0.5f),
+        { "LEVEL", 0.f, 20.f, 4.f, " dB" } }, 3,
       { none() }, 0 },
 
     // --- Gate / Noise ------------------------------------------------------
