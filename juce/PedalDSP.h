@@ -108,6 +108,19 @@ public:
         postLP_ .setCutoff (7000.f, sr_, false);
         bodyLP_ .setCutoff (120.f,  sr_, false);
         toneHP_ .setCutoff (700.f,  sr_, true);
+        shA_    .setCutoff (250.f,  sr_, true);   // spartiacque bassi/resto
+        shB_    .setCutoff (2200.f, sr_, true);   // spartiacque resto/acuti
+        shC_    .setCutoff (4000.f, sr_, true);   // spinta sugli acuti
+        tiltA_  .setCutoff (900.f,  sr_, true);   // perno della bilancia
+        ratPre_ .setCutoff (1000.f, sr_, true);   // enfasi prima della tosatura
+        ratPost_.setCutoff (2000.f, sr_, false);  // filtro, al contrario
+        muffA_  .setCutoff (100.f,  sr_, true);   // fra i due stadi del muff
+        // I due rami del tono devono essere distanti, non incrociarsi: e' lo
+        // spazio fra loro a fare la conca sui medi. Incrociandoli a 1,8 kHz la
+        // somma tornava piatta e del muff non restava niente.
+        muffB_  .setCutoff (700.f,  sr_, false);  // ramo scuro
+        muffC_  .setCutoff (2600.f, sr_, true);   // ramo chiaro
+        smoothLP_.setCutoff (6500.f, sr_, false);
         colorLo_.setCutoff (250.f,  sr_, false);
         colorHi_.setCutoff (2200.f, sr_, true);
         boostHP_.setCutoff (80.f,   sr_, true);
@@ -119,6 +132,11 @@ public:
     {
         inHP_.reset(); loopHP_.reset(); postLP_.reset(); bodyLP_.reset();
         toneHP_.reset(); colorLo_.reset(); colorHi_.reset(); boostHP_.reset();
+        shA_.reset(); shB_.reset(); shC_.reset(); tiltA_.reset();
+        ratPre_.reset(); ratPost_.reset();
+        muffA_.reset(); muffB_.reset(); muffC_.reset(); smoothLP_.reset();
+        bandA_.reset(); bandB_.reset(); bandC_.reset();
+        optFast_ = optSlow_ = 1.f;
         low_.reset(); mid_.reset(); high_.reset();
         for (auto& b : band_) b.reset();
         dc_ = 0.f; env_ = 0.f; gain_ = 1.f; cEnv_ = 0.f; cGain_ = 1.f; grDb_ = 0.f;
@@ -193,6 +211,26 @@ public:
             case Topology::CompSimple:
             case Topology::CompLimiter:
                 return compressor (x, m);
+
+            // --- seconda serie ---------------------------------------------
+            case Topology::OdKlon:          return odKlon    (inHP_.process (x));
+            case Topology::OdTwoBand:       return odTwoBand (inHP_.process (x));
+            case Topology::OdSmooth:        return odSmooth  (inHP_.process (x));
+            case Topology::DistRat:         return rat (inHP_.process (x), 0.45f, 2.5f);
+            case Topology::DistRatLed:      return rat (inHP_.process (x), 1.05f, 3.5f);
+            case Topology::DistThick:       return distThick (inHP_.process (x));
+            case Topology::DistFixedHi:     return distFixedHi (inHP_.process (x));
+            case Topology::HgMuffMetal:     return hgMuffMetal (inHP_.process (x));
+            case Topology::HgFiveBand:      return hgFiveBand (inHP_.process (x));
+            case Topology::FuzzMuff:        return fuzzMuff (inHP_.process (x));
+            case Topology::FuzzControlled:  return fuzzControlled (inHP_.process (x));
+            case Topology::BoostTransistor: return boostTransistor (x);
+            case Topology::BoostClean:      return x * std::pow (10.f, k_[0] / 20.f);
+            case Topology::GateReduction:   return gateReduction (x);
+            case Topology::GateExpander:    return gateExpander (x);
+            case Topology::EqGraphic6:      return eqGraphic6 (x);
+            case Topology::EqKnockout:      return eqKnockout (x);
+            case Topology::CompOpto:        return compOpto (x);
         }
         return x;
     }
@@ -341,6 +379,243 @@ private:
         cDetR_ = std::exp (-1.0f / (float) (sr_ * 0.120));      // 120 ms
     }
 
+    // ======================= seconda serie ==============================
+    // Una bilancia attorno a un perno: quanto alza da un lato tanto toglie
+    // dall'altro, cosi' il livello percepito non cambia.
+    float tilt (OnePole& hp, float v, float dB)
+    {
+        const float hi = hp.process (v);
+        const float lo = v - hi;
+        const float g  = std::pow (10.f, dB / 40.f);
+        return lo / g + hi * g;
+    }
+    float shelfLo (OnePole& hp, float v, float dB)
+    {
+        const float hi = hp.process (v);
+        return (v - hi) * std::pow (10.f, dB / 20.f) + hi;
+    }
+    float shelfHi (OnePole& hp, float v, float dB)
+    {
+        const float hi = hp.process (v);
+        return (v - hi) + hi * std::pow (10.f, dB / 20.f);
+    }
+
+    // Un anello pulito in parallelo a quello che distorce: il diretto non viene
+    // mai perso, e per questo il pedale "non si sente" finche' non lo si spinge.
+    float odKlon (float x)
+    {
+        const float d = k_[0];
+        const float g = 1.f + d * 45.f;
+        const float wet = softClip (x * g, 1.f) / (1.f + d * 2.f);
+        float v = x * (1.f - d * 0.45f) + wet * (0.35f + d * 1.1f);
+        v = tilt (tiltA_, v, k_[1]);
+        return v * k_[2];
+    }
+
+    // Clipping morbido con due bande separate invece del solo tono.
+    float odTwoBand (float x)
+    {
+        const float g = 6.f + k_[3] * 90.f;
+        float v = softClip (loopHP_.process (x) * g, 1.f) / (1.f + k_[3] * 3.f);
+        v = shelfLo (shA_, v, k_[1]);
+        v = shelfHi (shB_, v, k_[2]);
+        return v * k_[0];
+    }
+
+    // Molto dolce e molto compresso: la tosatura arriva presto ma con un
+    // ginocchio lunghissimo, e il passa-basso in coda toglie il sibilo.
+    float odSmooth (float x)
+    {
+        const float g = 4.f + k_[2] * 55.f;
+        float v = std::tanh (x * g * 0.6f) / (1.f + k_[2] * 1.8f);
+        v = smoothLP_.process (v);
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 14.f);
+        return v * k_[0];
+    }
+
+    // Op-amp a guadagno altissimo, enfasi sugli acuti prima della tosatura e
+    // due diodi verso massa.
+    //
+    // Fra la versione al silicio e quella coi LED non basta cambiare la soglia:
+    // col guadagno a fondo scala l'onda e' gia' piatta in entrambe e non si
+    // sentirebbe nulla. Quello che cambia davvero e' il rapporto fra guadagno e
+    // soglia, cioe' quanto del segnale resta sotto il ginocchio: i LED
+    // conducono a quasi un volt e mezzo, quindi lo stesso pedale tosa molto
+    // piu' tardi, resta piu' dinamico e va alzato di piu'. Il ginocchio dei LED
+    // e' anche piu' netto, perche' conducono piu' bruscamente.
+    float rat (float x, float th, float knee)
+    {
+        // Il guadagno parte da uno: a comando chiuso il pedale sporca appena,
+        // com'e' giusto. Partendo da otto, come faceva la prima stesura, l'onda
+        // era gia' piatta a fondo corsa chiusa e le due versioni suonavano
+        // identiche.
+        const float g = 1.f + k_[0] * 150.f;
+        float v = x * g;
+        v += ratPre_.process (v) * 0.8f;          // la gobba prima dei diodi
+        // Non si normalizza per la soglia: la versione coi LED deve restare
+        // piu' forte, perche' lo e'.
+        v = std::tanh (v * knee / th) * th;
+        // Il filtro lavora al contrario: piu' si apre in senso orario, piu'
+        // chiude gli acuti. Zero lo lascia aperto.
+        const float lp = ratPost_.process (v);
+        v = v * (1.f - k_[1]) + lp * k_[1];
+        return v * k_[2] * 1.6f;
+    }
+
+    // Clipping duro ma con i medi spinti invece che scavati: il corpo resta.
+    float distThick (float x)
+    {
+        const float g = 25.f + k_[2] * 160.f;
+        float v = hardClip (x * g, 0.5f) / 0.5f;
+        v = bandA_.process (v);                   // gobba sui medi
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 16.f);
+        return v * k_[0] * 0.5f;
+    }
+
+    // Guadagno inchiodato: si regola solo l'equalizzazione, che e' il punto.
+    float distFixedHi (float x)
+    {
+        float v = hardClip (x * 260.f, 0.35f) / 0.35f;
+        v = shelfLo (shA_, v, k_[1]);
+        v = bandB_.process (v);
+        v = shelfHi (shB_, v, k_[3]);
+        return v * k_[0] * 0.4f;
+    }
+
+    // Quattro stadi in cascata, con un passa-alto fra l'uno e l'altro perche'
+    // le basse non si impastino, e la spinta sugli acuti commutabile in coda.
+    float hgMuffMetal (float x)
+    {
+        const float g = 4.f + k_[3] * 26.f;
+        float v = x * g;
+        for (int i = 0; i < 4; ++i) v = softClip (v * 1.9f, 0.8f);
+        v = muffA_.process (v);
+        v = shelfLo (shA_, v, k_[1]);
+        v = shelfHi (shB_, v, k_[2]);
+        if (s_[0] == 1) v = shelfHi (shC_, v, 8.f);
+        return v * k_[0] * 0.45f;
+    }
+
+    float hgFiveBand (float x)
+    {
+        const float g = 20.f + k_[4] * 200.f;
+        float v = hardClip (x * g, 0.3f) / 0.3f;
+        v = bandA_.process (v);
+        v = bandB_.process (v);
+        v = bandC_.process (v);
+        return v * k_[0] * 0.4f;
+    }
+
+    // Due stadi di clipping in cascata e la rete di tono a conca: il comando
+    // mescola un ramo scuro e uno chiaro, e a meta' corsa la conca e' massima.
+    float fuzzMuff (float x)
+    {
+        const float g = 8.f + k_[2] * 90.f;
+        float v = softClip (x * g, 0.85f);
+        v = muffA_.process (v);
+        v = softClip (v * 6.f, 0.85f);
+        const float dark   = muffB_.process (v);
+        const float bright = muffC_.process (v);
+        v = dark * (1.f - k_[1]) + bright * k_[1];
+        return v * k_[0] * 0.6f;
+    }
+
+    // Fuzz tenuto a bada: ingresso filtrato, asimmetria contenuta e uscita
+    // limitata, cosi' le note restano leggibili anche in accordo.
+    float fuzzControlled (float x)
+    {
+        const float g = 10.f + k_[2] * 70.f;
+        float v = loopHP_.process (x) * g;
+        v = softClip (v, 0.55f);
+        v = hardClip (v, 0.8f);
+        v = tilt (tiltA_, v, (k_[1] - 0.5f) * 12.f);
+        return v * k_[0] * 0.5f;
+    }
+
+    // Uno stadio a transistor: fino a una certa spinta e' pulito, oltre
+    // comincia a schiacciare da solo, e non ha un comando per impedirlo.
+    float boostTransistor (float x)
+    {
+        const float g = std::pow (10.f, k_[0] / 20.f);
+        return std::tanh (boostHP_.process (x) * g * 0.8f) * 1.2f;
+    }
+
+    // --- gate della seconda serie ----------------------------------------
+    float gateReduction (float x)
+    {
+        const float a  = std::exp (-1.0f / (float) (sr_ * std::max (1.f, k_[1]) * 0.001));
+        const float ga = std::exp (-1.0f / (float) (sr_ * 0.005));
+        const float lvl = std::fabs (x);
+        env_ = (lvl > env_) ? lvl : (env_ * a + lvl * (1.f - a));
+
+        const float over = 20.f * std::log10 (std::max (env_, 1.0e-7f)) - k_[0];
+        const float floorG = std::pow (10.f, -k_[2] / 20.f);
+        float target;
+        if (over >= 0.f)      target = 1.f;
+        else if (over > -6.f) target = floorG + (1.f - floorG) * (1.f + over / 6.f);
+        else                  target = floorG;
+
+        gain_ = gain_ * ga + target * (1.f - ga);
+        return x * gain_;
+    }
+
+    // Sotto la soglia abbassa in proporzione invece di chiudere: la coda della
+    // nota scende insieme al fondo invece di venire tagliata.
+    float gateExpander (float x)
+    {
+        const float a  = std::exp (-1.0f / (float) (sr_ * std::max (1.f, k_[2]) * 0.001));
+        const float ga = std::exp (-1.0f / (float) (sr_ * 0.005));
+        const float lvl = std::fabs (x);
+        env_ = (lvl > env_) ? lvl : (env_ * a + lvl * (1.f - a));
+
+        const float envDB = 20.f * std::log10 (std::max (env_, 1.0e-7f));
+        float gdB = 0.f;
+        if (envDB < k_[0]) gdB = (envDB - k_[0]) * (std::max (1.01f, k_[1]) - 1.f);
+        const float target = std::pow (10.f, std::max (-60.f, gdB) / 20.f);
+
+        gain_ = gain_ * ga + target * (1.f - ga);
+        return x * gain_;
+    }
+
+    float eqGraphic6 (float x)
+    {
+        float v = x;
+        for (int i = 0; i < 6; ++i) v = band_[i].process (v);
+        return v * std::pow (10.f, k_[6] / 20.f);
+    }
+
+    float eqKnockout (float x)
+    {
+        const float v = tilt (tiltA_, x, k_[0]);
+        return v * std::pow (10.f, k_[1] / 20.f);
+    }
+
+    // Cella ottica: il rilascio ha due tempi, uno svelto per i transitori e uno
+    // lungo per il livello medio. E' quello che la fa "respirare".
+    float compOpto (float x)
+    {
+        const float sustain = std::min (std::max (k_[0], 0.f), 1.f);
+        const float thDB  = -8.f - sustain * 28.f;
+        const float ratio = 2.f + sustain * 6.f;
+
+        const float lvl = std::fabs (x);
+        cEnv_ = (lvl > cEnv_) ? (cEnv_ * cDetA_ + lvl * (1.f - cDetA_))
+                              : (cEnv_ * cDetR_ + lvl * (1.f - cDetR_));
+        const float envDB = 20.f * std::log10 (std::max (cEnv_, 1.0e-6f));
+        float gdB = 0.f;
+        if (envDB > thDB) gdB = (thDB - envDB) * (1.f - 1.f / ratio);
+        const float target = std::pow (10.f, gdB / 20.f);
+
+        // Due costanti in cascata: la prima insegue, la seconda trattiene.
+        static const float kAtk[3] = { 0.00035f, 0.0012f, 0.0055f };   // lento, medio, svelto
+        const float atk = kAtk[std::min (std::max (s_[0], 0), 2)];
+        optFast_ += (target   - optFast_) * (target < optFast_ ? atk : 0.0016f);
+        optSlow_ += (optFast_ - optSlow_) * 0.00012f;
+        const float g = std::min (optFast_, optSlow_);
+        grDb_ = 20.f * std::log10 (std::max (g, 1.0e-6f));
+        return x * g * std::pow (10.f, k_[1] / 20.f);
+    }
+
     // --- compressori ------------------------------------------------------
     // Inseguitore di picco con attacco regolabile e rilascio fisso per i due
     // sustainer, esplicito per il limitatore. Il rapporto dei sustainer cresce
@@ -442,6 +717,30 @@ private:
             band_[1].set (std::clamp (k_[3], 500.f, 8000.f), 1.0f, k_[2], sr_);
             return;
         }
+        if (m.topo == Topology::EqGraphic6) {
+            static const float kF[6] = { 63.f, 125.f, 250.f, 500.f, 1000.f, 2000.f };
+            for (int i = 0; i < 6; ++i) band_[i].set (kF[i], 1.4f, k_[i], sr_);
+            return;
+        }
+        if (m.topo == Topology::DistThick) {
+            bandA_.set (800.f, 0.9f, 5.f, sr_);          // la gobba sui medi, fissa
+            return;
+        }
+        if (m.topo == Topology::DistFixedHi) {
+            bandB_.set (700.f, 1.0f, k_[2], sr_);
+            return;
+        }
+        if (m.topo == Topology::HgFiveBand) {
+            bandA_.set (100.f,  0.8f, k_[1], sr_);
+            bandB_.set (700.f,  1.0f, k_[2], sr_);
+            bandC_.set (3200.f, 0.8f, k_[3], sr_);
+            return;
+        }
+        if (m.topo == Topology::EqKnockout) {
+            // Bright sposta il perno della bilancia piu' in alto.
+            tiltA_.setCutoff (s_[0] == 1 ? 2200.f : 900.f, sr_, true);
+            return;
+        }
         if (m.topo != Topology::HgZone) return;
         low_ .set (100.f,  0.8f, k_[2], sr_);
         high_.set (3200.f, 0.8f, k_[3], sr_);
@@ -455,8 +754,14 @@ private:
     std::array<int,   kMaxSwitch> s_ { { 0 } };
 
     OnePole inHP_, loopHP_, postLP_, bodyLP_, toneHP_, colorLo_, colorHi_, boostHP_;
+    // Seconda serie: ogni banco di filtri vuole la sua istanza, perche' un
+    // OnePole porta dentro lo stato del campione precedente.
+    OnePole shA_, shB_, shC_, tiltA_, ratPre_, ratPost_;
+    OnePole muffA_, muffB_, muffC_, smoothLP_;
     Peak    low_, mid_, high_;
     Peak    band_[7];               // bande dell'equalizzatore grafico
+    Peak    bandA_, bandB_, bandC_; // tre bande dei modelli a equalizzazione piena
+    float   optFast_ = 1.f, optSlow_ = 1.f;   // le due costanti della cella ottica
     float   dc_   = 0.f;
     float   env_  = 0.f;            // inviluppo del gate
     float   cEnv_ = 0.f;            // inviluppo del compressore

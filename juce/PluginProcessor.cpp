@@ -91,6 +91,15 @@ namespace ids {
     // Amp-model selector + MARCHELLOW (Marshall JCM800 2203)
     constexpr auto ampModel      = "amp_model";
     constexpr auto ampEnable2    = "amp_enable2";   // MARCHELLOW independent power
+    // RECTIFIER (Mesa Dual Rectifier a due canali): alimentazione propria,
+    // selettore di canale, modo per canale, raddrizzatore e variac. I sei
+    // comandi di ogni canale sono indipendenti, come sull'originale.
+    constexpr auto ampEnable3    = "amp_enable3";
+    constexpr auto recChannel    = "rec_channel";
+    constexpr auto recMode1      = "rec_mode1";
+    constexpr auto recMode2      = "rec_mode2";
+    constexpr auto recRect       = "rec_rect";
+    constexpr auto recPower      = "rec_power";
     constexpr auto marPreamp     = "mar_preamp";
     constexpr auto marMaster     = "mar_master";
     constexpr auto marBass       = "mar_bass";
@@ -283,7 +292,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     // Amp-model selector + MARCHELLOW (Marshall JCM800 2203). This selector routes
     // GEAR SX (0) vs MARCHELLOW (1). Each amp has its own independent power state:
     // ampEnable = GEAR SX power, ampEnable2 = MARCHELLOW power.
-    add (std::make_unique<C>(juce::ParameterID{ids::ampModel,1},    "Amp Model",    juce::StringArray{"GEAR SX","MARCHELLOW"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::ampModel,1},    "Amp Model",    juce::StringArray{"GEAR SX","MARCHELLOW","MAUSE RECTIFIER"}, 0));
+    add (std::make_unique<B>(juce::ParameterID{ids::ampEnable3,1},  "Amp Enable 3", false));
+    add (std::make_unique<C>(juce::ParameterID{ids::recChannel,1},  "Rec Channel",  juce::StringArray{"Ch 1","Ch 2"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::recMode1,1},    "Rec Mode 1",   juce::StringArray{"Clean","Vintage","Modern"}, 1));
+    add (std::make_unique<C>(juce::ParameterID{ids::recMode2,1},    "Rec Mode 2",   juce::StringArray{"Clean","Vintage","Modern"}, 2));
+    add (std::make_unique<C>(juce::ParameterID{ids::recRect,1},     "Rec Rectifier",juce::StringArray{"Tube","Silicon"}, 0));
+    add (std::make_unique<C>(juce::ParameterID{ids::recPower,1},    "Rec Power",    juce::StringArray{"Bold","Spongy"}, 0));
+    for (int c = 1; c <= 2; ++c) {
+        const juce::String pre = "rec" + juce::String (c) + "_";
+        const juce::String nm  = "Rec" + juce::String (c) + " ";
+        add (std::make_unique<P>(juce::ParameterID{pre + "gain", 1},     nm + "Gain",
+                                 juce::NormalisableRange<float>(0.f, 1.f, 0.001f), c == 1 ? 0.5f : 0.7f));
+        add (std::make_unique<P>(juce::ParameterID{pre + "master", 1},   nm + "Master",
+                                 juce::NormalisableRange<float>(-40.f, 6.f, 0.1f), -12.f));
+        add (std::make_unique<P>(juce::ParameterID{pre + "bass", 1},     nm + "Bass",
+                                 juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+        add (std::make_unique<P>(juce::ParameterID{pre + "mid", 1},      nm + "Mid",
+                                 juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), c == 1 ? 0.f : -4.f));
+        add (std::make_unique<P>(juce::ParameterID{pre + "treble", 1},   nm + "Treble",
+                                 juce::NormalisableRange<float>(-15.f, 15.f, 0.1f), 0.f));
+        add (std::make_unique<P>(juce::ParameterID{pre + "presence", 1}, nm + "Presence",
+                                 juce::NormalisableRange<float>(-12.f, 12.f, 0.1f), 0.f));
+    }
     add (std::make_unique<B>(juce::ParameterID{ids::ampEnable2,1},  "Amp Enable 2", false));
     add (std::make_unique<P>(juce::ParameterID{ids::marPreamp,1},   "Mar Preamp",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.6f));
     add (std::make_unique<P>(juce::ParameterID{ids::marMaster,1},   "Mar Master",   juce::NormalisableRange<float>(-30.f, 6.f, 0.1f), -12.f));
@@ -534,6 +565,22 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float aMa3 = apvts.getRawParameterValue (ids::ampMaster3)->load();
 
     const int   aModel = (int) apvts.getRawParameterValue (ids::ampModel)->load();
+    const bool  aEn3 = apvts.getRawParameterValue (ids::ampEnable3)->load() > 0.5f;
+    const int   rCh  = (int) apvts.getRawParameterValue (ids::recChannel)->load();
+    const int   rM1  = (int) apvts.getRawParameterValue (ids::recMode1)->load();
+    const int   rM2  = (int) apvts.getRawParameterValue (ids::recMode2)->load();
+    const int   rRec = (int) apvts.getRawParameterValue (ids::recRect)->load();
+    const int   rPow = (int) apvts.getRawParameterValue (ids::recPower)->load();
+    float rGain[2], rMas[2], rBass[2], rMid[2], rTreb[2], rPres[2];
+    for (int c = 0; c < 2; ++c) {
+        const juce::String pre = "rec" + juce::String (c + 1) + "_";
+        rGain[c] = apvts.getRawParameterValue (pre + "gain")->load();
+        rMas[c]  = apvts.getRawParameterValue (pre + "master")->load();
+        rBass[c] = apvts.getRawParameterValue (pre + "bass")->load();
+        rMid[c]  = apvts.getRawParameterValue (pre + "mid")->load();
+        rTreb[c] = apvts.getRawParameterValue (pre + "treble")->load();
+        rPres[c] = apvts.getRawParameterValue (pre + "presence")->load();
+    }
     const float mPre = apvts.getRawParameterValue (ids::marPreamp)->load();
     const float mMas = apvts.getRawParameterValue (ids::marMaster)->load();
     const float mB   = apvts.getRawParameterValue (ids::marBass)->load();
@@ -590,6 +637,8 @@ void NAMAudioProcessor::pushParametersToPipelines()
                         aG2, aMa2,
                         aB3, aM3, aT3, aG3, aMa3);
         p.setMarshall  (aEn2 && aModel == 1, mVal, mSens, mPre, mMas, mB, mM, mT, mPr);
+        p.setRectifier (aEn3 && aModel == 2, rCh, rM1, rM2, rRec, rPow,
+                        rGain, rMas, rBass, rMid, rTreb, rPres);
         p.setCompPos (cpPos);
         p.setDepthBypass (pwBp);
         p.setModelStage (mVol, mBs, mMd, mTr);

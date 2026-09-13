@@ -138,6 +138,7 @@ public:
         spring_.reset();
         riseEnv_ = 0.f;
         step_ = 0; stepPhase_ = 0.f; gateSm_ = 1.f;
+        revPos_ = 0.f; haloEnv_ = 0.f; phasePulsar_ = 0.f;
         fbState_ = 0.f;
     }
 
@@ -198,6 +199,17 @@ public:
             case Topology::TremStd:      return tremStd (x);
             case Topology::TremTr2:      return tremTr2 (x);
             case Topology::TremSlicer:   return tremSlicer (x);
+
+            // --- seconda serie ---------------------------------------------
+            case Topology::DelayMemory:     return delayMemory (x);
+            case Topology::DelayTape:       return delayTape (x);
+            case Topology::DelayDigi:       return delayDigi (x);
+            case Topology::ChorusClone:     return chorusClone (x);
+            case Topology::ChorusMulti:     return chorusMulti (x);
+            case Topology::FlangerMistress: return flangerMistress (x);
+            case Topology::ReverbGrail:     return reverbGrail (x);
+            case Topology::ReverbPolara:    return reverbPolara (x);
+            case Topology::TremPulsar:      return tremPulsar (x);
         }
         return x;
     }
@@ -403,6 +415,173 @@ private:
         return x * gateSm_;
     }
 
+    // ======================= seconda serie ==============================
+    // Secchi lunghi con le ripetizioni che ondeggiano: la modulazione sta
+    // dentro l'anello, quindi ogni giro si allarga un po' di piu' del
+    // precedente invece di ripetere lo stesso movimento.
+    float delayMemory (float x)
+    {
+        const float mod = lfoStep (0.4f, lfo_) * k_[3] * 0.003f * (float) sr_;
+        const float ts  = k_[0] * 0.001f * (float) sr_ + mod;
+        const float y   = long_.read (ts);
+        float fb = fbHp_.process (fbLp_.process (y));
+        fb = std::tanh (fb * 1.3f) * 0.78f;
+        long_.write (x + fb * k_[1]);
+        return x + y * k_[2];
+    }
+
+    // Nastro: la testina perde acuti a ogni passaggio e il trascinamento fa
+    // oscillare l'intonazione. Il "wow" e' lento e irregolare, non una
+    // sinusoide pulita: due oscillatori a velocita' diverse che si sommano.
+    float delayTape (float x)
+    {
+        const float wow = (lfoStep (0.27f, lfo_) * 0.6f + std::sin (lfo_ * 2.7f) * 0.4f)
+                          * k_[4] * 0.0035f * (float) sr_;
+        const float ts  = k_[0] * 0.001f * (float) sr_ + wow;
+        const float y   = long_.read (ts);
+        float fb = fbLp_.process (y);
+        fb = std::tanh (fb * 1.2f) * 0.8f;
+        long_.write (x + fb * k_[1]);
+        return x + toneLp_.process (y) * k_[2];
+    }
+
+    // Quattro modi: pulito, filtrato come un analogico, modulato, e rovesciato.
+    // Il rovesciato legge la linea all'indietro dentro una finestra che si
+    // ripete, quindi le note crescono al contrario.
+    float delayDigi (float x)
+    {
+        const int mode = std::clamp (sw_[0], 0, 3);
+        const float base = k_[0] * 0.001f * (float) sr_;
+        float ts = base;
+        if (mode == 2) ts += lfoStep (0.5f, lfo_) * 0.0035f * (float) sr_;
+        if (mode == 3) {
+            // Finestra che scorre all'indietro: la posizione di lettura risale
+            // mentre la scrittura avanza.
+            revPos_ -= 2.f;
+            if (revPos_ < 0.f) revPos_ = base;
+            ts = revPos_;
+        }
+        const float y = long_.read (ts);
+        const float fb = (mode == 1) ? fbLp_.process (y) : y;
+        long_.write (x + fb * k_[1]);
+        return x + y * k_[2];
+    }
+
+    // Un comando e un interruttore: la profondita' ha due posizioni, non una
+    // manopola, ed e' per questo che il pedale ha un suono solo e lo fa bene.
+    float chorusClone (float x)
+    {
+        const float depth = (sw_[0] == 1) ? 0.85f : 0.35f;
+        const float d = (22.f + 9.f * depth * lfoStep (k_[0], lfo_)) * 0.001f * (float) sr_;
+        const float y = wetLpFixed (mod_.read (d));
+        mod_.write (x);
+        return x * 0.72f + y * 0.55f;
+    }
+
+    // Tre voci sfasate di un terzo di giro, con la forma d'onda che passa dalla
+    // sinusoide al triangolo: il triangolo muove a velocita' costante, e si
+    // sente perche' il movimento non rallenta agli estremi.
+    float chorusMulti (float x)
+    {
+        const float sN = lfoStep (k_[1], lfo_);
+        const int voices = (int) std::lround (std::clamp (k_[4], 2.f, 4.f));
+        float wet = 0.f;
+        for (int v = 0; v < voices; ++v) {
+            const float ph = lfo_ + 6.2831853f * (float) v / (float) voices;
+            const float si = std::sin (ph);
+            const float tri = std::asin (std::clamp (si, -1.f, 1.f)) * 0.6366198f;
+            const float l = si * (1.f - k_[3]) + tri * k_[3];
+            const float d = (16.f + 5.f * (float) v + 7.f * k_[2] * l) * 0.001f * (float) sr_;
+            wet += mod_.read (d);
+        }
+        (void) sN;
+        mod_.write (x);
+        return x + (wet / (float) voices) * k_[0];
+    }
+
+    // Spazzolata lenta con estensione e colore separati. In modo filtro
+    // l'oscillatore si ferma: resta un pettine fisso, quella voce metallica
+    // immobile che e' meta' del carattere del pedale.
+    float flangerMistress (float x)
+    {
+        const bool filtro = (sw_[0] == 1);
+        const float swing = filtro ? 0.f : k_[1];
+        const float ms = 0.6f + 6.5f * k_[1] * 0.5f
+                       + (filtro ? 0.f : 3.2f * swing * lfoStep (k_[0], lfo_));
+        const float y = mod_.read (std::max (0.2f, ms) * 0.001f * (float) sr_);
+        mod_.write (x + y * k_[2]);
+        return x + y * 0.75f;
+    }
+
+    // Un comando solo e tre ambienti: la scelta cambia reazione, smorzamento e
+    // densita'. Il terzo modo passa la coda dentro un pettine modulato, ed e'
+    // quella via di mezzo fra riverbero e flanger che non somiglia a nulla.
+    float reverbGrail (float x)
+    {
+        const int mode = std::clamp (sw_[0], 0, 2);
+        float fb, damp, diff;
+        switch (mode) {
+            case 1:  fb = 0.90f; damp = 0.06f; diff = 0.68f; break;   // sala
+            case 2:  fb = 0.86f; damp = 0.12f; diff = 0.60f; break;   // flerb
+            default: fb = 0.80f; damp = 0.20f; diff = 0.45f; break;   // molla
+        }
+        float y = tank_.process (x, fb, damp, diff);
+        if (mode == 0) y = spring_.process (y);
+        if (mode == 2) {
+            const float d = (4.f + 3.f * lfoStep (0.6f, lfo_)) * 0.001f * (float) sr_;
+            const float w = mod_.read (d);
+            mod_.write (y);
+            y = y * 0.45f + w * 0.75f;
+        }
+        return x + y * k_[0];
+    }
+
+    // Ambienti digitali. Il rovesciato accumula in una finestra e la rilegge
+    // all'indietro, cosi' la coda cresce prima della nota invece di seguirla.
+    float reverbPolara (float x)
+    {
+        const int mode = std::clamp (sw_[0], 0, 3);
+        const float t = k_[2];
+        float fb, damp, diff;
+        switch (mode) {
+            case 1:  fb = 0.80f + t * 0.15f; damp = 0.04f; diff = 0.72f; break;  // piastra
+            case 2:  fb = 0.70f + t * 0.10f; damp = 0.10f; diff = 0.50f; break;  // rovesciato
+            case 3:  fb = 0.88f + t * 0.10f; damp = 0.02f; diff = 0.75f; break;  // alone
+            default: fb = 0.70f + t * 0.16f; damp = 0.28f; diff = 0.50f; break;  // stanza
+        }
+        float in = x;
+        if (mode == 2) {
+            revPos_ -= 1.f;
+            if (revPos_ < 1.f) revPos_ = (40.f + 260.f * t) * 0.001f * (float) sr_;
+            in = long_.read (revPos_);
+            long_.write (x);
+        }
+        float y = tank_.process (in, fb, damp, diff);
+        y = toneLp_.process (y);
+        if (mode == 3) {                      // l'alone sale, non entra subito
+            haloEnv_ += (std::fabs (y) - haloEnv_) * 0.00008f;
+            y *= std::min (1.f, haloEnv_ * 24.f);
+        }
+        return x + y * k_[0];
+    }
+
+    // Oltre alla forma si regola la simmetria: spostandola, il tempo in cui il
+    // suono passa e quello in cui e' chiuso smettono di essere uguali.
+    float tremPulsar (float x)
+    {
+        phasePulsar_ += std::max (0.05f, k_[0]) / (float) sr_;
+        while (phasePulsar_ >= 1.f) phasePulsar_ -= 1.f;
+        const float sym = std::clamp (k_[3], 0.05f, 0.95f);
+        // Il ciclo viene diviso in due tratti di durata diversa, poi riportato
+        // a una rampa 0..1 su cui si costruisce l'onda.
+        const float t = (phasePulsar_ < sym) ? (phasePulsar_ / sym) * 0.5f
+                                             : 0.5f + (phasePulsar_ - sym) / (1.f - sym) * 0.5f;
+        const float si = std::sin (6.2831853f * t);
+        const float sq = std::tanh (si * 12.f);
+        const float l  = si * (1.f - k_[2]) + sq * k_[2];
+        return x * (1.f - k_[1] * 0.5f * (1.f - l));
+    }
+
     float wetLpFixed (float v)
     {
         // Il passa-basso dei secchi, fisso: e' quello che rende dolce il coro.
@@ -422,6 +601,7 @@ private:
     pedal::Peak    spring_;
     float  lfo_ = 0.f, lfo2_ = 0.f;
     float  riseEnv_ = 0.f, fbState_ = 0.f, gateSm_ = 1.f, stepPhase_ = 0.f;
+    float  revPos_ = 0.f, haloEnv_ = 0.f, phasePulsar_ = 0.f;
     int    step_ = 0;
 };
 

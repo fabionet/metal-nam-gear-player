@@ -463,7 +463,16 @@ private:
 
     // MARCHELLOW (Marshall JCM800 2203) controls, shown on the AMP tab when
     // amp_model == 1. Six knobs laid out like the real 2203 front panel.
-    std::vector<KnobBox*> marKnobs_;   // pointers into knobs_, in layout order
+    std::vector<KnobBox*> marKnobs_;
+    // RECTIFIER: dodici pomelli (sei per canale) e cinque selettori.
+    std::vector<KnobBox*> recKnobs_;
+    juce::TextButton ampEnableBtnRec_ { "POWER" };
+    std::unique_ptr<BAtt> ampEnableBtnRecAtt_;
+    juce::ComboBox recChanBox_, recMode1Box_, recMode2Box_, recRectBox_, recPowerBox_;
+    std::unique_ptr<CAtt> recChanAtt_, recMode1Att_, recMode2Att_, recRectAtt_, recPowerAtt_;
+    juce::Label recChanLabel_  { {}, "CHANNEL" }, recMode1Label_ { {}, "CH 1 MODE" },
+                recMode2Label_ { {}, "CH 2 MODE" }, recRectLabel_ { {}, "RECTIFIER" },
+                recPowerLabel_ { {}, "POWER" };   // pointers into knobs_, in layout order
     juce::ComboBox marValvesBox_, marSensBox_;
     juce::Label    marValvesLabel_ { {}, "VALVES" };
     juce::Label    marSensLabel_   { {}, "SENS" };

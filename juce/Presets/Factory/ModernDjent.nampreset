@@ -190,6 +190,24 @@
       <PARAM id="fxtr_p4" value="0.5"/>
       <PARAM id="fxtr_p5" value="0.5"/>
       <PARAM id="fxtr_sw1" value="0"/>
+      <PARAM id="amp_enable3" value="0"/>
+      <PARAM id="rec_channel" value="0"/>
+      <PARAM id="rec_mode1" value="1"/>
+      <PARAM id="rec_mode2" value="2"/>
+      <PARAM id="rec_rect" value="0"/>
+      <PARAM id="rec_power" value="0"/>
+      <PARAM id="rec1_gain" value="0.5"/>
+      <PARAM id="rec1_master" value="-12"/>
+      <PARAM id="rec1_bass" value="0"/>
+      <PARAM id="rec1_mid" value="0"/>
+      <PARAM id="rec1_treble" value="0"/>
+      <PARAM id="rec1_presence" value="0"/>
+      <PARAM id="rec2_gain" value="0.7"/>
+      <PARAM id="rec2_master" value="-12"/>
+      <PARAM id="rec2_bass" value="0"/>
+      <PARAM id="rec2_mid" value="-4"/>
+      <PARAM id="rec2_treble" value="0"/>
+      <PARAM id="rec2_presence" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>
