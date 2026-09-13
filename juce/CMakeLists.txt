@@ -13,7 +13,7 @@ else()
 endif()
 
 juce_add_plugin(NAMCustom
-    VERSION               0.3.0
+    VERSION               0.4.0
     # Identita' distinta dalla linea "Full" (urn:fabionet:metalnamgearplayer,
     # bundle "Metal NAM Gear Player"): nome del prodotto, BUNDLE_ID, codice a
     # quattro lettere e URI LV2 sono tutti diversi, cosi' le due edizioni
