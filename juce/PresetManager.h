@@ -47,6 +47,12 @@ public:
     static juce::String bankLetters (int mask);    // "A B D" per la lista
     int  getCurrentBank() const { return currentBank_; }
 
+    // Sovrascrive o elimina il preset indicato, che non e' per forza quello
+    // caricato: nella lista si sceglie il bersaglio con un clic solo, senza
+    // doverlo prima richiamare e cambiare il suono sotto le dita.
+    bool saveOver (int index);
+    bool deleteAt (int index);
+
     bool save();                                   // save over current user preset
     bool saveAs (const juce::String& name);        // create new user preset
 

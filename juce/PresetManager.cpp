@@ -560,6 +560,36 @@ int PresetManager::exportAll (const juce::File& dest)
     return dest.replaceWithText (root.toString()) ? count : 0;
 }
 
+bool PresetManager::saveOver (int index)
+{
+    if (index < 0 || index >= (int) presets_.size()) return false;
+    auto& ref = presets_[(size_t) index];
+    if (ref.isFactory) return false;                 // i preset di fabbrica non si toccano
+
+    // Sovrascrivendo il preset caricato si aggiorna solo il banco corrente e si
+    // lasciano intatte le altre varianti; sovrascrivendone un altro si riscrive
+    // il suo banco A, perche' e' quello il punto di partenza.
+    if (index == currentIndex_) return saveBank (ref.name, currentBank_);
+
+    const auto prevName = currentName_;
+    const auto prevBank = currentBank_;
+    currentName_ = ref.name;
+    const bool ok = saveBank (ref.name, 0);
+    if (! ok) { currentName_ = prevName; currentBank_ = prevBank; }
+    return ok;
+}
+
+bool PresetManager::deleteAt (int index)
+{
+    if (index < 0 || index >= (int) presets_.size()) return false;
+    auto& ref = presets_[(size_t) index];
+    if (ref.isFactory) return false;
+    if (! ref.userFile.deleteFile()) return false;
+    if (index == currentIndex_) { currentName_ = {}; currentIndex_ = -1; dirty_ = false; }
+    refresh();
+    return true;
+}
+
 bool PresetManager::save()
 {
     if (currentIndex_ < 0) return false;

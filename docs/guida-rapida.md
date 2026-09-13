@@ -150,6 +150,8 @@ I toggle di bypass sono nel footer (checked = **attivo**, unchecked = bypass).
 
 ## 6. Preset
 
+**Un clic solo sceglie il bersaglio** di salva ed elimina, e quei due tasti si accendono subito: non serve più richiamare il preset per poterlo sovrascrivere o cancellare, cosa che cambiava il suono sotto le dita solo per arrivare al tasto. Il **doppio clic** resta quello che lo carica davvero. Sui preset di fabbrica salva ed elimina restano spenti: quelli non si toccano.
+
 Il pannello **PRESETS** entra da destra con uno scorrimento. Dentro trovi i preset di fabbrica per categoria (Clean / Rock / Metal / Extreme Metal), un **Default** neutro non sovrascrivibile, e i tuoi.
 
 - **Doppio clic** richiama un preset. Il **clic singolo** lo seleziona soltanto, per esportarlo o eliminarlo senza cambiare il suono sotto le dita.

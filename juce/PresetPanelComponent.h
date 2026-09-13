@@ -27,6 +27,7 @@ private:
 
     void doSaveAs();
     void updateEnableState();
+    int  targetIndex() const;
     void rebuildVisibleIndices();
     int  presetIndexForRow (int row) const;
 
