@@ -59,6 +59,8 @@ Il secondo si accende da solo passando a **Dual-Mono** o **Stereo**, dove serve 
 
 Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DISTORTION** ed **EQ** c'è una tendina con l'elenco dei pedali emulabili. L'elenco è **lo stesso in tutte**, raggruppato per categoria: Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor.
 
+Anche le cinque sezioni della scheda **FX** hanno la loro tendina, con un **elenco a parte**: lì hanno senso ritardi, modulazioni e riverberi, non distorsori. Le categorie sono Delay, Chorus, Flanger, Reverb, Tremolo, e ognuna si apre con l'effetto che quella sezione ha sempre avuto — scegliendolo si torna esattamente al suono di prima.
+
 Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.
 
 **Anche il nome della sezione segue il pedale**: titolo e tasto di attivazione diventano EQUALIZER, COMPRESSOR, HIGH GAIN e così via. La posizione nella catena non cambia, e si legge dall'ordine dei pannelli.
@@ -68,7 +70,7 @@ Sull'acceso/spento valgono due regole, e non si contraddicono:
 - scegli un pedale **mai usato finora**: la sezione tiene lo stato che aveva. Se era spenta resta spenta.
 - richiami un pedale **già presente o già usato** in un'altra sezione: arriva com'era — stessi valori dei pomelli, stesso interruttore, stessa accensione. È lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
 
-Con lo stesso pedale in due sezioni, quella che comanda è **l'ultima che hai regolato**: la copia ferma non sovrascrive quella su cui stai lavorando.
+**Lo stesso effetto non si può mettere in due sezioni.** Se lo scegli dove ce n'è già uno uguale, la scelta viene rifiutata e compare un avviso che dice dove sta. Per spostarlo, prima cambia pedale alla sezione che lo ospita, poi richiamalo dove vuoi: ci arriverà com'era.
 
 La sola **torre di tono dell'amplificatore** non si duplica: è una e sta nella sezione EQ. Sceglierla altrove lascia la sezione senza comandi, e te lo dice.
 

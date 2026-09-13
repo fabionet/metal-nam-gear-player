@@ -44,26 +44,10 @@
       <PARAM id="ln_enabled" value="0"/>
       <PARAM id="ln_target_db" value="-14"/>
       <PARAM id="ng_bypass" value="0"/>
-      <PARAM id="delay_time_ms" value="350"/>
-      <PARAM id="delay_feedback" value="0.35"/>
-      <PARAM id="delay_mix" value="0.25"/>
       <PARAM id="delay_bypass" value="1"/>
-      <PARAM id="chorus_rate_hz" value="0.8"/>
-      <PARAM id="chorus_depth" value="0.4"/>
-      <PARAM id="chorus_mix" value="0.3"/>
       <PARAM id="chorus_bypass" value="1"/>
-      <PARAM id="flanger_rate_hz" value="0.3"/>
-      <PARAM id="flanger_depth" value="0.5"/>
-      <PARAM id="flanger_feedback" value="0.4"/>
-      <PARAM id="flanger_mix" value="0.25"/>
       <PARAM id="flanger_bypass" value="1"/>
-      <PARAM id="reverb_room" value="0.5"/>
-      <PARAM id="reverb_damping" value="0.5"/>
-      <PARAM id="reverb_mix" value="0.25"/>
       <PARAM id="reverb_bypass" value="1"/>
-      <PARAM id="tremolo_rate_hz" value="4"/>
-      <PARAM id="tremolo_depth" value="0.5"/>
-      <PARAM id="tremolo_shape" value="0"/>
       <PARAM id="tremolo_bypass" value="1"/>
       <PARAM id="ir_hp_freq" value="80"/>
       <PARAM id="ir_hp_bypass" value="1"/>
@@ -171,6 +155,41 @@
       <PARAM id="eq_p7" value="0.5"/>
       <PARAM id="eq_p8" value="0.5"/>
       <PARAM id="eq_sw1" value="0"/>
+      <PARAM id="fxdel_model" value="0"/>
+      <PARAM id="fxdel_p1" value="0.2542"/>
+      <PARAM id="fxdel_p2" value="0.3889"/>
+      <PARAM id="fxdel_p3" value="0.25"/>
+      <PARAM id="fxdel_p4" value="0.5"/>
+      <PARAM id="fxdel_p5" value="0.5"/>
+      <PARAM id="fxdel_sw1" value="0"/>
+      <PARAM id="fxch_model" value="4"/>
+      <PARAM id="fxch_p1" value="0.0754"/>
+      <PARAM id="fxch_p2" value="0.4"/>
+      <PARAM id="fxch_p3" value="0.3"/>
+      <PARAM id="fxch_p4" value="0.5"/>
+      <PARAM id="fxch_p5" value="0.5"/>
+      <PARAM id="fxch_sw1" value="0"/>
+      <PARAM id="fxfl_model" value="8"/>
+      <PARAM id="fxfl_p1" value="0.0251"/>
+      <PARAM id="fxfl_p2" value="0.5"/>
+      <PARAM id="fxfl_p3" value="0.4444"/>
+      <PARAM id="fxfl_p4" value="0.25"/>
+      <PARAM id="fxfl_p5" value="0.5"/>
+      <PARAM id="fxfl_sw1" value="0"/>
+      <PARAM id="fxrv_model" value="11"/>
+      <PARAM id="fxrv_p1" value="0.5"/>
+      <PARAM id="fxrv_p2" value="0.5"/>
+      <PARAM id="fxrv_p3" value="0.25"/>
+      <PARAM id="fxrv_p4" value="0.5"/>
+      <PARAM id="fxrv_p5" value="0.5"/>
+      <PARAM id="fxrv_sw1" value="0"/>
+      <PARAM id="fxtr_model" value="14"/>
+      <PARAM id="fxtr_p1" value="0.397"/>
+      <PARAM id="fxtr_p2" value="0.5"/>
+      <PARAM id="fxtr_p3" value="0"/>
+      <PARAM id="fxtr_p4" value="0.5"/>
+      <PARAM id="fxtr_p5" value="0.5"/>
+      <PARAM id="fxtr_sw1" value="0"/>
     </PARAMS>
   </Parameters>
 </NAMPreset>

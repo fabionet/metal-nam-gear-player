@@ -11,6 +11,7 @@
 #include "PresetPanelComponent.h"
 #include "MeterStripComponent.h"
 #include "EQAnalyserComponent.h"
+#include "FxRegistry.h"
 #include "LCDDisplayComponent.h"
 #include "PedalDSP.h"
 
@@ -218,27 +219,63 @@ private:
     juce::Label  irVol1Label_ { {}, "VOL" }, irVol2Label_ { {}, "VOL" };
     std::unique_ptr<SAtt> irVol1Att_, irVol2Att_;
     std::unique_ptr<MeterStripComponent> ir1Meter_, ir2Meter_;
-    // Un analizzatore e un misuratore di riduzione per ogni slot: si mostra
-    // quello dello slot in cui e' finito l'equalizzatore o il compressore.
-    std::unique_ptr<EQAnalyserComponent> pedalAnalyser_[6];
-    std::unique_ptr<GrMeterComponent>    pedalGrMeter_[6];
+    // Gli slot delle sezioni a pedale: i primi sei stanno nella scheda MAIN e
+    // pescano dal registro principale, gli altri cinque nella scheda FX e
+    // pescano dal suo. Due elenchi distinti, un solo meccanismo.
+    static constexpr int kMainSlots  = 6;
+    static constexpr int kPedalSlots = 11;
+    static bool isFxSlot (int slot) { return slot >= kMainSlots; }
+
+    // Un analizzatore e un misuratore di riduzione per ogni slot principale: si
+    // mostra quello dello slot in cui e' finito l'equalizzatore o il
+    // compressore. Le sezioni FX non ne hanno.
+    std::unique_ptr<EQAnalyserComponent> pedalAnalyser_[kPedalSlots];
+    std::unique_ptr<GrMeterComponent>    pedalGrMeter_[kPedalSlots];
     // Riga di spiegazione per una sezione che non ha comandi da mostrare.
-    juce::Label                          pedalNote_[6];
+    juce::Label                          pedalNote_[kPedalSlots];
+    // Avviso a comparsa per i tentativi rifiutati, con il suo conto alla rovescia.
+    juce::Label pedalMsg_;
+    int         pedalMsgTicks_ = 0;
     std::unique_ptr<LCDDisplayComponent> lcd_;
 
     // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
     // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE.
-    static constexpr int kPedalSlots = 6;
+    // Gli slot delle sezioni a pedale: i primi sei stanno nella scheda MAIN e
+    // pescano dal registro principale, gli altri cinque nella scheda FX e
+    // pescano dal suo. Due elenchi distinti, un solo meccanismo.
+
+    // Vista comune su un modello, qualunque sia il registro da cui viene:
+    // Knob e Switch sono gli stessi tipi, cambia solo l'elenco.
+    struct ModelView
+    {
+        const char* id = "";
+        const char* name = "";
+        const char* blurb = "";
+        const pedal::Knob*   knobs = nullptr;
+        int numKnobs = 0;
+        const pedal::Switch* switches = nullptr;
+        int numSwitches = 0;
+        juce::String title;          // il nome della categoria, in maiuscolo
+    };
+    ModelView slotModel (int slot, int idx) const;
+    // Il nome del posto nella catena, che non cambia col pedale: serve per dire
+    // dove sta gia' un effetto che si sta cercando di mettere altrove.
+    static const char* slotChainName (int slot);
+    // Lo slot dello stesso elenco che ospita gia' quel modello, -1 se nessuno.
+    int slotWithModel (int exceptSlot, int modelIdx) const;
+    void showPedalMessage (const juce::String& text);
+    static int slotModelCount (int slot);
+    static int slotMaxKnobs   (int slot);
     PedalBox pedalBox_[kPedalSlots];
     std::unique_ptr<CAtt> pedalAtt_[kPedalSlots];
     juce::ComboBox pedalSwitch_[kPedalSlots][pedal::kMaxSwitch];
     std::unique_ptr<CAtt> pedalSwitchAtt_[kPedalSlots][pedal::kMaxSwitch];
     juce::Label    pedalSwitchLabel_[kPedalSlots][pedal::kMaxSwitch];
-    int pedalKnobBase_[kPedalSlots] { -1, -1, -1, -1, -1, -1 };
-    int lastPedalModel_[kPedalSlots] { -1, -1, -1, -1, -1, -1 };
+    int pedalKnobBase_[kPedalSlots];   // riempito nel costruttore, uno per slot
+    int lastPedalModel_[kPedalSlots];  // -1 finche' la sezione non e' stata popolata
     static int pedalSlotFor (const juce::String& sectionName);
     static const char* pedalPrefix (int slot);
-    void buildPedalMenu (juce::ComboBox&);
+    void buildPedalMenu (juce::ComboBox&, int slot);
     void refreshPedalSection (int slot);
     std::vector<int> pedalKnobIds (int slot) const;
     // Vero quando il modello scelto si comanda a cursori verticali per banda.
@@ -261,7 +298,8 @@ private:
         float knobs[pedal::kMaxKnobs] {};
         int   sw[pedal::kMaxSwitch] {};
     };
-    PedalMemory modelMemory_[64];               // il registro ha molti meno modelli
+    // Due registri, due memorie: gli indici si sovrappongono.
+    PedalMemory modelMemory_[2][64];
 
     // Istantanea di cosa aveva ogni sezione al giro precedente. Serve a capire
     // quale copia di un pedale e' stata toccata davvero: con lo stesso pedale in

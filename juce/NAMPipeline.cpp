@@ -34,16 +34,12 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     eq_.prepare(sampleRate, 1);
     depth_.prepare(sampleRate, 1);
     gate_.prepare(sampleRate);
-    for (auto& p : pedals_) p.prepare(sampleRate);
+    for (auto& p : pedals_)   p.prepare(sampleRate);
+    for (auto& p : fxPedals_) p.prepare(sampleRate);
     scopeTap_.assign((size_t) std::max(1, blockSize), 0.f);
     hp_.prepare(sampleRate);
     loud_.prepare(sampleRate);
     ng_.prepare(sampleRate);
-    delay_.prepare(sampleRate);
-    chorus_.prepare(sampleRate);
-    flanger_.prepare(sampleRate);
-    reverb_.prepare(sampleRate);
-    tremolo_.prepare(sampleRate);
     amp_.prepare(sampleRate);
     marshall_.prepare(sampleRate);
     irHp_.reset();
@@ -77,15 +73,11 @@ void NAMPipeline::reset()
     eq_.reset();
     depth_.reset();
     gate_.reset();
-    for (auto& p : pedals_) p.reset();
+    for (auto& p : pedals_)   p.reset();
+    for (auto& p : fxPedals_) p.reset();
     hp_.reset();
     loud_.reset();
     ng_.reset();
-    delay_.reset();
-    chorus_.reset();
-    flanger_.reset();
-    reverb_.reset();
-    tremolo_.reset();
     amp_.reset();
     marshall_.reset();
     irHp_.reset();
@@ -342,11 +334,13 @@ void NAMPipeline::process(const float* in, float* out, int n)
         if (tapPost) scopeTap_[(size_t) i] = s;
         s = hp_.process   (s);
         s = loud_.process (s);
-        s = delay_.process   (s);
-        s = chorus_.process  (s);
-        s = flanger_.process (s);
-        s = reverb_.process  (s);
-        s = tremolo_.process (s);
+        // Le cinque sezioni della scheda FX sono anch'esse posti nella catena:
+        // cosa ci suona lo decide il modello scelto nella loro tendina.
+        s = fxPedals_[0].process (s);   // DELAY
+        s = fxPedals_[1].process (s);   // CHORUS
+        s = fxPedals_[2].process (s);   // FLANGER
+        s = fxPedals_[3].process (s);   // REVERB
+        s = fxPedals_[4].process (s);   // TREMOLO
         out[i] = s;
     }
 
