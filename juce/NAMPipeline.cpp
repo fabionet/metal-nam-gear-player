@@ -42,6 +42,7 @@ void NAMPipeline::prepare(double sampleRate, int blockSize)
     ng_.prepare(sampleRate);
     amp_.prepare(sampleRate);
     marshall_.prepare(sampleRate);
+    rect_.prepare(sampleRate);
     irHp_.reset();
     irLp_.reset();
 
@@ -80,6 +81,7 @@ void NAMPipeline::reset()
     ng_.reset();
     amp_.reset();
     marshall_.reset();
+    rect_.reset();
     irHp_.reset();
     irLp_.reset();
     if (ir_)  ir_ ->reset();
@@ -261,12 +263,19 @@ void NAMPipeline::process(const float* in, float* out, int n)
     // Each amp carries its own power state: ampEnabled_ for GEAR SX, marshallEnabled_
     // for MARCHELLOW. Gating on ampEnabled_ alone made the MARCHELLOW branch
     // unreachable (ampEnabled_ is only ever true while ampModel_ == 0).
-    if (ampModel_.load() == 0) {
-        if (ampEnabled_.load())
-            for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
-    } else {
-        if (marshallEnabled_.load())
-            for (int i = 0; i < n; ++i) out[i] = marshall_.process(out[i]);
+    switch (ampModel_.load()) {
+        case 0:
+            if (ampEnabled_.load())
+                for (int i = 0; i < n; ++i) out[i] = amp_.process(out[i]);
+            break;
+        case 1:
+            if (marshallEnabled_.load())
+                for (int i = 0; i < n; ++i) out[i] = marshall_.process(out[i]);
+            break;
+        default:
+            if (rectEnabled_.load())
+                for (int i = 0; i < n; ++i) out[i] = rect_.process(out[i]);
+            break;
     }
 
     // --- Depth + Resonance (POWER section, bypassable) ---

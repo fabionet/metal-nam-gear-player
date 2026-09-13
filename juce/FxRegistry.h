@@ -43,7 +43,18 @@ enum class Topology {
     ReverbMod,      // la coda respira, modulata piano
     TremStd,        // il tremolo della catena
     TremTr2,        // onda regolabile dal triangolo all'onda quadra
-    TremSlicer      // tremolo a passi, con motivi ritmici
+    TremSlicer,     // tremolo a passi, con motivi ritmici
+
+    // --- seconda serie: altre scuole costruttive ---------------------------
+    DelayMemory,    // secchi lunghi con le ripetizioni che ondeggiano
+    DelayTape,      // simulazione di nastro: testina che perde acuti e wow
+    DelayDigi,      // ritardo a modi, dal pulito al filtrato al rovesciato
+    ChorusClone,    // una voce, un comando, profondita' a due posizioni
+    ChorusMulti,    // piu' voci sommate, con la forma d'onda regolabile
+    FlangerMistress,// spazzolata lenta con estensione e colore separati
+    ReverbGrail,    // tre ambienti a scelta e un comando solo
+    ReverbPolara,   // ambienti digitali fra cui uno rovesciato
+    TremPulsar      // onda regolabile e simmetria del ciclo
 };
 
 struct Model
@@ -101,6 +112,30 @@ inline const std::vector<Model>& models()
         { "E.LEVEL", 0.f, 1.f, 0.3f, "" }, { "MOD", 0.f, 1.f, 0.35f, "" } }, 4,
       { none() }, 0 },
 
+    { "dl_memory", "MEMORY MAN EH", Category::Delay, Topology::DelayMemory,
+      "Secchi analogici lunghi, con una modulazione lenta sulle ripetizioni: la "
+      "coda si allarga e non si sente mai ferma. Spinta va in oscillazione, ed "
+      "e' parte del mestiere.",
+      { { "DELAY", 30.f, 550.f, 320.f, " ms" }, { "FEEDBACK", 0.f, 0.95f, 0.4f, "" },
+        { "BLEND", 0.f, 1.f, 0.35f, "" }, { "CHORUS", 0.f, 1.f, 0.3f, "" } }, 4,
+      { none() }, 0 },
+
+    { "dl_tape", "TES Tape Echo PC", Category::Delay, Topology::DelayTape,
+      "Simulazione di nastro: la testina perde acuti a ogni passaggio e il "
+      "trascinamento fa oscillare appena l'intonazione. Il tono decide quanto "
+      "vecchio suona il nastro.",
+      { { "TIME", 40.f, 900.f, 380.f, " ms" }, { "REPEATS", 0.f, 0.92f, 0.4f, "" },
+        { "LEVEL", 0.f, 1.f, 0.3f, "" }, { "TONE", -12.f, 12.f, -3.f, " dB" },
+        { "WOW", 0.f, 1.f, 0.3f, "" } }, 5,
+      { none() }, 0 },
+
+    { "dl_digi", "DIGIDELAY DT", Category::Delay, Topology::DelayDigi,
+      "Ritardo digitale a modi: pulito, filtrato come un analogico, modulato, "
+      "oppure con le ripetizioni rovesciate.",
+      { { "TIME", 20.f, 1200.f, 400.f, " ms" }, { "REPEATS", 0.f, 0.9f, 0.35f, "" },
+        { "LEVEL", 0.f, 1.f, 0.3f, "" } }, 3,
+      { { "MODE", { "Clean", "Analog", "Mod", "Reverse" }, 4, 0 } }, 1 },
+
     // --- Chorus ------------------------------------------------------------
     { "ch_std", "STANDARD Chorus", Category::Chorus, Topology::ChorusStd,
       "Il coro che la catena ha sempre avuto: una voce modulata mescolata al "
@@ -129,6 +164,20 @@ inline const std::vector<Model>& models()
       { rate (5.f), depth (0.35f), { "RISE", 0.f, 2000.f, 300.f, " ms" } }, 3,
       { none() }, 0 },
 
+    { "ch_clone", "SMALL CLONE EH", Category::Chorus, Topology::ChorusClone,
+      "Un comando solo per la velocita' e un interruttore per la profondita': "
+      "niente da regolare, e il suono e' quello. Profondo e lento, il coro "
+      "liquido che si riconosce in due note.",
+      { rate (0.4f) }, 1,
+      { { "DEPTH", { "Shallow", "Deep", "", "" }, 2, 1 } }, 1 },
+
+    { "ch_multi", "MULTI CHORUS DT", Category::Chorus, Topology::ChorusMulti,
+      "Piu' voci sommate invece di una, con la forma d'onda della modulazione "
+      "regolabile: dal respiro sinusoidale al movimento a scatti del triangolo.",
+      { { "LEVEL", 0.f, 1.f, 0.4f, "" }, rate (0.5f), depth (0.5f),
+        { "WAVE", 0.f, 1.f, 0.f, "" }, { "VOICES", 2.f, 4.f, 3.f, "" } }, 5,
+      { none() }, 0 },
+
     // --- Flanger -----------------------------------------------------------
     { "fl_std", "STANDARD Flanger", Category::Flanger, Topology::FlangerStd,
       "Il flanger che la catena ha sempre avuto: ritardo cortissimo, reazione e "
@@ -150,6 +199,13 @@ inline const std::vector<Model>& models()
       { { "MANUAL", 0.3f, 10.f, 2.f, " ms" }, depth (0.6f), rate (0.3f),
         { "RESONANCE", 0.f, 0.95f, 0.5f, "" } }, 4,
       { { "MODE", { "Normal", "Ultra", "", "" }, 2, 0 } }, 1 },
+
+    { "fl_mistress", "ELECTRIC MISTRESS EH", Category::Flanger, Topology::FlangerMistress,
+      "Spazzolata lenta e liquida, con estensione e colore su due comandi "
+      "separati. Il modo a filtro ferma la spazzolata e lascia il pettine fisso: "
+      "una voce metallica che non si muove.",
+      { rate (0.25f), { "RANGE", 0.f, 1.f, 0.6f, "" }, { "COLOR", 0.f, 0.95f, 0.5f, "" } }, 3,
+      { { "MODE", { "Flange", "Filter", "", "" }, 2, 0 } }, 1 },
 
     // --- Reverb ------------------------------------------------------------
     { "rv_std", "STANDARD Reverb", Category::Reverb, Topology::ReverbStd,
@@ -173,6 +229,19 @@ inline const std::vector<Model>& models()
         { "TIME", 0.f, 1.f, 0.6f, "" }, { "MOD", 0.f, 1.f, 0.4f, "" } }, 4,
       { none() }, 0 },
 
+    { "rv_grail", "HOLY GRAIL EH", Category::Reverb, Topology::ReverbGrail,
+      "Un comando solo, la quantita', e tre ambienti fra cui scegliere: molla, "
+      "sala, e quello strano a meta' fra riverbero e flanger.",
+      { { "AMOUNT", 0.f, 1.f, 0.35f, "" } }, 1,
+      { { "MODE", { "Spring", "Hall", "Flerb", "" }, 3, 0 } }, 1 },
+
+    { "rv_polara", "POLARA DT", Category::Reverb, Topology::ReverbPolara,
+      "Ambienti digitali, compreso uno rovesciato che fa crescere la coda prima "
+      "della nota. La vivacita' decide quanto la coda resta brillante.",
+      { { "LEVEL", 0.f, 1.f, 0.3f, "" }, { "LIVENESS", -12.f, 12.f, 0.f, " dB" },
+        { "DECAY", 0.f, 1.f, 0.5f, "" } }, 3,
+      { { "MODE", { "Room", "Plate", "Reverse", "Halo" }, 4, 0 } }, 1 },
+
     // --- Tremolo -----------------------------------------------------------
     { "tr_std", "STANDARD Tremolo", Category::Tremolo, Topology::TremStd,
       "Il tremolo che la catena ha sempre avuto: velocita', profondita' e forma "
@@ -191,6 +260,14 @@ inline const std::vector<Model>& models()
       "secondo lo schema scelto.",
       { rate (2.f), depth (0.9f), { "SMOOTH", 0.f, 1.f, 0.25f, "" } }, 3,
       { { "PATTERN", { "Otto", "Terzine", "Salto", "Sincope" }, 4, 0 } }, 1 },
+
+    { "tr_pulsar", "PULSAR EH", Category::Tremolo, Topology::TremPulsar,
+      "Oltre alla forma d'onda si regola la simmetria del ciclo: spostandola, il "
+      "tempo in cui il suono passa e quello in cui e' chiuso smettono di essere "
+      "uguali, e il tremolo comincia a zoppicare apposta.",
+      { rate (4.f), depth (0.6f), { "SHAPE", 0.f, 1.f, 0.4f, "" },
+        { "SYMMETRY", 0.1f, 0.9f, 0.5f, "" } }, 4,
+      { none() }, 0 },
     };
     return list;
 }

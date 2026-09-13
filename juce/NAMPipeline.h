@@ -17,6 +17,7 @@
 #include "FxDSP.h"
 #include "NativeAmp.h"
 #include "MarshallAmp.h"
+#include "RectifierAmp.h"
 #include "Biquad.h"
 
 class NAMPipeline {
@@ -165,8 +166,9 @@ public:
     float lastIR1Peak() const noexcept { return lastIr1Peak_; }
     float lastIR2Peak() const noexcept { return lastIr2Peak_; }
 
-    // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp).
-    void setAmpModel(int m) { ampModel_.store(m <= 0 ? 0 : 1); }
+    // Amp-model selector: 0 = GEAR SX (NativeAmp), 1 = MARCHELLOW (MarshallAmp),
+    // 2 = RECTIFIER (RectifierAmp, due canali).
+    void setAmpModel(int m) { ampModel_.store(m < 0 ? 0 : (m > 2 ? 2 : m)); }
 
     // MARCHELLOW (Marshall JCM800 2203). Enable is gated by the caller so the
     // non-selected amp receives en=false and stays idle.
@@ -178,6 +180,24 @@ public:
         marshall_.setValves(valves);
         marshall_.setSens(sens);
         marshall_.setControls(preamp01, masterDB, bassDB, midDB, trebleDB, presenceDB);
+    }
+
+    // RECTIFIER (Mesa Dual Rectifier a due canali). I comandi arrivano per
+    // canale: quello non selezionato tiene i suoi valori e non lavora.
+    void setRectifier (bool en, int channel, int mode0, int mode1, int rect, int power,
+                       const float* gain, const float* masterDB, const float* bassDB,
+                       const float* midDB, const float* trebleDB, const float* presDB)
+    {
+        rectEnabled_.store (en);
+        rect_.setEnabled (en);
+        rect_.setChannel (channel);
+        rect_.setMode (0, mode0);
+        rect_.setMode (1, mode1);
+        rect_.setRectifier (rect);
+        rect_.setPower (power);
+        for (int c = 0; c < 2; ++c)
+            rect_.setChannelControls (c, gain[c], masterDB[c], bassDB[c],
+                                      midDB[c], trebleDB[c], presDB[c]);
     }
 
     // --- Model / IR loading (call from non-audio thread) ---
@@ -223,6 +243,7 @@ private:
     // IR post-processing tools (Fase 2a).
     preamp_fx::NativeAmp     amp_;
     preamp_fx::MarshallAmp   marshall_;
+    preamp_fx::RectifierAmp  rect_;
     std::atomic<int>         ampModel_ { 0 };
 
     nam_dsp::Biquad modelBass_, modelMid_, modelTreble_;
@@ -279,6 +300,7 @@ private:
     std::atomic<bool>  isSlimmable_   { false };
     std::atomic<bool>  ampEnabled_    { false };
     std::atomic<bool>  marshallEnabled_ { false };
+    std::atomic<bool>  rectEnabled_     { false };
 
 public:
     // True when prepare() has already run for exactly this sr/blocksize. Lets the

@@ -139,6 +139,31 @@ Un preset salvato prima di questa pulizia si carica lo stesso: `replaceState` ig
 
 **L'equalizzatore.** Il primo modello della categoria, `eq_tonestack`, è un passante: la torre di tono nativa è già nella catena e continua a fare il suo lavoro. Scegliendo un altro modello il processore **azzera** le bande native, altrimenti le due curve si sommerebbero.
 
+## MAUSE RECTIFIER
+
+`RectifierAmp.h`, stessa impostazione di `MarshallAmp.h`: header-only, mono,
+niente JUCE, stadi a triodo con tanh asimmetrica e torre di tono a biquad RBJ.
+Due canali con comandi indipendenti e tre modi ciascuno.
+
+**Il cedimento dell'alimentazione.** Col raddrizzatore a valvole la tensione
+scende in qualche millisecondo sotto il segnale forte e risale in un paio di
+decimi: e' quello che rende elastico l'attacco. Coi diodi resta ferma. Bold e
+Spongy non cambiano solo un guadagno: Spongy parte da una tensione piu' bassa,
+cede fino a poco piu' della meta' e risale col doppio del tempo. Misurato su un
+gradino forte: 0,25 dB di cedimento in Bold, 1,81 dB in Spongy, -0,12 dB coi
+diodi, cioe' nessuno.
+
+**Dove sta la presenza.** Sul canale uno e' nell'anello di controreazione,
+quindi dopo il Master; sul canale due nel preamplificatore, prima dello stadio
+finale, che la comprime. Con la stessa manopola a +10 dB si misurano +8,4 dB a
+5 kHz sul canale uno e +1,1 dB sul due: e' la ragione per cui la presenza del
+canale rosso e' descritta come piu' dolce.
+
+**I modi.** Clean sono due stadi appena spinti; Vintage tre stadi con la seconda
+armonica in evidenza; Modern tre stadi piu' duri con un passa-alto fra il
+secondo e il terzo, che e' quello che tiene pulite le basse sotto guadagno alto.
+Misurata sulla stessa nota: THD 0,275 / 0,357 / 0,695.
+
 ## Analizzatore EQ
 
 `EQAnalyserComponent` disegna spettro e curva sovrapposti.

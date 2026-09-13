@@ -59,6 +59,8 @@ Il secondo si accende da solo passando a **Dual-Mono** o **Stereo**, dove serve 
 
 Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DISTORTION** ed **EQ** c'è una tendina con l'elenco dei pedali emulabili. L'elenco è **lo stesso in tutte**, raggruppato per categoria: Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor.
 
+Gli elenchi contengono due serie: quella costruita sugli schemi della casa giapponese (compresa la serie artigianale) e una seconda che raccoglie le altre scuole — il roditore col suo op-amp spinto, i quattro stadi in cascata della scuola newyorkese, le due bande separate della scuola americana da studio, e i circuiti silenziosissimi della scuola inglese su misura. Nomi evocativi e non marchi, topologie vere.
+
 Anche le cinque sezioni della scheda **FX** hanno la loro tendina, con un **elenco a parte**: lì hanno senso ritardi, modulazioni e riverberi, non distorsori. Le categorie sono Delay, Chorus, Flanger, Reverb, Tremolo, e ognuna si apre con l'effetto che quella sezione ha sempre avuto — scegliendolo si torna esattamente al suono di prima.
 
 Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli interruttori che quel pedale ha davvero, con i nomi, le unità e i valori di fabbrica suoi. Un limitatore mostra soglia, rapporto, rilascio e livello; un sustainer mostra sustain, attacco, tono e livello; un grafico a sette bande mostra sette cursori più il livello. La larghezza del pannello si adatta da sola.
@@ -91,6 +93,17 @@ Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e 
 - **EQ-TWENTY Parametric** — due maniglie spazzolabili in frequenza.
 
 > Con il guadagno MID a zero il Q non cambia nulla, né nel disegno né nel suono: un filtro a campana senza guadagno è un passa-tutto. Alza il MID di qualche dB e vedrai la campana stringersi.
+
+## 4-quinquies. Il terzo amplificatore: MAUSE RECTIFIER
+
+Nella scheda **AMP SIM** il menu degli amplificatori ha ora tre voci. La terza è un **due canali americano** con tutti i comandi dell'originale: Gain, Treble, Mid, Bass, Presence e Master **indipendenti per canale**, il modo di ciascun canale (Clean, Vintage, Modern), il selettore di canale, il raddrizzatore a valvole o a diodi e l'interruttore Bold/Spongy.
+
+Due cose che cambiano davvero il suono e non solo il nome:
+
+- **Il raddrizzatore.** A valvole la tensione cede sotto la pennata e risale dopo: l'attacco diventa elastico. Coi diodi non cede e resta duro. Spongy parte da una tensione più bassa, cede di più e ci mette il doppio a risalire.
+- **Dove sta la presenza.** Sul canale uno lavora nell'anello di controreazione, dopo lo stadio finale, e apre parecchio; sul canale due sta nel preamplificatore, prima della saturazione, che la smorza. È la stessa manopola e non fa la stessa cosa — come sull'ampli vero.
+
+I pomelli del canale non selezionato restano visibili ma attenuati, così si vedono le regolazioni dell'altro senza confonderle con quelle che stanno suonando.
 
 ## 5. Catena effetti
 
