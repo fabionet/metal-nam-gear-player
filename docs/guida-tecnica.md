@@ -36,6 +36,21 @@ Host (VST3 / LV2 / Standalone)
 
 ## Formato preset
 
+**I modelli si salvano per nome, non per numero.** Le sezioni a pedale e il
+selettore degli amplificatori scelgono con un indice dentro il loro registro, e
+quell'indice cambia ogni volta che si inserisce un modello in mezzo all'elenco.
+E' successo: dopo aver aggiunto tre overdrive in testa alla lista, tutti i
+preset di fabbrica si sono ritrovati un overdrive nella sezione dei distorsori e
+un pedale a caso in quella dei gate, senza che niente lo segnalasse. Da allora
+il preset porta anche un blocco `<Models>` con l'id testuale di ogni sezione, e
+`applyModelIds()` lo rilegge **dopo** `replaceState`: gli id non si muovono, gli
+indici si'. Un modello sparito lascia la sezione com'era invece di puntare a
+caso, e un preset scritto prima di questa modifica si carica lo stesso, solo
+senza la correzione.
+
+Ogni variante di banco porta il proprio blocco: una variante puo' avere pedali
+diversi dal preset che la contiene.
+
 `.nampreset` è XML (APVTS state) con l'aggiunta di:
 
 - `<NAMPreset name="…" version="1" lockModel="0|1" category="…">`

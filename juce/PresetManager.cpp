@@ -1,5 +1,8 @@
 // Stage 7 — PresetManager implementation.
 #include "PresetManager.h"
+#include "PedalRegistry.h"
+#include "FxRegistry.h"
+#include "AmpRegistry.h"
 #include <map>
 #include "PluginProcessor.h"
 #include "NAMPresetData.h"
@@ -23,6 +26,61 @@ namespace
     constexpr const char* kChildBanks = "Banks";
     constexpr const char* kBank       = "Bank";
     constexpr const char* kAttrBankId = "id";
+    // I modelli scelti nelle sezioni si salvano per NOME e non per numero.
+    // L'indice nel registro cambia ogni volta che si aggiunge un pedale in
+    // mezzo all'elenco, e un preset salvato prima si ritroverebbe in quella
+    // sezione un effetto diverso senza accorgersene. Il nome invece non si
+    // muove: e' per questo che ogni modello ne ha uno.
+    constexpr const char* kChildModels = "Models";
+    constexpr const char* kModelEntry  = "M";
+
+    enum class Reg { Pedal, Fx, Amp };
+    struct ModelParam { const char* param; Reg reg; };
+    const ModelParam kModelParams[] = {
+        { "od_model",    Reg::Pedal }, { "dist_model",  Reg::Pedal },
+        { "ng_model",    Reg::Pedal }, { "gate_model",  Reg::Pedal },
+        { "comp_model",  Reg::Pedal }, { "eq_model",    Reg::Pedal },
+        { "fxdel_model", Reg::Fx },    { "fxch_model",  Reg::Fx },
+        { "fxfl_model",  Reg::Fx },    { "fxrv_model",  Reg::Fx },
+        { "fxtr_model",  Reg::Fx },    { "amp_model",   Reg::Amp },
+    };
+
+    // I primi tre amplificatori non stanno nel registro: hanno parametri propri
+    // e vanno nominati qui.
+    const char* const kFixedAmps[3] = { "gearsx", "marchellow", "rectifier" };
+
+    juce::String modelIdFor (Reg r, int index)
+    {
+        switch (r) {
+            case Reg::Pedal: return pedal::at (index).id;
+            case Reg::Fx:    return fxpedal::at (index).id;
+            case Reg::Amp:
+                if (index < 3) return kFixedAmps[index < 0 ? 0 : index];
+                return ampmodel::at (index - 3).id;
+        }
+        return {};
+    }
+
+    int modelIndexFor (Reg r, const juce::String& id, int fallback)
+    {
+        if (id.isEmpty()) return fallback;
+        switch (r) {
+            case Reg::Pedal:
+                for (int i = 0; i < pedal::count(); ++i)
+                    if (id == pedal::at (i).id) return i;
+                break;
+            case Reg::Fx:
+                for (int i = 0; i < fxpedal::count(); ++i)
+                    if (id == fxpedal::at (i).id) return i;
+                break;
+            case Reg::Amp:
+                for (int i = 0; i < 3; ++i) if (id == kFixedAmps[i]) return i;
+                for (int i = 0; i < ampmodel::count(); ++i)
+                    if (id == ampmodel::at (i).id) return i + 3;
+                break;
+        }
+        return fallback;   // modello sparito: si tiene quello che c'era
+    }
 
     static juce::String stem (const juce::File& f) { return f.getFileNameWithoutExtension(); }
 
@@ -173,6 +231,35 @@ void PresetManager::notify()
     if (onChanged) juce::MessageManager::callAsync ([cb = onChanged]() { cb(); });
 }
 
+void PresetManager::writeModelIds (juce::XmlElement& dest) const
+{
+    auto* models = dest.createNewChildElement (kChildModels);
+    for (const auto& mp : kModelParams)
+        if (auto* v = apvts_.getRawParameterValue (mp.param)) {
+            auto* e = models->createNewChildElement (kModelEntry);
+            e->setAttribute ("p", mp.param);
+            e->setAttribute ("id", modelIdFor (mp.reg, (int) v->load()));
+        }
+}
+
+void PresetManager::applyModelIds (const juce::XmlElement& src)
+{
+    auto* models = src.getChildByName (kChildModels);
+    if (models == nullptr) return;          // preset vecchio: resta com'e'
+    for (auto* e : models->getChildWithTagNameIterator (kModelEntry)) {
+        const auto pid = e->getStringAttribute ("p");
+        const auto mid = e->getStringAttribute ("id");
+        const ModelParam* mp = nullptr;
+        for (const auto& c : kModelParams) if (pid == c.param) { mp = &c; break; }
+        if (mp == nullptr) continue;
+        auto* par = apvts_.getParameter (pid);
+        if (par == nullptr) continue;
+        const int cur = (int) par->convertFrom0to1 (par->getValue());
+        const int idx = modelIndexFor (mp->reg, mid, cur);
+        par->setValueNotifyingHost (par->convertTo0to1 ((float) idx));
+    }
+}
+
 juce::String PresetManager::serialize (const juce::String& name) const
 {
     juce::XmlElement root (kRoot);
@@ -196,6 +283,7 @@ juce::String PresetManager::serialize (const juce::String& name) const
         if (auto xml = state.createXml())
             params->addChildElement (xml.release());
     }
+    writeModelIds (root);
 
     return root.toString();
 }
@@ -215,12 +303,16 @@ bool PresetManager::applyXml (const juce::XmlElement& root, int bank)
     // ripiega sul banco A, che esiste sempre: meglio richiamare il preset nella
     // sua versione base che non richiamarlo affatto.
     const juce::XmlElement* paramXml = nullptr;
+    const juce::XmlElement* bankNode = nullptr;
     if (bank > 0) {
         if (auto* banks = root.getChildByName (kChildBanks)) {
             const auto letter = juce::String::charToString ((juce::juce_wchar) ('A' + bank));
             for (auto* b : banks->getChildWithTagNameIterator (kBank))
                 if (b->getStringAttribute (kAttrBankId) == letter) {
-                    paramXml = b->getFirstChildElement();
+                    bankNode = b;
+                    paramXml = b->getChildByName (kChildParams) != nullptr
+                             ? b->getChildByName (kChildParams)->getFirstChildElement()
+                             : b->getFirstChildElement();
                     break;
                 }
         }
@@ -235,6 +327,14 @@ bool PresetManager::applyXml (const juce::XmlElement& root, int bank)
         if (vt.isValid())
             apvts_.replaceState (vt);
     }
+
+    // I numeri appena caricati vanno riletti per nome: e' l'unica cosa che
+    // sopravvive all'aggiunta di modelli in mezzo agli elenchi. La variante ha
+    // i suoi, se li ha; altrimenti valgono quelli del preset.
+    if (bankNode != nullptr && bankNode->getChildByName (kChildModels) != nullptr)
+        applyModelIds (*bankNode);
+    else
+        applyModelIds (root);
 
     if (! effectiveLock)
     {
@@ -494,12 +594,13 @@ bool PresetManager::saveBank (const juce::String& name, int bank)
     if (! root || ! root->hasTagName (kRoot)) {
         // Preset nuovo: parte dallo stato corrente, che diventa anche il banco A.
         root = std::move (fresh);
-        if (bank == 0) { /* gia' scritto in <Parameters> */ }
+        if (bank == 0) { /* gia' scritto in <Parameters> e <Models> */ }
         else {
             auto* banks = root->createNewChildElement (kChildBanks);
             auto* b = banks->createNewChildElement (kBank);
             b->setAttribute (kAttrBankId, juce::String::charToString ((juce::juce_wchar) ('A' + bank)));
-            b->addChildElement (new juce::XmlElement (*freshParams->getFirstChildElement()));
+            b->addChildElement (new juce::XmlElement (*freshParams));
+            writeModelIds (*b);
         }
     } else {
         // Preset esistente: si sostituisce solo il banco richiesto, e si
@@ -516,6 +617,11 @@ bool PresetManager::saveBank (const juce::String& name, int bank)
         if (bank == 0) {
             root->removeChildElement (root->getChildByName (kChildParams), true);
             root->addChildElement (new juce::XmlElement (*freshParams));
+            // I nomi dei modelli vanno riscritti insieme ai parametri, o
+            // resterebbero quelli della versione precedente del banco.
+            root->removeChildElement (root->getChildByName (kChildModels), true);
+            if (auto* fm = fresh->getChildByName (kChildModels))
+                root->addChildElement (new juce::XmlElement (*fm));
         } else {
             auto* banks = root->getChildByName (kChildBanks);
             if (banks == nullptr) banks = root->createNewChildElement (kChildBanks);
@@ -526,7 +632,8 @@ bool PresetManager::saveBank (const juce::String& name, int bank)
             if (target != nullptr) banks->removeChildElement (target, true);
             auto* b = banks->createNewChildElement (kBank);
             b->setAttribute (kAttrBankId, letter);
-            b->addChildElement (new juce::XmlElement (*freshParams->getFirstChildElement()));
+            b->addChildElement (new juce::XmlElement (*freshParams));
+            writeModelIds (*b);
         }
     }
 
