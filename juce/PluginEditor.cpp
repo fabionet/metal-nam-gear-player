@@ -87,9 +87,9 @@ NAMAudioProcessorEditor::addKnob (const juce::String& paramId, const juce::Strin
 NAMAudioProcessorEditor::NAMAudioProcessorEditor (NAMAudioProcessor& p)
     : AudioProcessorEditor (&p), processorRef (p), presetPanel (p.getPresetManager())
 {
-    // Nessun modello ha ancora una memoria di accensione: finche' e' cosi', una
-    // sezione che cambia pedale tiene lo stato che aveva.
-    for (auto& v : modelPower_) v = -1;
+    // Nessun modello ha ancora una memoria: finche' e' cosi', una sezione che
+    // cambia pedale tiene la sua accensione e prende i valori di fabbrica.
+    for (auto& m : modelMemory_) m = PedalMemory{};
 
     setLookAndFeel (&lnf_);
 
@@ -752,7 +752,16 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
     const auto& m = pedal::at (idx);
     const bool changed = (idx != lastPedalModel_[slot]);
     lastPedalModel_[slot] = idx;
-    if (changed) applyRememberedPower (slot, idx);
+
+    // Riscrivere i comandi della sezione ha senso solo se il pedale l'ha scelto
+    // l'utente. Quando il cambio arriva dal ripristino di uno stato o dal
+    // caricamento di un preset, i valori giusti sono quelli appena caricati e
+    // sovrascriverli li perderebbe.
+    const bool byUser = pedalBox_[slot].userDriven;
+    pedalBox_[slot].userDriven = false;
+    const bool recall = changed && byUser;
+    if (recall) applyRememberedState (slot, idx);
+    const bool factory = recall && ! modelMemory_[idx].known;
 
     const char* prefix = pedalPrefix (slot);
     const int base = pedalKnobBase_[slot];
@@ -789,7 +798,7 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
             };
             kb->slider.updateText();
         }
-        if (used && changed) {
+        if (used && factory) {
             // Il parametro e' normalizzato: si riporta il predefinito reale.
             const auto& k = m.knobs[i];
             const float norm = (k.max > k.min) ? (k.def - k.min) / (k.max - k.min) : 0.f;
@@ -802,16 +811,28 @@ void NAMAudioProcessorEditor::refreshPedalSection (int slot)
     for (int i = 0; i < pedal::kMaxSwitch; ++i) {
         const bool used = (i < m.numSwitches);
         auto& cb = pedalSwitch_[slot][i];
-        if (used) {
-            const auto keep = cb.getSelectedItemIndex();
-            cb.clear (juce::dontSendNotification);
-            for (int o = 0; o < m.switches[i].numOptions; ++o)
-                cb.addItem (m.switches[i].options[o], o + 1);
-            cb.setSelectedItemIndex (juce::jlimit (0, m.switches[i].numOptions - 1,
-                                                   changed ? m.switches[i].def : keep),
-                                     juce::dontSendNotification);
-            pedalSwitchLabel_[slot][i].setText (m.switches[i].label, juce::dontSendNotification);
+        if (! used) continue;
+
+        const auto id = juce::String (prefix) + "_sw" + juce::String (i + 1);
+        if (factory) {
+            // Il valore va scritto nel parametro e non solo mostrato nella
+            // tendina: e' da li' che il DSP legge quale modo e' selezionato.
+            if (auto* p = processorRef.apvts.getParameter (id))
+                p->setValueNotifyingHost (p->convertTo0to1 ((float) m.switches[i].def));
         }
+
+        cb.clear (juce::dontSendNotification);
+        for (int o = 0; o < m.switches[i].numOptions; ++o)
+            cb.addItem (m.switches[i].options[o], o + 1);
+
+        // La tendina rispecchia il parametro, sempre: e' l'unica fonte buona,
+        // sia che il valore venga dalla memoria del pedale, dal preset o dai
+        // predefiniti appena scritti.
+        int cur = 0;
+        if (auto* v = processorRef.apvts.getRawParameterValue (id)) cur = (int) v->load();
+        cb.setSelectedItemIndex (juce::jlimit (0, m.switches[i].numOptions - 1, cur),
+                                 juce::dontSendNotification);
+        pedalSwitchLabel_[slot][i].setText (m.switches[i].label, juce::dontSendNotification);
     }
     // Il tasto prende il nome dal pedale scelto, non dalla sezione. Si cambia
     // solo il testo: lo stato acceso/spento e' un parametro e non si tocca,
@@ -840,31 +861,72 @@ juce::TextButton* NAMAudioProcessorEditor::pedalBypassButton (int slot)
     return nullptr;
 }
 
-// Un pedale acceso in una sezione, richiamato in un'altra, ci arriva acceso:
-// e' lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
-// La memoria e' per modello e non per slot, cosi' funziona anche quando il
-// pedale e' stato prima tolto di dove stava e poi ripreso altrove.
-void NAMAudioProcessorEditor::rememberPedalPower()
+// Un pedale richiamato in un'altra sezione ci arriva com'era: stessi valori,
+// stesso interruttore, stessa accensione. E' lo stesso effetto spostato o
+// duplicato, non un altro che comincia da zero.
+//
+// La memoria e' per MODELLO e non per slot, perche' deve funzionare anche
+// quando il pedale viene prima tolto di dove stava e poi ripreso altrove: al
+// momento in cui lo si richiama, la sezione di partenza non lo ha piu'.
+void NAMAudioProcessorEditor::rememberPedalState()
 {
     for (int slot = 0; slot < kPedalSlots; ++slot) {
         const int idx = lastPedalModel_[slot];
         if (idx < 0 || idx >= pedal::count()) continue;
-        if (auto* v = processorRef.apvts.getRawParameterValue (
-                juce::String (pedalPrefix (slot)) + "_bypass"))
-            modelPower_[idx] = (v->load() > 0.5f) ? 0 : 1;
+        const juce::String pre (pedalPrefix (slot));
+
+        SlotSnapshot now;
+        now.valid = true;
+        now.model = idx;
+        if (auto* v = processorRef.apvts.getRawParameterValue (pre + "_bypass"))
+            now.power = (v->load() > 0.5f) ? 0 : 1;
+        for (int i = 0; i < pedal::kMaxKnobs; ++i)
+            if (auto* v = processorRef.apvts.getRawParameterValue (pre + "_p" + juce::String (i + 1)))
+                now.knobs[i] = v->load();
+        for (int i = 0; i < pedal::kMaxSwitch; ++i)
+            if (auto* v = processorRef.apvts.getRawParameterValue (pre + "_sw" + juce::String (i + 1)))
+                now.sw[i] = (int) v->load();
+
+        // Solo la sezione che e' cambiata aggiorna la memoria del pedale: cosi'
+        // con lo stesso pedale in due sezioni comanda quella che si sta
+        // regolando, e l'altra, ferma, non la sovrascrive.
+        const auto& was = slotSeen_[slot];
+        bool mosso = ! was.valid || was.model != now.model || was.power != now.power;
+        for (int i = 0; ! mosso && i < pedal::kMaxKnobs;  ++i) mosso = (was.knobs[i] != now.knobs[i]);
+        for (int i = 0; ! mosso && i < pedal::kMaxSwitch; ++i) mosso = (was.sw[i]    != now.sw[i]);
+        slotSeen_[slot] = now;
+        if (! mosso) continue;
+
+        auto& mem = modelMemory_[idx];
+        mem.power = now.power;
+        for (int i = 0; i < pedal::kMaxKnobs;  ++i) mem.knobs[i] = now.knobs[i];
+        for (int i = 0; i < pedal::kMaxSwitch; ++i) mem.sw[i]    = now.sw[i];
+        mem.known = true;
     }
 }
 
-// Un modello mai visto non ha memoria: in quel caso la sezione tiene lo stato
-// che aveva, che e' la regola per un pedale qualunque.
-void NAMAudioProcessorEditor::applyRememberedPower (int slot, int modelIdx)
+// Un modello mai visto non ha memoria: in quel caso la sezione tiene la sua
+// accensione e i pomelli partono dai valori di fabbrica del pedale.
+void NAMAudioProcessorEditor::applyRememberedState (int slot, int modelIdx)
 {
     if (modelIdx < 0 || modelIdx >= pedal::count()) return;
-    const int want = modelPower_[modelIdx];
-    if (want < 0) return;
-    if (auto* p = processorRef.apvts.getParameter (
-            juce::String (pedalPrefix (slot)) + "_bypass"))
-        p->setValueNotifyingHost (want == 1 ? 0.f : 1.f);   // bypass = non acceso
+    const auto& mem = modelMemory_[modelIdx];
+    if (! mem.known) return;
+    const auto& m = pedal::at (modelIdx);
+    const juce::String pre (pedalPrefix (slot));
+
+    if (mem.power >= 0)
+        if (auto* p = processorRef.apvts.getParameter (pre + "_bypass"))
+            p->setValueNotifyingHost (mem.power == 1 ? 0.f : 1.f);   // bypass = non acceso
+
+    for (int i = 0; i < m.numKnobs; ++i)
+        if (auto* p = processorRef.apvts.getParameter (pre + "_p" + juce::String (i + 1)))
+            p->setValueNotifyingHost (juce::jlimit (0.f, 1.f, mem.knobs[i]));
+
+    for (int i = 0; i < m.numSwitches; ++i)
+        if (auto* p = processorRef.apvts.getParameter (pre + "_sw" + juce::String (i + 1)))
+            p->setValueNotifyingHost (p->convertTo0to1 ((float) juce::jlimit (0, m.switches[i].numOptions - 1,
+                                                                             mem.sw[i])));
 }
 
 // La sezione prende il nome dal pedale che ci sta dentro: sostituendo
@@ -918,7 +980,7 @@ std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
 
 void NAMAudioProcessorEditor::timerCallback()
 {
-    rememberPedalPower();
+    rememberPedalState();
     updateSlimEnabled();
     updateTubeIndicator();
     updateLoadStatus();

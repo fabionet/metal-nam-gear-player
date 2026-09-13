@@ -66,7 +66,9 @@ Scegliendo un pedale la sezione si **ripopola**: restano solo i pomelli e gli in
 Sull'acceso/spento valgono due regole, e non si contraddicono:
 
 - scegli un pedale **mai usato finora**: la sezione tiene lo stato che aveva. Se era spenta resta spenta.
-- richiami un pedale **già presente o già usato** in un'altra sezione: arriva com'era. Se lì era acceso, si accende anche qui. È lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
+- richiami un pedale **già presente o già usato** in un'altra sezione: arriva com'era — stessi valori dei pomelli, stesso interruttore, stessa accensione. È lo stesso effetto spostato o duplicato, non un altro che comincia da zero.
+
+Con lo stesso pedale in due sezioni, quella che comanda è **l'ultima che hai regolato**: la copia ferma non sovrascrive quella su cui stai lavorando.
 
 La sola **torre di tono dell'amplificatore** non si duplica: è una e sta nella sezione EQ. Sceglierla altrove lascia la sezione senza comandi, e te lo dice.
 

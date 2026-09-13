@@ -60,6 +60,22 @@ public:
 
     // Small gain-reduction readout for the COMP section. Polled at 15 Hz.
     // Shows GR in dB as a vertical bar filling bottom-to-top with depth.
+    // Una tendina che sa dire se il cambio l'ha chiesto l'utente. Serve perche'
+    // scegliere un pedale a mano riscrive i comandi della sezione, mentre un
+    // cambio che arriva dal ripristino di uno stato o dal caricamento di un
+    // preset deve lasciare intatti i valori appena caricati.
+    class PedalBox : public juce::ComboBox
+    {
+    public:
+        bool userDriven = false;
+        void showPopup() override { userDriven = true; juce::ComboBox::showPopup(); }
+        bool keyPressed (const juce::KeyPress& k) override
+        { userDriven = true; return juce::ComboBox::keyPressed (k); }
+        void mouseWheelMove (const juce::MouseEvent& e,
+                             const juce::MouseWheelDetails& w) override
+        { userDriven = true; juce::ComboBox::mouseWheelMove (e, w); }
+    };
+
     class GrMeterComponent : public juce::Component, private juce::Timer
     {
     public:
@@ -213,7 +229,7 @@ private:
     // Menu dei pedali sopra al titolo, riserva di pomelli e interruttori.
     // Slot: 0 OVERDRIVE, 1 DISTORTION, 2 NGATE, 3 GATE.
     static constexpr int kPedalSlots = 6;
-    juce::ComboBox pedalBox_[kPedalSlots];
+    PedalBox pedalBox_[kPedalSlots];
     std::unique_ptr<CAtt> pedalAtt_[kPedalSlots];
     juce::ComboBox pedalSwitch_[kPedalSlots][pedal::kMaxSwitch];
     std::unique_ptr<CAtt> pedalSwitchAtt_[kPedalSlots][pedal::kMaxSwitch];
@@ -234,11 +250,35 @@ private:
     // il nome sul tasto sono la stessa cosa.
     juce::String pedalSectionTitle (int slot) const;
 
-    // Accensione ricordata per modello: -1 mai vista, 0 spento, 1 acceso.
-    // Serve a far ritrovare un pedale com'era quando lo si richiama altrove.
-    int  modelPower_[64];   // indicizzato per modello; il registro ne ha assai meno
-    void rememberPedalPower();
-    void applyRememberedPower (int slot, int modelIdx);
+    // Come si e' lasciato un pedale, ricordato per MODELLO e non per sezione:
+    // richiamandolo altrove lo si ritrova com'era, accensione compresa. I
+    // valori sono quelli normalizzati 0..1 della riserva, quindi si spostano
+    // fra sezioni senza conversioni.
+    struct PedalMemory
+    {
+        bool  known = false;
+        int   power = -1;                       // -1 mai visto, 0 spento, 1 acceso
+        float knobs[pedal::kMaxKnobs] {};
+        int   sw[pedal::kMaxSwitch] {};
+    };
+    PedalMemory modelMemory_[64];               // il registro ha molti meno modelli
+
+    // Istantanea di cosa aveva ogni sezione al giro precedente. Serve a capire
+    // quale copia di un pedale e' stata toccata davvero: con lo stesso pedale in
+    // due sezioni, la memoria deve seguire quella che l'utente sta regolando,
+    // non l'ultima che capita nel ciclo.
+    struct SlotSnapshot
+    {
+        bool  valid = false;
+        int   model = -1;
+        int   power = -1;
+        float knobs[pedal::kMaxKnobs] {};
+        int   sw[pedal::kMaxSwitch] {};
+    };
+    SlotSnapshot slotSeen_[kPedalSlots];
+
+    void rememberPedalState();
+    void applyRememberedState (int slot, int modelIdx);
     bool lcdInline_ = true;   // falso quando il display scende sotto le schede
 
     void browseIR2();
