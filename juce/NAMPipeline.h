@@ -14,6 +14,7 @@
 #include "IRConvolver.h"
 #include "PreampFX.h"
 #include "PedalDSP.h"
+#include "FxDSP.h"
 #include "NativeAmp.h"
 #include "MarshallAmp.h"
 #include "Biquad.h"
@@ -92,6 +93,18 @@ public:
         p.setBypass (byp);
         p.commit();
     }
+    // Pedali della scheda FX. Slot: 0 DELAY, 1 CHORUS, 2 FLANGER, 3 REVERB,
+    // 4 TREMOLO, nell'ordine in cui stanno nella coda della catena.
+    void setFxPedal (int slot, int model, const float* knobs, const int* switches, bool byp)
+    {
+        fxpedal::FxFX& p = fxPedals_[(std::size_t) (slot < 0 ? 0 : (slot > 4 ? 4 : slot))];
+        p.setModel (model);
+        for (int i = 0; i < fxpedal::kMaxKnobs;  ++i) p.setKnob   (i, knobs[i]);
+        for (int i = 0; i < fxpedal::kMaxSwitch; ++i) p.setSwitch (i, switches[i]);
+        p.setBypass (byp);
+        p.commit();
+    }
+
     void setHighPass(float freqHz, bool byp)
     { hp_.setFreqHz(freqHz); hp_.setBypass(byp); }
     void setLoudnessNorm(bool enabled, float targetDB)
@@ -111,16 +124,6 @@ public:
     // ospita l'equalizzatore, cosi' nello spettro si vede l'effetto della sua
     // curva. 5 e' lo slot EQ, cioe' il comportamento di sempre.
     void setScopeSlot (int slot) { scopeSlot_.store (slot); }
-    void setDelay(float timeMs, float feedback, float mix, bool byp)
-    { delay_.setTimeMs(timeMs); delay_.setFeedback(feedback); delay_.setMix(mix); delay_.setBypass(byp); }
-    void setChorus(float rateHz, float depth, float mix, bool byp)
-    { chorus_.setRateHz(rateHz); chorus_.setDepth(depth); chorus_.setMix(mix); chorus_.setBypass(byp); }
-    void setFlanger(float rateHz, float depth, float feedback, float mix, bool byp)
-    { flanger_.setRateHz(rateHz); flanger_.setDepth(depth); flanger_.setFeedback(feedback); flanger_.setMix(mix); flanger_.setBypass(byp); }
-    void setReverb(float room, float damping, float mix, bool byp)
-    { reverb_.setRoomSize(room); reverb_.setDamping(damping); reverb_.setMix(mix); reverb_.setBypass(byp); }
-    void setTremolo(float rateHz, float depth, float shape, bool byp)
-    { tremolo_.setRateHz(rateHz); tremolo_.setDepth(depth); tremolo_.setShape(shape); tremolo_.setBypass(byp); }
     void setIRTools(float hpFreqHz, bool hpBypass,
                     float lpFreqHz, bool lpBypass,
                     float trimDb,   bool phaseInv);
@@ -211,15 +214,11 @@ private:
     std::atomic<int>         compPos_ { 0 };
     std::atomic<int>         scopeSlot_ { 5 };
     preamp_fx::SmartGate     gate_;
-    pedal::PedalFX  pedals_[6];   // od, dist, ngate, gate, comp, eq
+    pedal::PedalFX  pedals_[6];     // od, dist, ngate, gate, comp, eq
+    fxpedal::FxFX   fxPedals_[5];   // delay, chorus, flanger, reverb, tremolo
     preamp_fx::HighPass      hp_;
     preamp_fx::LoudnessNorm  loud_;
     preamp_fx::NoiseGate     ng_;
-    preamp_fx::DelayFX       delay_;
-    preamp_fx::ChorusFX      chorus_;
-    preamp_fx::FlangerFX     flanger_;
-    preamp_fx::ReverbFX      reverb_;
-    preamp_fx::TremoloFX     tremolo_;
 
     // IR post-processing tools (Fase 2a).
     preamp_fx::NativeAmp     amp_;

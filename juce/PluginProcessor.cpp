@@ -37,6 +37,11 @@ namespace ids {
     constexpr auto gateModel     = "gate_model";
     constexpr auto compModel     = "comp_model";
     constexpr auto eqModel       = "eq_model";
+    constexpr auto fxDelModel    = "fxdel_model";
+    constexpr auto fxChModel     = "fxch_model";
+    constexpr auto fxFlModel     = "fxfl_model";
+    constexpr auto fxRvModel     = "fxrv_model";
+    constexpr auto fxTrModel     = "fxtr_model";
     constexpr auto modelBypass   = "model_bypass";
     // Pre-FX
     constexpr auto gateBypass    = "gate_bypass";
@@ -49,27 +54,11 @@ namespace ids {
     // NoiseGate (pre-chain)
     constexpr auto ngBypass      = "ng_bypass";
     // Post-cab FX
-    constexpr auto delTime       = "delay_time_ms";
-    constexpr auto delFb         = "delay_feedback";
-    constexpr auto delMix        = "delay_mix";
     constexpr auto delBypass     = "delay_bypass";
-    constexpr auto chRate        = "chorus_rate_hz";
-    constexpr auto chDepth       = "chorus_depth";
-    constexpr auto chMix         = "chorus_mix";
     constexpr auto chBypass      = "chorus_bypass";
-    constexpr auto flRate        = "flanger_rate_hz";
-    constexpr auto flDepth       = "flanger_depth";
-    constexpr auto flFb          = "flanger_feedback";
-    constexpr auto flMix         = "flanger_mix";
     constexpr auto flBypass      = "flanger_bypass";
-    constexpr auto rvRoom        = "reverb_room";
-    constexpr auto rvDamping     = "reverb_damping";
-    constexpr auto rvMix         = "reverb_mix";
     constexpr auto rvBypass      = "reverb_bypass";
     // Tremolo
-    constexpr auto trRate        = "tremolo_rate_hz";
-    constexpr auto trDepth       = "tremolo_depth";
-    constexpr auto trShape       = "tremolo_shape";
     constexpr auto trBypass      = "tremolo_bypass";
     // IR tools (Fase 2a)
     constexpr auto irHpFreq      = "ir_hp_freq";
@@ -201,6 +190,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
         add (std::make_unique<C>(juce::ParameterID{ids::eqModel,1},   "EQ Model",   names,
                                  pedal::indexOf ("eq_tonestack")));
     }
+    // Le sezioni della scheda FX pescano dal loro elenco, e partono ognuna
+    // sull'effetto che quella sezione ha sempre avuto.
+    {
+        juce::StringArray names;
+        for (int i = 0; i < fxpedal::count(); ++i) names.add (fxpedal::at (i).name);
+        add (std::make_unique<C>(juce::ParameterID{ids::fxDelModel,1}, "Delay Model",   names, fxpedal::indexOf ("dl_std")));
+        add (std::make_unique<C>(juce::ParameterID{ids::fxChModel,1},  "Chorus Model",  names, fxpedal::indexOf ("ch_std")));
+        add (std::make_unique<C>(juce::ParameterID{ids::fxFlModel,1},  "Flanger Model", names, fxpedal::indexOf ("fl_std")));
+        add (std::make_unique<C>(juce::ParameterID{ids::fxRvModel,1},  "Reverb Model",  names, fxpedal::indexOf ("rv_std")));
+        add (std::make_unique<C>(juce::ParameterID{ids::fxTrModel,1},  "Tremolo Model", names, fxpedal::indexOf ("tr_std")));
+    }
+    for (const char* pre : { "fxdel", "fxch", "fxfl", "fxrv", "fxtr" }) {
+        for (int i = 1; i <= fxpedal::kMaxKnobs; ++i)
+            add (std::make_unique<P>(juce::ParameterID{juce::String (pre) + "_p" + juce::String (i), 1},
+                                     juce::String (pre).toUpperCase() + " P" + juce::String (i),
+                                     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
+        for (int i = 1; i <= fxpedal::kMaxSwitch; ++i)
+            add (std::make_unique<C>(juce::ParameterID{juce::String (pre) + "_sw" + juce::String (i), 1},
+                                     juce::String (pre).toUpperCase() + " SW" + juce::String (i),
+                                     juce::StringArray{"0","1","2","3"}, 0));
+    }
     for (const char* pre : { "od", "dist", "ng", "gate", "comp", "eq" }) {
         for (int i = 1; i <= pedal::kMaxKnobs; ++i)
             add (std::make_unique<P>(juce::ParameterID{juce::String (pre) + "_p" + juce::String (i), 1},
@@ -222,34 +232,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout NAMAudioProcessor::createPar
     add (std::make_unique<B>(juce::ParameterID{ids::ngBypass,1},  "NG Bypass",    false));
 
     // Delay
-    add (std::make_unique<P>(juce::ParameterID{ids::delTime,1},   "Delay Time",     juce::NormalisableRange<float>(10.f, 2000.f, 1.f, 0.5f), 350.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::delFb,1},     "Delay Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.35f));
-    add (std::make_unique<P>(juce::ParameterID{ids::delMix,1},    "Delay Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::delBypass,1}, "Delay Bypass",   true));
 
     // Chorus
-    add (std::make_unique<P>(juce::ParameterID{ids::chRate,1},   "Chorus Rate",  juce::NormalisableRange<float>(0.05f, 6.f, 0.001f, 0.5f), 0.8f));
-    add (std::make_unique<P>(juce::ParameterID{ids::chDepth,1},  "Chorus Depth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.4f));
-    add (std::make_unique<P>(juce::ParameterID{ids::chMix,1},    "Chorus Mix",   juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.3f));
     add (std::make_unique<B>(juce::ParameterID{ids::chBypass,1}, "Chorus Bypass",true));
 
     // Flanger
-    add (std::make_unique<P>(juce::ParameterID{ids::flRate,1},   "Flanger Rate",     juce::NormalisableRange<float>(0.05f, 6.f, 0.001f, 0.5f), 0.3f));
-    add (std::make_unique<P>(juce::ParameterID{ids::flDepth,1},  "Flanger Depth",    juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-    add (std::make_unique<P>(juce::ParameterID{ids::flFb,1},     "Flanger Feedback", juce::NormalisableRange<float>(0.f, 0.9f, 0.001f), 0.4f));
-    add (std::make_unique<P>(juce::ParameterID{ids::flMix,1},    "Flanger Mix",      juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::flBypass,1}, "Flanger Bypass",   true));
 
     // Reverb
-    add (std::make_unique<P>(juce::ParameterID{ids::rvRoom,1},    "Reverb Room",    juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-    add (std::make_unique<P>(juce::ParameterID{ids::rvDamping,1}, "Reverb Damping", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-    add (std::make_unique<P>(juce::ParameterID{ids::rvMix,1},     "Reverb Mix",     juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.25f));
     add (std::make_unique<B>(juce::ParameterID{ids::rvBypass,1},  "Reverb Bypass",  true));
 
     // Tremolo
-    add (std::make_unique<P>(juce::ParameterID{ids::trRate,1},   "Tremolo Rate",  juce::NormalisableRange<float>(0.05f, 20.f, 0.01f, 0.3f), 4.f));
-    add (std::make_unique<P>(juce::ParameterID{ids::trDepth,1},  "Tremolo Depth", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.5f));
-    add (std::make_unique<P>(juce::ParameterID{ids::trShape,1},  "Tremolo Shape", juce::NormalisableRange<float>(0.f, 1.f, 0.001f), 0.f));
     add (std::make_unique<B>(juce::ParameterID{ids::trBypass,1}, "Tremolo Bypass", true));
 
     // IR tools
@@ -454,6 +448,30 @@ void NAMAudioProcessor::pushParametersToPipelines()
             fill (kSlotPrefix[sl], pedModel[sl], pedKnobs[sl], pedSwitch[sl]);
         }
     }
+    // Stessa conversione per le sezioni della scheda FX, che pescano dal loro
+    // elenco e hanno una riserva piu' corta.
+    static const char* kFxPrefix[5] = { "fxdel", "fxch", "fxfl", "fxrv", "fxtr" };
+    const char* kFxModelId[5] = { ids::fxDelModel, ids::fxChModel, ids::fxFlModel,
+                                  ids::fxRvModel, ids::fxTrModel };
+    int   fxModel [5] {};
+    float fxKnobs [5][fxpedal::kMaxKnobs] {};
+    int   fxSwitch[5][fxpedal::kMaxSwitch] {};
+    for (int sl = 0; sl < 5; ++sl) {
+        fxModel[sl] = juce::jlimit (0, fxpedal::count() - 1,
+                                    (int) apvts.getRawParameterValue (kFxModelId[sl])->load());
+        const auto& fm = fxpedal::at (fxModel[sl]);
+        for (int i = 0; i < fxpedal::kMaxKnobs; ++i) {
+            const auto id = juce::String (kFxPrefix[sl]) + "_p" + juce::String (i + 1);
+            const float norm = apvts.getRawParameterValue (id)->load();
+            const auto& k = fm.knobs[i];
+            fxKnobs[sl][i] = (i < fm.numKnobs) ? (k.min + norm * (k.max - k.min)) : 0.f;
+        }
+        for (int i = 0; i < fxpedal::kMaxSwitch; ++i) {
+            const auto id = juce::String (kFxPrefix[sl]) + "_sw" + juce::String (i + 1);
+            fxSwitch[sl][i] = (int) apvts.getRawParameterValue (id)->load();
+        }
+    }
+
     // Nella sezione EQ lavora un equalizzatore solo: scegliendo un pedale, la
     // torre di tono nativa va piatta, altrimenti le due curve si sommerebbero.
     if (pedal::at (pedModel[5]).topo != pedal::Topology::EqNative)
@@ -482,26 +500,10 @@ void NAMAudioProcessor::pushParametersToPipelines()
     const float lnT = apvts.getRawParameterValue (ids::lnTargetDB)->load();
 
     const bool  ngBp = apvts.getRawParameterValue (ids::ngBypass)->load() > 0.5f;
-    const float dT  = apvts.getRawParameterValue (ids::delTime)->load();
-    const float dFb = apvts.getRawParameterValue (ids::delFb)->load();
-    const float dMx = apvts.getRawParameterValue (ids::delMix)->load();
     const bool  dBp = apvts.getRawParameterValue (ids::delBypass)->load() > 0.5f;
-    const float cR  = apvts.getRawParameterValue (ids::chRate)->load();
-    const float cD  = apvts.getRawParameterValue (ids::chDepth)->load();
-    const float cMx = apvts.getRawParameterValue (ids::chMix)->load();
     const bool  cBp = apvts.getRawParameterValue (ids::chBypass)->load() > 0.5f;
-    const float fR  = apvts.getRawParameterValue (ids::flRate)->load();
-    const float fD  = apvts.getRawParameterValue (ids::flDepth)->load();
-    const float fFb = apvts.getRawParameterValue (ids::flFb)->load();
-    const float fMx = apvts.getRawParameterValue (ids::flMix)->load();
     const bool  fBp = apvts.getRawParameterValue (ids::flBypass)->load() > 0.5f;
-    const float rvRm = apvts.getRawParameterValue (ids::rvRoom)->load();
-    const float rvDp = apvts.getRawParameterValue (ids::rvDamping)->load();
-    const float rvMx = apvts.getRawParameterValue (ids::rvMix)->load();
     const bool  rvBp = apvts.getRawParameterValue (ids::rvBypass)->load() > 0.5f;
-    const float trRt = apvts.getRawParameterValue (ids::trRate)->load();
-    const float trDp = apvts.getRawParameterValue (ids::trDepth)->load();
-    const float trSh = apvts.getRawParameterValue (ids::trShape)->load();
     const bool  trBp = apvts.getRawParameterValue (ids::trBypass)->load() > 0.5f;
     const float irHp  = apvts.getRawParameterValue (ids::irHpFreq)->load();
     const bool  irHpB = apvts.getRawParameterValue (ids::irHpBypass)->load() > 0.5f;
@@ -575,11 +577,9 @@ void NAMAudioProcessor::pushParametersToPipelines()
         p.setScopeSlot (scopeSlot);
         p.setHighPass (hpF, hpBp);
         p.setLoudnessNorm (lnOn, lnT);
-        p.setDelay     (dT, dFb, dMx, dBp);
-        p.setChorus    (cR, cD, cMx, cBp);
-        p.setFlanger   (fR, fD, fFb, fMx, fBp);
-        p.setReverb    (rvRm, rvDp, rvMx, rvBp);
-        p.setTremolo   (trRt, trDp, trSh, trBp);
+        const bool fxBypass[5] = { dBp, cBp, fBp, rvBp, trBp };
+        for (int sl = 0; sl < 5; ++sl)
+            p.setFxPedal (sl, fxModel[sl], fxKnobs[sl], fxSwitch[sl], fxBypass[sl]);
         p.setIRTools   (irHp, irHpB, irLp, irLpB, irTr, irPhi);
         p.setOutputMode (static_cast<NAMPipeline::OutputMode>(outMd));
         p.setCalibrateInput (calIn);
