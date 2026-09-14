@@ -22,8 +22,6 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 **MAIN tab** — Noise Gate, Comp, Overdrive/Distortion, Splitter, Amp, EQ **con analizzatore di spettro e bande trascinabili**, Power, Cab, IR Tools **con IR BAL**, Master. Sei sezioni hanno sotto al titolo la **tendina dei pedali**, con un elenco unico diviso per categoria. In alto il **display LCD** con banchi, TAP e metronomo; in basso i **due caricatori IR** con volumi e meter separati.
 
-> Nello scatto il modello caricato è un ENGL `amp_cab`, che contiene già la cassa: per questo la sezione **CAB** e il **primo caricatore IR** sono spenti e attenuati: è l'esclusione automatica, non un difetto. Il secondo caricatore resta attivo con la sua IR.
-
 ![MAIN tab](docs/screenshots/main_tab.png)
 
 **FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
@@ -38,9 +36,21 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ![AMP SIM (MARCHELLOW) tab](docs/screenshots/ampsim2_tab.png)
 
+**AMP SIM (MAUSE RECTIFIER) tab** — due canali con comandi indipendenti, modi per canale, raddrizzatore a valvole o diodi e variac Bold/Spongy. Accanto al selettore è scritto a quale testa reale si ispira quella scelta:
+
+![AMP SIM (MAUSE RECTIFIER) tab](docs/screenshots/ampsim3_tab.png)
+
+**AMP SIM — le teste a riserva condivisa** — sei modelli che si rietichettano da soli, qui quello a quattro canali separati. I comandi del canale che non suona restano visibili ma attenuati:
+
+![AMP SIM (testa a riserva condivisa)](docs/screenshots/ampsim4_tab.png)
+
 **CATENA tab** — mappa del percorso del segnale; il nodo **CAB 2** compare quando il secondo IR è attivo:
 
 ![CATENA tab](docs/screenshots/catena_tab.png)
+
+**Pannello dei preset** — le varianti disponibili di ogni preset compaiono accanto al nome; un clic solo sceglie il bersaglio di salva ed elimina, il doppio clic carica:
+
+![Pannello dei preset](docs/screenshots/preset_panel.png)
 
 ## Features
 

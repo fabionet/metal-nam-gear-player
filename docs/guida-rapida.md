@@ -22,6 +22,13 @@ Gli host vedono il plugin come **Metal NAM Gear Players Neo**; il titolo nell'in
 
 ## 2. Prima sessione
 
+La scheda **MAIN** è la catena principale: dai due gate all'uscita, con le
+sezioni a pedale, lo splitter, l'amplificatore, l'equalizzatore con
+l'analizzatore, la cassa e gli strumenti IR. In alto il display, in basso i due
+caricatori.
+
+![Scheda MAIN](screenshots/main_tab.png)
+
 1. Fai partire il DAW a **48 kHz** (i modelli NAM sono generalmente allenati a 48 kHz).
 2. Inserisci **Metal NAM Gear Players Neo** su una traccia con una chitarra DI (segnale pulito direct-in).
 3. Clicca sul loader **MODEL** e apri un file `.nam` (V1 o A2). Trovi modelli gratuiti su [Tone3000](https://www.tone3000.com/).
@@ -57,6 +64,8 @@ Il secondo si accende da solo passando a **Dual-Mono** o **Stereo**, dove serve 
 
 ## 4-ter. Il menu dei pedali
 
+![Le tendine sotto al titolo delle sezioni](screenshots/pedali_detail.png)
+
 Sotto al titolo delle sezioni **NGATE**, **GATE**, **COMP**, **OVERDRIVE**, **DISTORTION** ed **EQ** c'è una tendina con l'elenco dei pedali emulabili. L'elenco è **lo stesso in tutte**, raggruppato per categoria: Overdrive, Distortion, High Gain, Fuzz, Booster, Gate / Noise, Equalizer, Compressor.
 
 Gli elenchi contengono due serie: quella costruita sugli schemi della casa giapponese (compresa la serie artigianale) e una seconda che raccoglie le altre scuole — il roditore col suo op-amp spinto, i quattro stadi in cascata della scuola newyorkese, le due bande separate della scuola americana da studio, e i circuiti silenziosissimi della scuola inglese su misura. Nomi evocativi e non marchi, topologie vere.
@@ -86,6 +95,8 @@ Le sezioni che gestiscono **IR**, **AMP** e **MASTER** non hanno la tendina: non
 
 ## 4-quater. Analizzatore dell'equalizzatore
 
+![La sezione dell'equalizzatore con l'analizzatore](screenshots/eq_detail.png)
+
 Dove metti un equalizzatore, fra i comandi e il tasto di attivazione compare un analizzatore di spettro con sopra la sua curva. Il segnale è prelevato **subito dopo quella sezione**, quindi vedi l'effetto della curva anche se hai spostato l'equalizzatore all'inizio della catena. Sostituendo l'equalizzatore con un altro pedale l'analizzatore sparisce insieme a lui.
 
 Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e compare la lettura del valore. Quali maniglie vedi dipende dall'equalizzatore scelto:
@@ -98,6 +109,8 @@ Ogni banda ha una maniglia colorata: trascinala in verticale per il guadagno, e 
 
 ## 4-quinquies. Il terzo amplificatore: MAUSE RECTIFIER
 
+![MAUSE RECTIFIER](screenshots/ampsim3_tab.png)
+
 Nella scheda **AMP SIM** il menu degli amplificatori ha ora tre voci. La terza è un **due canali americano** con tutti i comandi dell'originale: Gain, Treble, Mid, Bass, Presence e Master **indipendenti per canale**, il modo di ciascun canale (Clean, Vintage, Modern), il selettore di canale, il raddrizzatore a valvole o a diodi e l'interruttore Bold/Spongy.
 
 Due cose che cambiano davvero il suono e non solo il nome:
@@ -108,6 +121,8 @@ Due cose che cambiano davvero il suono e non solo il nome:
 I pomelli del canale non selezionato restano visibili ma attenuati, così si vedono le regolazioni dell'altro senza confonderle con quelle che stanno suonando.
 
 ## 4-sexies. Le altre sei teste
+
+![Una testa a riserva condivisa](screenshots/ampsim4_tab.png)
 
 Il menu degli amplificatori ne conta ora nove. Le prime tre hanno una pagina
 disegnata su misura; le altre sei condividono una riserva di comandi e si
@@ -130,7 +145,24 @@ I comandi del canale che non sta suonando restano visibili ma attenuati, così
 si vedono le regolazioni degli altri senza confonderle con quelle attive. Anche
 queste teste si accendono una per volta, come le prime tre.
 
+## 4-septies. Gli altri due amplificatori
+
+Il primo, di voce originale, e il secondo sulla scia della testa britannica:
+
+![GEAR SX](screenshots/ampsim_tab.png)
+
+![MARCHELLOW](screenshots/ampsim2_tab.png)
+
 ## 5. Catena effetti
+
+Le cinque sezioni della scheda **FX**, ognuna con la sua tendina:
+
+![Scheda FX](screenshots/fx_tab.png)
+
+La scheda **CATENA** disegna il percorso del segnale e mostra quali stadi sono
+accesi:
+
+![Scheda CATENA](screenshots/catena_tab.png)
 
 Ordine di segnale:
 
@@ -149,6 +181,8 @@ Sei di questi stadi — NGATE, GATE, COMP, OVERDRIVE, DISTORTION, EQ — sono **
 I toggle di bypass sono nel footer (checked = **attivo**, unchecked = bypass).
 
 ## 6. Preset
+
+![Pannello dei preset](screenshots/preset_panel.png)
 
 **Un clic solo sceglie il bersaglio** di salva ed elimina, e quei due tasti si accendono subito: non serve più richiamare il preset per poterlo sovrascrivere o cancellare, cosa che cambiava il suono sotto le dita solo per arrivare al tasto. Il **doppio clic** resta quello che lo carica davvero. Sui preset di fabbrica salva ed elimina restano spenti: quelli non si toccano.
 
