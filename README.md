@@ -18,6 +18,16 @@ Gli host lo vedono come **"Metal NAM Gear Players Neo"**.
 
 ![MAIN tab](docs/screenshots/main-tab.png)
 
+**AMP SIM** — nove amplificatori, con accanto al selettore la testa reale a cui si ispira quello scelto:
+
+![MAUSE RECTIFIER](docs/screenshots/ampsim3-tab.png)
+
+![Testa a riserva condivisa](docs/screenshots/ampsim4-tab.png)
+
+**Pannello dei preset** — le varianti compaiono accanto al nome:
+
+![Pannello dei preset](docs/screenshots/preset-panel.png)
+
 **FX tab** — Delay, Chorus, Flanger, Reverb, Tremolo (post-cab effects):
 
 ![FX tab](docs/screenshots/fx-tab.png)
