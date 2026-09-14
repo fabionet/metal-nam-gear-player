@@ -117,6 +117,13 @@ public:
     // Compressor gain-reduction (dB, <= 0), updated at every processBlock.
     // Riduzione di guadagno per slot: il compressore puo' stare in qualunque
     // sezione, e il misuratore va mostrato dov'e' lui.
+    // Vero per un percorso LOCALE. Rifiuta i percorsi UNC, quelli di device NT
+    // e gli schemi di rete: e' la guardia contro il furto di credenziali
+    // NetNTLM, e vale per il modello, l'IR e il secondo IR. Pubblica perche' la
+    // usa anche il gestore dei preset: due definizioni diverse di "sicuro"
+    // finiscono per non essere d'accordo.
+    static bool isLocalSafePath (const juce::String& path);
+
     float getPedalGrDb (int slot) const noexcept
     { return pedalGr_[(size_t) juce::jlimit (0, 5, slot)].load (std::memory_order_relaxed); }
 

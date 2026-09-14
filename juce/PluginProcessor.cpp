@@ -1021,7 +1021,7 @@ void NAMAudioProcessor::parameterChanged (const juce::String& id, float value)
 // (not a UNC/network/device path). This guards state-restore from crafted
 // project files that could trigger outbound network authentication (e.g.
 // NetNTLM via SMB on Windows, or network-mount URIs on macOS/Linux).
-static bool isLocalSafePath (const juce::String& p)
+bool NAMAudioProcessor::isLocalSafePath (const juce::String& p)
 {
     if (p.isEmpty()) return false;
 

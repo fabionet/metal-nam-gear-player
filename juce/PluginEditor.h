@@ -507,6 +507,9 @@ private:
     void browseModel();
     void browseIR();
     void refreshLabels();
+    // Ultimi percorsi visti nel processore: servono a capire quando il modello
+    // o un IR sono cambiati per una via che non e' il pulsante Browse.
+    juce::String seenModelPath_, seenIRPath_, seenIR2Path_;
     void rescanModelDir (const juce::File& sel);
     void rescanIRDir    (const juce::File& sel);
     void stepCombo (juce::ComboBox& cb, int delta);

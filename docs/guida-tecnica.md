@@ -36,6 +36,28 @@ Host (VST3 / LV2 / Standalone)
 
 ## Formato preset
 
+**Un preset puo' puntare a un file locale qualunque.** C'era un elenco di
+cartelle consentite — home, Documenti, Musica, dati applicazione, temporanei —
+e tutto il resto veniva scartato **in silenzio**: modello e IR si azzeravano e
+il preset si apriva pulito senza dire perche'. Chi tiene la libreria su un disco
+esterno montato sotto `/media`, o su un secondo disco in Windows, non poteva
+usare i propri preset. La guardia che serve davvero e' rimasta ed e' una sola,
+`NAMAudioProcessor::isLocalSafePath`: rifiuta i percorsi UNC, quelli di device
+NT e gli schemi di rete, che sono la via del furto di credenziali. Un file
+locale qualunque, al massimo, non si lascia leggere come modello.
+
+**I caricatori seguono anche i cambi che non vengono da loro.** Le liste si
+aggiornavano solo passando dal pulsante Browse: caricando un preset il modello e
+l'IR entravano davvero in catena, ma le caselle continuavano a dire "- none -"
+e sembrava che non si fosse caricato niente. Ora il timer dell'editor confronta
+i percorsi correnti del processore con gli ultimi visti e rilegge la cartella
+solo quando cambiano: la scansione e' ricorsiva e non va fatta a ogni giro.
+
+**Al salvataggio si scrivono solo i parametri che esistono.** `replaceState`
+sostituisce l'albero intero e i nodi dei parametri spariti restano dentro, per
+poi essere riscritti al salvataggio successivo: un preset si portava dietro
+trenta voci morte e cresceva a ogni giro.
+
 **I modelli si salvano per nome, non per numero.** Le sezioni a pedale e il
 selettore degli amplificatori scelgono con un indice dentro il loro registro, e
 quell'indice cambia ogni volta che si inserisce un modello in mezzo all'elenco.
