@@ -1189,6 +1189,27 @@ std::vector<int> NAMAudioProcessorEditor::pedalKnobIds (int slot) const
 void NAMAudioProcessorEditor::timerCallback()
 {
     if (pedalMsgTicks_ > 0 && --pedalMsgTicks_ == 0) pedalMsg_.setVisible (false);
+
+    // I caricatori devono seguire anche i cambi che non vengono da loro: un
+    // preset, una variante di banco, l'automazione dell'host. Prima le liste si
+    // aggiornavano solo passando da Browse, quindi caricando un preset il
+    // modello e l'IR entravano in catena ma le caselle continuavano a dire
+    // "- none -", e sembrava che non si fosse caricato niente. Si confronta il
+    // percorso e si rilegge la cartella solo quando cambia davvero: la
+    // scansione e' ricorsiva e non va fatta a ogni giro.
+    {
+        const auto mp  = processorRef.getCurrentModelPath();
+        const auto ip  = processorRef.getCurrentIRPath();
+        const auto ip2 = processorRef.getCurrentIR2Path();
+        if (mp != seenModelPath_ || ip != seenIRPath_ || ip2 != seenIR2Path_) {
+            seenModelPath_ = mp; seenIRPath_ = ip; seenIR2Path_ = ip2;
+            refreshLabels();
+            if (ip2.isNotEmpty()) {
+                juce::File f (ip2);
+                if (f.existsAsFile()) rescanIR2Dir (f);
+            }
+        }
+    }
     rememberPedalState();
     updateSlimEnabled();
     updateTubeIndicator();

@@ -93,22 +93,26 @@ namespace
     // one of the standard user/system data roots where NAM assets legitimately
     // live. isAChildOf works on canonicalised paths, so ../.. tricks that
     // land outside the allowed roots are rejected automatically.
+    // Un preset puo' puntare a un file LOCALE qualunque, purche' non sia un
+    // percorso di rete.
+    //
+    // Prima qui c'era un elenco di cartelle consentite — home, Documenti,
+    // Musica, dati applicazione, temporanei — e tutto il resto veniva scartato
+    // in silenzio: il modello e l'IR si azzeravano e il preset si apriva
+    // pulito senza dire perche'. Chi tiene la libreria su un disco esterno
+    // montato sotto /media, o su un secondo disco D: in Windows, non poteva
+    // usare i propri preset.
+    //
+    // La guardia che serve davvero e' un'altra ed e' rimasta: i percorsi UNC,
+    // quelli di device NT e gli schemi di rete restano rifiutati, perche' e'
+    // da li' che passa il furto di credenziali. Un file locale qualunque, al
+    // massimo, non si lascia leggere come modello.
     static bool isPresetPathAllowed (const juce::File& f)
     {
-        if (f == juce::File{}) return false;
-        if (f.getFullPathName().isEmpty()) return false;
-        static const juce::File roots[] = {
-            juce::File::getSpecialLocation (juce::File::userHomeDirectory),
-            juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
-            juce::File::getSpecialLocation (juce::File::userMusicDirectory),
-            juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory),
-            juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory),
-            juce::File::getSpecialLocation (juce::File::commonDocumentsDirectory),
-            juce::File::getSpecialLocation (juce::File::tempDirectory),
-        };
-        for (const auto& r : roots)
-            if (r != juce::File{} && (f == r || f.isAChildOf (r))) return true;
-        return false;
+        const auto path = f.getFullPathName();
+        if (path.isEmpty()) return false;
+        if (path.contains ("..")) return false;          // niente risalite
+        return NAMAudioProcessor::isLocalSafePath (path);
     }
 }
 
@@ -280,6 +284,17 @@ juce::String PresetManager::serialize (const juce::String& name) const
     auto* params = root.createNewChildElement (kChildParams);
     if (auto state = apvts_.copyState(); state.isValid())
     {
+        // Caricando un preset, replaceState sostituisce l'albero intero, e i
+        // nodi di parametri che non esistono piu' restano dentro: al
+        // salvataggio successivo vengono riscritti, e il file cresce a ogni
+        // giro. Un preset arrivava a portarsi dietro trenta voci morte. Qui si
+        // scrive solo quello che il processore registra davvero.
+        for (int i = state.getNumChildren(); --i >= 0;) {
+            const auto child = state.getChild (i);
+            const auto pid = child.getProperty ("id").toString();
+            if (pid.isNotEmpty() && apvts_.getParameter (pid) == nullptr)
+                state.removeChild (i, nullptr);
+        }
         if (auto xml = state.createXml())
             params->addChildElement (xml.release());
     }
